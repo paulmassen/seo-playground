@@ -1,8 +1,11 @@
+export const dynamic = 'force-dynamic';
+
 import {
   getCredentials,
   getKwOverviewHistory,
   saveKwOverviewSearch,
   getKwOverviewResults,
+  getSetting,
   type KwOverviewSearchEntry,
 } from '@/lib/db';
 import { LOCATIONS, LANGUAGES } from '@/lib/geo-options';
@@ -88,7 +91,7 @@ async function fetchKeywordOverview(
   };
 
   const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Réponse API vide.' };
+  if (!task) return { items: [], error: 'Empty API response.' };
   if (task.status_code && task.status_code !== 20000) {
     return { items: [], error: `DataForSEO: ${task.status_message}` };
   }
@@ -173,8 +176,10 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
   const historyId = params.history_id;
 
   const rawKeywords = params.keywords ?? '';
-  const location = params.location ?? 'France';
-  const language = params.language ?? 'French';
+  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLanguage = getSetting('default_language') ?? 'French';
+  const location = params.location ?? defaultLocation;
+  const language = params.language ?? defaultLanguage;
 
   let items: KwOverviewItem[] = [];
   let cost: number | undefined;
@@ -190,7 +195,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
       const history = getKwOverviewHistory();
       activeEntry = history.find((e) => e.id === historyId) ?? null;
     } else {
-      error = "Cette recherche n'est plus disponible.";
+      error = 'This search is no longer available.';
     }
   }
 
@@ -198,7 +203,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
 
   if (!historyId && keywords.length > 0) {
     if (!creds) {
-      error = 'Identifiants DataForSEO manquants. Configurez-les dans les paramètres.';
+      error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const res = await fetchKeywordOverview(keywords, location, language, creds.login, creds.pass);
       items = res.items;
@@ -299,7 +304,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
             </div>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              <span className="text-xs font-black text-slate-400">{items.length} mot{items.length !== 1 ? 's' : ''}-clé{items.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs font-black text-slate-400">{items.length} keyword{items.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
@@ -316,7 +321,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
                     <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Intent</th>
                     <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Competition</th>
                     <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">CPC</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Tendance</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Trend</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -368,7 +373,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.keywords}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {entry.location} · {entry.count} mot{entry.count !== 1 ? 's' : ''}-clé{entry.count !== 1 ? 's' : ''}
+                      {entry.location} · {entry.count} keyword{entry.count !== 1 ? 's' : ''}
                       {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}
                     </p>
                   </div>

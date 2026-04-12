@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Search, Globe, Settings, MapPin, FileSearch2,
-  TrendingUp, Link2, Users, BarChart2, Map, Activity, GitMerge, Clock, FolderKanban, Anchor,
+  TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
   Gauge, Lightbulb,
 } from 'lucide-react';
 
@@ -39,7 +39,6 @@ const sections = [
     label: 'SERP',
     items: [
       { name: 'SERP Checker', href: '/dashboard/serp', icon: Globe },
-      { name: 'Maps SERP', href: '/dashboard/maps', icon: Map },
       { name: 'Local Finder', href: '/dashboard/local-finder', icon: MapPin },
     ],
   },

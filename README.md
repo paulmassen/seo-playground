@@ -2,6 +2,14 @@
 
 A self-hosted SEO dashboard powered by the [DataForSEO API](https://dataforseo.com/). Runs locally on your machine with a SQLite database — no cloud infrastructure required.
 
+## Screenshots
+
+![Local Finder — Grid Search](public/screenshot-local-finder.png)
+*Local Finder: grid search showing local rankings across a geographic area*
+
+![Rank Tracker](public/screenshot-rank-tracker.png)
+*Rank Tracker: monitor keyword positions over time for any domain*
+
 ## Features
 
 - **Rank Tracker** — Track keyword positions over time for any domain
@@ -15,8 +23,7 @@ A self-hosted SEO dashboard powered by the [DataForSEO API](https://dataforseo.c
 - **Domain Intersection** — Common keywords between two domains
 - **Historical Rank** — Ranking history overview for a domain
 - **Backlinks** — Full backlink profile (summary, list, referring domains, anchors)
-- **Maps SERP** — Google Maps local results
-- **Local Finder** — Local business listing results
+- **Local Finder** — Local business listings with grid search for geographic visibility analysis
 - **On-Page** — On-page SEO audit with microdata analysis
 - **Settings** — Store your DataForSEO credentials locally
 

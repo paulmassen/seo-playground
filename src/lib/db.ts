@@ -72,15 +72,7 @@ function initSchema(db: Database.Database) {
       items TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS maps_searches (
-      id TEXT PRIMARY KEY,
-      ts INTEGER NOT NULL,
-      keyword TEXT NOT NULL,
-      location TEXT NOT NULL,
-      language TEXT NOT NULL,
-      result_count INTEGER NOT NULL,
-      items TEXT NOT NULL
-    );
+
 
     CREATE TABLE IF NOT EXISTS backlinks_searches (
       id TEXT PRIMARY KEY,
@@ -500,36 +492,6 @@ export function saveKwOverviewSearch<T>(entry: KwOverviewSearchEntry, items: T[]
 
 export function getKwOverviewResults<T>(id: string): T[] | null {
   const row = getDb().prepare('SELECT items FROM kw_overview_searches WHERE id = ?').get(id) as { items: string } | undefined;
-  if (!row) return null;
-  try { return JSON.parse(row.items) as T[]; } catch { return null; }
-}
-
-// --- Maps SERP ---
-
-export interface MapsSearchEntry {
-  id: string;
-  ts: number;
-  keyword: string;
-  location: string;
-  language: string;
-  count: number;
-}
-
-export function getMapsHistory(): MapsSearchEntry[] {
-  const rows = getDb()
-    .prepare('SELECT id, ts, keyword, location, language, result_count FROM maps_searches ORDER BY ts DESC LIMIT 30')
-    .all() as Array<{ id: string; ts: number; keyword: string; location: string; language: string; result_count: number }>;
-  return rows.map((r) => ({ ...r, count: r.result_count }));
-}
-
-export function saveMapsSearch<T>(entry: MapsSearchEntry, items: T[]): void {
-  getDb()
-    .prepare('INSERT OR REPLACE INTO maps_searches (id, ts, keyword, location, language, result_count, items) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.keyword, entry.location, entry.language, entry.count, JSON.stringify(items));
-}
-
-export function getMapsResults<T>(id: string): T[] | null {
-  const row = getDb().prepare('SELECT items FROM maps_searches WHERE id = ?').get(id) as { items: string } | undefined;
   if (!row) return null;
   try { return JSON.parse(row.items) as T[]; } catch { return null; }
 }
