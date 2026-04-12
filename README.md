@@ -1,6 +1,13 @@
 # SEO Playground — Local SEO Dashboard
 
-A self-hosted SEO dashboard powered by the [DataForSEO API](https://dataforseo.com/). Runs locally on your machine with a SQLite database — no cloud infrastructure required.
+> **Work in progress** — new DataForSEO endpoints are being added progressively.
+
+SEO Playground is a self-hosted dashboard that lets you run SEO and local SEO queries directly against the [DataForSEO API](https://dataforseo.com/). Every search is saved locally in a SQLite database, so you can browse your history and revisit results without making additional API calls. There is no cloud infrastructure involved — everything runs on your machine.
+
+If you find this useful, consider supporting the project:
+
+[![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/paulmassendari)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/paulmassendari)
 
 ## Screenshots
 
