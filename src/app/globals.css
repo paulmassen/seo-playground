@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/* Class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Global dark mode overrides ─────────────────────────────────────────────
+   These cover every page without modifying individual page files.
+   Specificity (.dark .class = 0,2,0) beats Tailwind utilities (0,1,0).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Backgrounds */
+.dark .bg-white   { background-color: rgb(15 23 42);   }   /* slate-900 */
+.dark .bg-slate-50  { background-color: rgb(2 6 23);   }   /* slate-950 */
+.dark .bg-slate-100 { background-color: rgb(30 41 59 / 0.6); } /* slate-800/60 */
+
+/* Borders */
+.dark .border-slate-200 { border-color: rgb(51 65 85);  }  /* slate-600 */
+.dark .border-slate-100 { border-color: rgb(30 41 59);  }  /* slate-800 */
+
+/* Text */
+.dark .text-slate-900 { color: rgb(248 250 252); }  /* slate-50   */
+.dark .text-slate-800 { color: rgb(226 232 240); }  /* slate-200  */
+.dark .text-slate-700 { color: rgb(203 213 225); }  /* slate-300  */
+.dark .text-slate-600 { color: rgb(148 163 184); }  /* slate-400  */
+
+/* Hover rows & links */
+.dark .hover\:bg-slate-50:hover { background-color: rgb(30 41 59 / 0.6); }
+
+/* Dividers (divide-y) */
+.dark .divide-slate-50  > :not([hidden]) ~ :not([hidden]) { border-color: rgb(30 41 59); }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(30 41 59); }
+
+/* Table header stripe */
+.dark thead tr { background-color: rgb(2 6 23); }
+
+/* Form elements */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: rgb(2 6 23);
+  color: rgb(248 250 252);
+  border-color: rgb(51 65 85);
+}
+
+.dark ::placeholder { color: rgb(71 85 105); opacity: 1; } /* slate-600 */
+
+/* CTA buttons (bg-slate-900 on <button>) become blue in dark mode */
+.dark button.bg-slate-900 {
+  background-color: rgb(37 99 235);  /* blue-600 */
+  box-shadow: none;
+}
+.dark button.hover\:bg-blue-600:hover { background-color: rgb(29 78 216); } /* blue-700 */
+
+/* Shadows — soften in dark */
+.dark .shadow-sm  { box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); }
+.dark .shadow-xl  { box-shadow: 0 4px 24px rgb(0 0 0 / 0.5); }
