@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { getCredentials, getTrackedKeywords, getRankHistory, getLatestRankCheck, getSetting } from '@/lib/db';
 import { LOCATIONS, LANGUAGES } from '@/lib/geo-options';
-import { addKeywordAction, removeKeywordAction, checkOneAction, checkAllAction } from './actions';
+import { addKeywordAction, removeKeywordAction, checkOneAction, checkAllAction, saveDepthAction } from './actions';
 import type { RankCheck } from '@/lib/db';
 import PendingButton from '@/components/PendingButton';
 
@@ -79,6 +79,7 @@ export default async function RankTrackerPage() {
   const defaultLocation = getSetting('default_location') ?? 'France';
   const defaultLanguage = getSetting('default_language') ?? 'French';
   const defaultDomain = getSetting('default_domain') ?? '';
+  const rankDepth = getSetting('rank_tracker_depth') ?? '100';
 
   const rows = keywords.map((kw) => {
     const history = getRankHistory(kw.id, 30);
@@ -95,18 +96,37 @@ export default async function RankTrackerPage() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Rank Tracker</h1>
           <p className="text-slate-500 text-sm mt-1 font-medium">{keywords.length} keyword{keywords.length !== 1 ? 's' : ''} suivis</p>
         </div>
-        {keywords.length > 0 && creds && (
-          <form action={checkAllAction}>
-            <PendingButton
-              type="submit"
-              className="px-5 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all shadow-xl shadow-slate-200"
-              pendingClassName="px-5 py-3 bg-slate-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl shadow-slate-200 cursor-not-allowed"
-              pendingChildren={`Checking ${keywords.length}…`}
+        <div className="flex items-center gap-3">
+          {/* Depth selector */}
+          <form action={saveDepthAction} className="flex items-center gap-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Top</label>
+            <select
+              name="rank_tracker_depth"
+              defaultValue={rankDepth}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none"
             >
-              Check All ({keywords.length})
-            </PendingButton>
+              {['10', '20', '50', '100'].map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+            <button type="submit" className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">
+              Save
+            </button>
           </form>
-        )}
+
+          {keywords.length > 0 && creds && (
+            <form action={checkAllAction}>
+              <PendingButton
+                type="submit"
+                className="px-5 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all shadow-xl shadow-slate-200"
+                pendingClassName="px-5 py-3 bg-slate-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl shadow-slate-200 cursor-not-allowed"
+                pendingChildren={`Checking ${keywords.length}…`}
+              >
+                Check All ({keywords.length})
+              </PendingButton>
+            </form>
+          )}
+        </div>
       </div>
 
       {!creds && (

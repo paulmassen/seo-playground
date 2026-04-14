@@ -223,6 +223,29 @@ function initSchema(db: Database.Database) {
       cost REAL,
       result TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS reddit_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      targets TEXT NOT NULL,
+      result_count INTEGER NOT NULL,
+      cost REAL,
+      items TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews_tasks (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      business TEXT NOT NULL,
+      location TEXT NOT NULL,
+      language TEXT NOT NULL,
+      depth INTEGER NOT NULL,
+      sort_by TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      cost REAL,
+      result_count INTEGER,
+      result TEXT
+    );
   `);
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_rank_checks_kw ON rank_checks(keyword_id, checked_at DESC)`);
@@ -912,4 +935,77 @@ export function getInstantPageResult<T>(id: string): T | null {
   const row = getDb().prepare('SELECT result FROM instant_page_searches WHERE id = ?').get(id) as { result: string } | undefined;
   if (!row) return null;
   try { return JSON.parse(row.result) as T; } catch { return null; }
+}
+
+// --- Reddit ---
+
+export interface RedditSearchEntry {
+  id: string;
+  ts: number;
+  targets: string;
+  count: number;
+  cost?: number;
+}
+
+export function getRedditHistory(): RedditSearchEntry[] {
+  const rows = getDb()
+    .prepare('SELECT id, ts, targets, result_count, cost FROM reddit_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; targets: string; result_count: number; cost: number | null }>;
+  return rows.map((r) => ({ id: r.id, ts: r.ts, targets: r.targets, count: r.result_count, cost: r.cost ?? undefined }));
+}
+
+export function saveRedditSearch<T>(entry: RedditSearchEntry, items: T[]): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO reddit_searches (id, ts, targets, result_count, cost, items) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.targets, entry.count, entry.cost ?? null, JSON.stringify(items));
+}
+
+export function getRedditResults<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT items FROM reddit_searches WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null;
+  try { return JSON.parse(row.items) as T[]; } catch { return null; }
+}
+
+// --- Google Reviews ---
+
+export interface ReviewsTask {
+  id: string;
+  ts: number;
+  business: string;
+  location: string;
+  language: string;
+  depth: number;
+  sortBy: string;
+  status: 'pending' | 'ready' | 'error';
+  cost?: number;
+  resultCount?: number;
+}
+
+export function saveReviewsTask(id: string, business: string, location: string, language: string, depth: number, sortBy: string, cost?: number): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO reviews_tasks (id, ts, business, location, language, depth, sort_by, status, cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, Date.now(), business, location, language, depth, sortBy, 'pending', cost ?? null);
+}
+
+export function getReviewsTasks(): ReviewsTask[] {
+  const rows = getDb()
+    .prepare('SELECT id, ts, business, location, language, depth, sort_by, status, cost, result_count FROM reviews_tasks ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; business: string; location: string; language: string; depth: number; sort_by: string; status: string; cost: number | null; result_count: number | null }>;
+  return rows.map((r) => ({
+    id: r.id, ts: r.ts, business: r.business, location: r.location, language: r.language,
+    depth: r.depth, sortBy: r.sort_by, status: r.status as ReviewsTask['status'],
+    cost: r.cost ?? undefined, resultCount: r.result_count ?? undefined,
+  }));
+}
+
+export function updateReviewsTask(id: string, status: ReviewsTask['status'], items: unknown[], cost?: number, resultCount?: number): void {
+  getDb()
+    .prepare('UPDATE reviews_tasks SET status = ?, result = ?, cost = ?, result_count = ? WHERE id = ?')
+    .run(status, JSON.stringify(items), cost ?? null, resultCount ?? items.length, id);
+}
+
+export function getReviewsTaskResult<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT result FROM reviews_tasks WHERE id = ?').get(id) as { result: string | null } | undefined;
+  if (!row?.result) return null;
+  try { return JSON.parse(row.result) as T[]; } catch { return null; }
 }

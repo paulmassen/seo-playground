@@ -2,7 +2,7 @@
 
 import {
   getCredentials, getTrackedKeywords, addTrackedKeyword,
-  removeTrackedKeyword, saveRankCheck,
+  removeTrackedKeyword, saveRankCheck, getSetting, setSetting,
 } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
@@ -16,6 +16,7 @@ interface SerpItem {
 
 interface SerpResponse {
   tasks?: Array<{
+    status_code?: number;
     cost?: number;
     result?: Array<{ items?: SerpItem[] }>;
   }>;
@@ -35,6 +36,7 @@ async function checkKeywordsBatch(
   const creds = getCredentials();
   if (!creds || keywords.length === 0) return;
 
+  const depth = parseInt(getSetting('rank_tracker_depth') ?? '100', 10);
   const auth = btoa(`${creds.login}:${creds.pass}`);
   const BATCH = 100; // DataForSEO max tasks per request
 
@@ -49,7 +51,7 @@ async function checkKeywordsBatch(
           keyword: kw.keyword,
           location_name: kw.location,
           language_name: kw.language,
-          depth: 100,
+          depth,
         })),
       ),
     });
@@ -60,10 +62,15 @@ async function checkKeywordsBatch(
     for (let i = 0; i < batch.length; i++) {
       const kw = batch[i];
       const task = data.tasks?.[i];
+
+      // Skip saving if the task itself returned an API-level error (preserves existing data)
+      if (task?.status_code !== 20000) continue;
+
       const items = task?.result?.[0]?.items ?? [];
       const cost = task?.cost ?? null;
 
-      const domain = cleanDomain(kw.domain);
+      // Split by '/' so a tracked domain like "example.com/page" still matches
+      const domain = cleanDomain(kw.domain).split('/')[0];
       const hit = items.find((item) => {
         if (item.type !== 'organic') return false;
         const d = cleanDomain(item.domain ?? item.url ?? '').split('/')[0];
@@ -73,6 +80,13 @@ async function checkKeywordsBatch(
       saveRankCheck(kw.id, hit?.rank_absolute ?? null, hit?.url ?? null, hit?.title ?? null, cost);
     }
   }
+}
+
+export async function saveDepthAction(formData: FormData) {
+  const depth = formData.get('rank_tracker_depth') as string;
+  const valid = ['10', '20', '50', '100'];
+  if (valid.includes(depth)) setSetting('rank_tracker_depth', depth);
+  revalidatePath('/dashboard/rank-tracker');
 }
 
 export async function addKeywordAction(formData: FormData) {

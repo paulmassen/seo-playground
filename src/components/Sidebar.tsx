@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Search, Globe, Settings, MapPin, FileSearch2,
   TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
-  Gauge, Lightbulb,
+  Gauge, Lightbulb, BrainCircuit, MessageSquare, Star,
 } from 'lucide-react';
 
 const sections = [
@@ -40,6 +40,24 @@ const sections = [
     items: [
       { name: 'SERP Checker', href: '/dashboard/serp', icon: Globe },
       { name: 'Local Finder', href: '/dashboard/local-finder', icon: MapPin },
+    ],
+  },
+  {
+    label: 'AI',
+    items: [
+      { name: 'AI Optimization', href: '/dashboard/ai-optimization', icon: BrainCircuit },
+    ],
+  },
+  {
+    label: 'Business',
+    items: [
+      { name: 'Google Reviews', href: '/dashboard/google-reviews', icon: Star },
+    ],
+  },
+  {
+    label: 'Social Media',
+    items: [
+      { name: 'Reddit', href: '/dashboard/social-media/reddit', icon: MessageSquare },
     ],
   },
   {
