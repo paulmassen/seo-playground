@@ -215,6 +215,14 @@ function initSchema(db: Database.Database) {
       cost REAL,
       results TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS instant_page_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      url TEXT NOT NULL,
+      cost REAL,
+      result TEXT NOT NULL
+    );
   `);
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_rank_checks_kw ON rank_checks(keyword_id, checked_at DESC)`);
@@ -876,4 +884,32 @@ export function getGridResults(id: string): GridPoint[] | null {
   const row = getDb().prepare('SELECT results FROM grid_searches WHERE id = ?').get(id) as { results: string } | undefined;
   if (!row) return null;
   try { return JSON.parse(row.results) as GridPoint[]; } catch { return null; }
+}
+
+// --- Instant Pages ---
+
+export interface InstantPageEntry {
+  id: string;
+  ts: number;
+  url: string;
+  cost?: number;
+}
+
+export function getInstantPageHistory(): InstantPageEntry[] {
+  const rows = getDb()
+    .prepare('SELECT id, ts, url, cost FROM instant_page_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; url: string; cost: number | null }>;
+  return rows.map((r) => ({ id: r.id, ts: r.ts, url: r.url, cost: r.cost ?? undefined }));
+}
+
+export function saveInstantPageResult<T>(entry: InstantPageEntry, result: T): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO instant_page_searches (id, ts, url, cost, result) VALUES (?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.url, entry.cost ?? null, JSON.stringify(result));
+}
+
+export function getInstantPageResult<T>(id: string): T | null {
+  const row = getDb().prepare('SELECT result FROM instant_page_searches WHERE id = ?').get(id) as { result: string } | undefined;
+  if (!row) return null;
+  try { return JSON.parse(row.result) as T; } catch { return null; }
 }

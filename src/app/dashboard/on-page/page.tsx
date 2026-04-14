@@ -9,6 +9,13 @@ const tools = [
     badge: 'Disponible',
     badgeCls: 'text-emerald-600 bg-emerald-50 border-emerald-100',
   },
+  {
+    name: 'Instant Pages',
+    description: 'Audit on-page complet d\'une URL : métadonnées, performance, checks SEO, métriques de contenu.',
+    href: '/dashboard/on-page/instant-pages',
+    badge: 'Disponible',
+    badgeCls: 'text-emerald-600 bg-emerald-50 border-emerald-100',
+  },
 ];
 
 export default function OnPageHub() {
