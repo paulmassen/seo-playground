@@ -17,6 +17,9 @@ If you find this useful, consider supporting the project:
 ![Rank Tracker](public/screenshot-rank-tracker.png)
 *Rank Tracker: monitor keyword positions over time for any domain*
 
+![Google Reviews Analysis](public/review-analysis-screenshot.png)
+*Google Reviews: rating distribution, monthly review chart, and rating goal calculator*
+
 ## Features
 
 - **Rank Tracker** — Track keyword positions over time for any domain
@@ -32,6 +35,9 @@ If you find this useful, consider supporting the project:
 - **Backlinks** — Full backlink profile (summary, list, referring domains, anchors)
 - **Local Finder** — Local business listings with grid search for geographic visibility analysis
 - **On-Page** — On-page SEO audit with microdata analysis
+- **Google Reviews** — Fetch and analyze Google Business reviews: rating distribution, monthly chart, and rating goal calculator
+- **AI Optimization** — AI-powered content optimization suggestions
+- **Reddit Mentions** — Discover Reddit threads linking to or discussing your URLs
 - **Settings** — Store your DataForSEO credentials locally
 
 ## Requirements

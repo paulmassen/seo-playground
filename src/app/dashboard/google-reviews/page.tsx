@@ -409,7 +409,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
               type="text"
               name="keyword"
               required
-              placeholder="e.g. Plomberie 5 Etoiles Paris"
+              placeholder="e.g. Joe's Plumbing New York"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
