@@ -40,16 +40,12 @@ interface ImpressionsInfo {
   daily_impressions_max?: number;
 }
 
-interface KeywordData {
+export interface KwOverviewItem {
   keyword?: string;
   keyword_info?: KeywordInfo;
   keyword_properties?: KeywordProperties;
   search_intent_info?: SearchIntentInfo;
   impressions_info?: ImpressionsInfo;
-}
-
-export interface KwOverviewItem {
-  keyword_data?: KeywordData;
 }
 
 interface SearchParams {
@@ -231,9 +227,9 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
 
   // Aggregate stats
   const avgDifficulty = items.length > 0
-    ? Math.round(items.reduce((s, i) => s + (i.keyword_data?.keyword_properties?.keyword_difficulty ?? 0), 0) / items.length)
+    ? Math.round(items.reduce((s, i) => s + (i.keyword_properties?.keyword_difficulty ?? 0), 0) / items.length)
     : null;
-  const totalVolume = items.reduce((s, i) => s + (i.keyword_data?.keyword_info?.search_volume ?? 0), 0);
+  const totalVolume = items.reduce((s, i) => s + (i.keyword_info?.search_volume ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -325,32 +321,29 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {items.map((item, i) => {
-                    const kw = item.keyword_data;
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">{kw?.keyword ?? '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
-                          {kw?.keyword_info?.search_volume?.toLocaleString("en-GB") ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <DifficultyBar value={kw?.keyword_properties?.keyword_difficulty} />
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <IntentBadge value={kw?.search_intent_info?.main_intent} />
-                        </td>
-                        <td className="px-4 py-3 text-center hidden sm:table-cell">
-                          <CompetitionBadge level={kw?.keyword_info?.competition_level} />
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
-                          {kw?.keyword_info?.cpc != null ? `$${kw.keyword_info.cpc.toFixed(2)}` : '—'}
-                        </td>
-                        <td className="px-4 py-3 hidden xl:table-cell">
-                          <Sparkline monthly={kw?.keyword_info?.monthly_searches} />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {items.map((item, i) => (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">{item.keyword ?? '—'}</td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
+                        {item.keyword_info?.search_volume?.toLocaleString("en-GB") ?? '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <DifficultyBar value={item.keyword_properties?.keyword_difficulty} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <IntentBadge value={item.search_intent_info?.main_intent} />
+                      </td>
+                      <td className="px-4 py-3 text-center hidden sm:table-cell">
+                        <CompetitionBadge level={item.keyword_info?.competition_level} />
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
+                        {item.keyword_info?.cpc != null ? `$${item.keyword_info.cpc.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <Sparkline monthly={item.keyword_info?.monthly_searches} />
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
