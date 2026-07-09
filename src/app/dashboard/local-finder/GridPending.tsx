@@ -37,10 +37,12 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const checkingRef = useRef(false);
   const doneRef = useRef(false);
 
   const checkStatus = useCallback(async () => {
-    if (checking || doneRef.current) return;
+    if (checkingRef.current || doneRef.current) return;
+    checkingRef.current = true;
     setChecking(true);
     setError(null);
     try {
@@ -60,18 +62,27 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
     } catch {
       setError('Network error — will retry.');
     } finally {
+      checkingRef.current = false;
       setChecking(false);
     }
-  }, [searchId, checking, router]);
+  }, [searchId, router]);
 
   const interval = POLL_INTERVAL[queueMode];
 
   useEffect(() => {
-    checkStatus();
-    const timer = setInterval(checkStatus, interval);
-    return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interval]);
+    doneRef.current = false;
+
+    const runCheck = () => {
+      void checkStatus();
+    };
+
+    const initialTimer = setTimeout(runCheck, 0);
+    const timer = setInterval(runCheck, interval);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(timer);
+    };
+  }, [checkStatus, interval]);
 
   const pct = totalPoints > 0 ? Math.round((ready / totalPoints) * 100) : 0;
 
