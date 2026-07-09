@@ -15,14 +15,9 @@ export const dynamic = 'force-dynamic';
 
 // ---- Types ----
 
-interface TechItem {
-  name?: string;
-  version?: string;
-}
-
-interface TechCategory {
-  [techName: string]: TechItem;
-}
+// technologies: { category: { subcategory: ["TechName", ...] } }
+// e.g. { content: { cms: ["WordPress"] }, servers: { cdn: ["Cloudflare"] } }
+type TechCategories = Record<string, Record<string, string[]>>;
 
 interface DomainTechResult {
   domain?: string;
@@ -34,7 +29,7 @@ interface DomainTechResult {
   phone_numbers?: string[];
   emails?: string[];
   social_graph_urls?: string[];
-  technologies?: Record<string, TechCategory>;
+  technologies?: TechCategories;
 }
 
 interface FindDomainItem {
@@ -44,7 +39,7 @@ interface FindDomainItem {
   domain_rank?: number;
   country_iso_code?: string;
   last_visited?: string;
-  technologies?: Record<string, TechCategory>;
+  technologies?: TechCategories;
 }
 
 interface SearchParams {
@@ -136,16 +131,14 @@ function fmtVisited(s?: string) {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'CMS': 'bg-blue-50 border-blue-100 text-blue-700',
-  'Analytics': 'bg-violet-50 border-violet-100 text-violet-700',
-  'Marketing': 'bg-pink-50 border-pink-100 text-pink-700',
-  'E-commerce': 'bg-emerald-50 border-emerald-100 text-emerald-700',
-  'Hosting': 'bg-amber-50 border-amber-100 text-amber-700',
-  'CDN': 'bg-orange-50 border-orange-100 text-orange-700',
-  'Security': 'bg-red-50 border-red-100 text-red-700',
-  'JavaScript': 'bg-yellow-50 border-yellow-100 text-yellow-700',
-  'CSS': 'bg-indigo-50 border-indigo-100 text-indigo-700',
-  'Server': 'bg-teal-50 border-teal-100 text-teal-700',
+  'content': 'bg-blue-50 border-blue-100 text-blue-700',
+  'analytics': 'bg-violet-50 border-violet-100 text-violet-700',
+  'marketing': 'bg-pink-50 border-pink-100 text-pink-700',
+  'sales': 'bg-emerald-50 border-emerald-100 text-emerald-700',
+  'add_ons': 'bg-amber-50 border-amber-100 text-amber-700',
+  'security': 'bg-red-50 border-red-100 text-red-700',
+  'web_development': 'bg-indigo-50 border-indigo-100 text-indigo-700',
+  'servers': 'bg-teal-50 border-teal-100 text-teal-700',
 };
 
 function categoryColor(cat: string) {
@@ -153,6 +146,10 @@ function categoryColor(cat: string) {
     if (cat.toLowerCase().includes(key.toLowerCase())) return val;
   }
   return 'bg-slate-50 border-slate-200 text-slate-600';
+}
+
+function formatLabel(slug: string) {
+  return slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function DrBadge({ value }: { value?: number }) {
@@ -270,7 +267,10 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
   const techCategories = domainResult?.technologies
     ? Object.entries(domainResult.technologies).sort(([a], [b]) => a.localeCompare(b))
     : [];
-  const totalTechs = techCategories.reduce((s, [, cat]) => s + Object.keys(cat).length, 0);
+  const totalTechs = techCategories.reduce(
+    (s, [, subcats]) => s + new Set(Object.values(subcats).flat()).size,
+    0,
+  );
 
   const activeTech = activeFindEntry?.technology ?? technology;
   const activeKw = activeFindEntry?.keyword ?? keyword;
@@ -451,20 +451,27 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
           {/* Tech stack */}
           {techCategories.length > 0 ? (
             <div className="space-y-4">
-              {techCategories.map(([category, techs]) => {
-                const techEntries = Object.entries(techs);
+              {techCategories.map(([category, subcats]) => {
+                const subEntries = Object.entries(subcats).sort(([a], [b]) => a.localeCompare(b));
                 const colorClass = categoryColor(category);
+                const uniqueCount = new Set(subEntries.flatMap(([, names]) => names)).size;
                 return (
                   <div id="results" key={category} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                     <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{category}</h2>
-                      <span className="text-[10px] font-black text-slate-400">{techEntries.length}</span>
+                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">{formatLabel(category)}</h2>
+                      <span className="text-[10px] font-black text-slate-400">{uniqueCount}</span>
                     </div>
-                    <div className="p-4 flex flex-wrap gap-2">
-                      {techEntries.map(([name, tech]) => (
-                        <div key={name} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${colorClass}`}>
-                          <span>{name}</span>
-                          {tech.version && <span className="opacity-60 font-mono text-[10px]">{tech.version}</span>}
+                    <div className="p-4 space-y-3">
+                      {subEntries.map(([subcat, names]) => (
+                        <div key={subcat}>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">{formatLabel(subcat)}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {names.map((name) => (
+                              <span key={name} className={`inline-flex items-center px-3 py-1.5 rounded-xl border text-xs font-bold ${colorClass}`}>
+                                {name}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -565,8 +572,11 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
                           </a>
                           {item.technologies && (
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {Object.entries(item.technologies)
-                                .flatMap(([, cats]) => Object.keys(cats))
+                              {Array.from(
+                                new Set(
+                                  Object.values(item.technologies).flatMap((subcats) => Object.values(subcats).flat()),
+                                ),
+                              )
                                 .slice(0, 6)
                                 .map((t) => (
                                   <span key={t} className="text-[9px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded">{t}</span>
