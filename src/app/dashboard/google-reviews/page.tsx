@@ -8,6 +8,7 @@ import {
 import { submitReviewsTaskAction } from './actions';
 import PendingButton from '@/components/PendingButton';
 import HistorySidebar from '@/components/HistorySidebar';
+import LocationPicker from '@/components/LocationPicker';
 import DownloadCsvButton from './DownloadCsvButton';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
@@ -671,11 +672,10 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <input
-              type="text"
+            <LocationPicker
               name="location"
               defaultValue={defaultLocation}
-              placeholder="e.g. France"
+              placeholder="e.g. France, Paris"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

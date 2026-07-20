@@ -4,13 +4,14 @@ import {
   getCredentials, getTrackedKeywords, getRankHistory, getLatestRankCheck,
   getSetting, getTargetDomains,
 } from '@/lib/db';
-import { LOCATIONS, LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES } from '@/lib/geo-options';
 import {
   addKeywordAction, removeKeywordAction, checkOneAction, checkAllAction,
   saveDepthAction, addDomainAction, removeDomainAction, checkDomainAction,
 } from './actions';
 import KeywordRow from './KeywordRow';
 import PendingButton from '@/components/PendingButton';
+import LocationPicker from '@/components/LocationPicker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -248,12 +249,8 @@ export default async function RankTrackerPage({ searchParams }: { searchParams: 
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Country</label>
-                  <select name="location" defaultValue={defaultLocation} className={inputCls}>
-                    {LOCATIONS.map((l) => (
-                      <option key={l.value} value={l.value}>{l.label}</option>
-                    ))}
-                  </select>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</label>
+                  <LocationPicker name="location" defaultValue={defaultLocation} className={inputCls} />
                 </div>
 
                 <div className="space-y-1.5">

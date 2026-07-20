@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
 let _db: Database.Database | null = null;
 
@@ -8,6 +9,7 @@ function getDb(): Database.Database {
     _db = new Database(process.env.DB_PATH ?? path.join(process.cwd(), 'seo-playground.db'));
     _db.pragma('journal_mode = WAL');
     initSchema(_db);
+    seedLocations(_db);
   }
   return _db;
 }
@@ -442,7 +444,16 @@ function initSchema(db: Database.Database) {
       cost REAL,
       result TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS dfs_locations (
+      location_code INTEGER PRIMARY KEY,
+      location_name TEXT NOT NULL,
+      country_iso_code TEXT NOT NULL,
+      location_type TEXT NOT NULL
+    );
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_dfs_locations_name ON dfs_locations(location_name)`);
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_rank_checks_kw ON rank_checks(keyword_id, checked_at DESC)`);
 
@@ -456,6 +467,91 @@ function initSchema(db: Database.Database) {
   try { db.exec('ALTER TABLE reviews_tasks ADD COLUMN meta TEXT'); } catch { /* already exists */ }
   try { db.exec('ALTER TABLE domain_find_searches ADD COLUMN keyword TEXT'); } catch { /* already exists */ }
   try { db.exec('ALTER TABLE domain_find_searches ADD COLUMN technology TEXT'); } catch { /* already exists */ }
+}
+
+// --- DataForSEO locations (country/region/city picker) ---
+
+function parseLocationsCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = false;
+      } else cur += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+function seedLocations(db: Database.Database): void {
+  const { count } = db.prepare('SELECT COUNT(*) as count FROM dfs_locations').get() as { count: number };
+  if (count > 0) return;
+
+  const csvPath = path.join(process.cwd(), 'data', 'dfs-locations.csv');
+  if (!fs.existsSync(csvPath)) return;
+
+  const lines = fs.readFileSync(csvPath, 'utf8').split('\n').filter(Boolean);
+  const insert = db.prepare('INSERT OR IGNORE INTO dfs_locations (location_code, location_name, country_iso_code, location_type) VALUES (?, ?, ?, ?)');
+  const insertAll = db.transaction((rows: string[][]) => {
+    for (const row of rows) insert.run(Number(row[0]), row[1], row[2], row[3]);
+  });
+  const rows = lines.slice(1).map(parseLocationsCsvLine);
+  insertAll(rows);
+}
+
+export interface LocationOption {
+  code: number;
+  name: string;
+  countryIso: string;
+  type: string;
+}
+
+const LOCATION_TYPE_RANK = `CASE location_type
+  WHEN 'Country' THEN 0
+  WHEN 'Region' THEN 1 WHEN 'State' THEN 1 WHEN 'Province' THEN 1
+  WHEN 'City' THEN 2 WHEN 'City Region' THEN 2
+  WHEN 'County' THEN 3 WHEN 'Department' THEN 3 WHEN 'Municipality' THEN 3 WHEN 'Canton' THEN 3 WHEN 'Governorate' THEN 3
+  WHEN 'District' THEN 4 WHEN 'Borough' THEN 4
+  ELSE 5
+END`;
+
+export function searchLocations(query: string, limit = 20): LocationOption[] {
+  const db = getDb();
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+
+  type Row = { location_code: number; location_name: string; country_iso_code: string; location_type: string };
+
+  let rows: Row[];
+  if (tokens.length === 0) {
+    rows = db
+      .prepare(`SELECT location_code, location_name, country_iso_code, location_type FROM dfs_locations WHERE location_type = 'Country' ORDER BY location_name ASC LIMIT ?`)
+      .all(limit) as Row[];
+  } else {
+    const whereClause = tokens.map(() => 'location_name LIKE ?').join(' AND ');
+    const whereParams = tokens.map((t) => `%${t}%`);
+    rows = db
+      .prepare(
+        `SELECT location_code, location_name, country_iso_code, location_type FROM dfs_locations
+         WHERE ${whereClause}
+         ORDER BY
+           (LOWER(location_name) = LOWER(?)) DESC,
+           (location_name LIKE ?) DESC,
+           ${LOCATION_TYPE_RANK} ASC,
+           LENGTH(location_name) ASC
+         LIMIT ?`
+      )
+      .all(...whereParams, query.trim(), `${tokens[0]},%`, limit) as Row[];
+  }
+  return rows.map((r) => ({ code: r.location_code, name: r.location_name, countryIso: r.country_iso_code, type: r.location_type }));
 }
 
 // --- Settings ---

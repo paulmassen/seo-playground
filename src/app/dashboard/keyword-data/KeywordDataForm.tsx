@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import LocationPicker from '@/components/LocationPicker';
 
 type SE = 'google_ads' | 'bing';
 type SEType =
@@ -169,11 +170,10 @@ export default function KeywordDataForm({ defaults }: Props) {
           <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
             Location {isBing && <span className="text-red-400">*</span>}
           </label>
-          <input
-            type="text"
+          <LocationPicker
             name="location"
             defaultValue={defaults.location || 'France'}
-            placeholder="ex: France, United States"
+            placeholder="ex: France, Paris"
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

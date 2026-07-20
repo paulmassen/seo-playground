@@ -5,7 +5,8 @@ import {
   saveDomainIntersectionSearch, getDomainIntersectionResults, getSetting,
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
-import { LOCATIONS, LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES } from '@/lib/geo-options';
+import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 
 interface IntersectionItem {
@@ -148,9 +149,7 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</label>
-                <select name="location" defaultValue={location} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900">
-                  {LOCATIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
+                <LocationPicker name="location" defaultValue={location} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Language</label>

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { getCredentials, getSetting } from '@/lib/db';
 import { updateSettings, deleteCredentials } from './actions';
+import LocationPicker from '@/components/LocationPicker';
 
 interface DFUserResponse {
   tasks?: Array<{
@@ -100,7 +101,7 @@ export default async function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Location</label>
-                  <input name="default_location" type="text" defaultValue={defaultLocation} placeholder="e.g. France" className={inputCls} />
+                  <LocationPicker name="default_location" defaultValue={defaultLocation} placeholder="e.g. France, Paris" className={inputCls} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Language</label>

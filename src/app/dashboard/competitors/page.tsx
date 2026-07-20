@@ -6,7 +6,8 @@ import {
   type CompetitorsSearchEntry,
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
-import { LOCATIONS, LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES } from '@/lib/geo-options';
+import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 
 // ---- Types ----
@@ -191,10 +192,7 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <select name="location" defaultValue={activeEntry?.location ?? location}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              {LOCATIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
+            <LocationPicker name="location" defaultValue={activeEntry?.location ?? location} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
