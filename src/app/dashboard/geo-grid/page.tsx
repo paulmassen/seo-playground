@@ -20,7 +20,10 @@ interface SearchParams {
 }
 
 function formatDate(ts: number) {
-  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(ts).toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
 }
 
 function gridRerunUrl(entry: { keyword: string; center: string; grid_size: number; spacing_km: number; target: string; language: string; queue_mode: string }, basePath = '/dashboard/geo-grid') {
@@ -118,7 +121,7 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
           const result = await postGridTasksQueue(
             params.keyword, params.location_coordinate,
             gridSize, spacingKm, params.language ?? defaultLanguage,
-            creds.login, creds.pass,
+            creds.login, creds.pass, queueMode,
           );
           if (result.error) {
             gridError = result.error;
@@ -210,12 +213,14 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
                 keyword={gridEntry.keyword}
                 target={gridEntry.target}
                 gridSize={gridEntry.grid_size}
+                startedAt={gridEntry.ts}
               />
             )}
             {gridResults && gridEntry && (
               <GridResults
                 results={gridResults}
                 gridSize={gridEntry.grid_size}
+                spacingKm={gridEntry.spacing_km}
                 keyword={gridEntry.keyword}
                 target={gridEntry.target}
                 cost={gridCost ?? gridEntry.cost}

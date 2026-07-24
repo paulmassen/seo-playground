@@ -26,6 +26,29 @@ interface Props {
   };
 }
 
+// DataForSEO Local Finder SERP API pricing (checked against their pricing page — they revise this periodically).
+type QueueMode = 'live' | 'priority' | 'standard';
+
+const QUEUE_MODES: { value: QueueMode; label: string; costPerPoint: number; wait: string }[] = [
+  { value: 'live', label: 'Live', costPerPoint: 0.002, wait: 'Blocks the page' },
+  { value: 'priority', label: 'Priority', costPerPoint: 0.0012, wait: '~1 min avg, background' },
+  { value: 'standard', label: 'Standard', costPerPoint: 0.0006, wait: '5–45 min, background' },
+];
+
+// Live requests are throttled to 6 in flight; each point currently takes ~8-10s on DataForSEO's side.
+const LIVE_SECONDS_PER_BATCH = 9;
+const LIVE_CONCURRENCY = 6;
+
+function formatCost(n: number) {
+  return `$${n.toFixed(4)}`;
+}
+
+function formatLiveDuration(totalPoints: number) {
+  const seconds = Math.ceil(totalPoints / LIVE_CONCURRENCY) * LIVE_SECONDS_PER_BATCH;
+  if (seconds < 60) return `~${seconds}s`;
+  return `~${Math.ceil(seconds / 60)} min`;
+}
+
 function GridPreview({ size, spacingKm }: { size: number; spacingKm: number }) {
   const half = Math.floor(size / 2);
   return (
@@ -62,6 +85,7 @@ export default function LocalFinderForm({ defaults }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [gridSize, setGridSize] = useState(parseInt(defaults.gridSize ?? '5', 10));
   const [spacingKm, setSpacingKm] = useState(parseFloat(defaults.spacingKm ?? '1'));
+  const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'live');
 
   const osOptions =
     device === 'mobile'
@@ -205,27 +229,42 @@ export default function LocalFinderForm({ defaults }: Props) {
 
           {/* Queue mode */}
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Run mode</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: 'live', label: 'Live', desc: 'Results in ~30s, higher cost' },
-                { value: 'queue', label: 'Queue', desc: 'Background task, cheaper' },
-              ].map((opt) => (
-                <label key={opt.value} className="relative flex flex-col cursor-pointer">
-                  <input
-                    type="radio"
-                    name="queue_mode"
-                    value={opt.value}
-                    defaultChecked={(defaults.queueMode ?? 'live') === opt.value}
-                    className="sr-only peer"
-                  />
-                  <div className="px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-950 transition-all">
-                    <p className="text-sm font-black text-slate-800 dark:text-white">{opt.label}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{opt.desc}</p>
-                  </div>
-                </label>
-              ))}
+            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">API mode</label>
+            <input type="hidden" name="queue_mode" value={queueMode} />
+            <div className="grid grid-cols-3 gap-2">
+              {QUEUE_MODES.map((mode) => {
+                const active = queueMode === mode.value;
+                const totalPoints = gridSize * gridSize;
+                const estCost = formatCost(totalPoints * mode.costPerPoint);
+                return (
+                  <button
+                    key={mode.value}
+                    type="button"
+                    onClick={() => setQueueMode(mode.value)}
+                    className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                      active
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <span className={`text-xs font-black ${active ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {mode.label}
+                    </span>
+                    <span className={`text-[10px] font-mono ${active ? 'text-blue-500' : 'text-slate-400'}`}>{estCost}</span>
+                    <span className="text-[10px] text-slate-400">{mode.wait}</span>
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-[11px] text-slate-400 mt-2">
+              {queueMode === 'live' ? (
+                <>Blocks the page for {formatLiveDuration(gridSize * gridSize)} — DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
+              ) : queueMode === 'priority' ? (
+                <>Tasks are queued with DataForSEO’s high-priority flag. The page will auto-refresh every 10 seconds until results are ready.</>
+              ) : (
+                <>Tasks are queued for standard background processing. The page will check every 30 seconds — or you can come back later.</>
+              )}
+            </p>
           </div>
         </>
       ) : (

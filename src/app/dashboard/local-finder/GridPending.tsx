@@ -11,6 +11,7 @@ interface Props {
   keyword: string;
   target: string;
   gridSize: number;
+  startedAt: number;
 }
 
 const POLL_INTERVAL: Record<GridQueueMode, number> = {
@@ -31,14 +32,32 @@ const WAIT_HINT: Record<GridQueueMode, string> = {
   standard: 'Results typically in 5–45 minutes',
 };
 
-export default function GridPending({ searchId, totalPoints, queueMode, keyword, target, gridSize }: Props) {
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+export default function GridPending({ searchId, totalPoints, queueMode, keyword, target, gridSize, startedAt }: Props) {
   const router = useRouter();
   const [ready, setReady] = useState(0);
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const checkingRef = useRef(false);
   const doneRef = useRef(false);
+
+  useEffect(() => {
+    const tick = () => setElapsedMs(Date.now() - startedAt);
+    tick();
+    const timer = setInterval(tick, 1_000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
 
   const checkStatus = useCallback(async () => {
     if (checkingRef.current || doneRef.current) return;
@@ -85,6 +104,9 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
   }, [checkStatus, interval]);
 
   const pct = totalPoints > 0 ? Math.round((ready / totalPoints) * 100) : 0;
+  const etaMs = ready > 0 && ready < totalPoints
+    ? (elapsedMs / ready) * (totalPoints - ready)
+    : null;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -120,7 +142,7 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Progress</span>
-            <span className="text-[11px] font-mono text-slate-500">{ready} / {totalPoints} points ready</span>
+            <span className="text-[11px] font-mono text-slate-500">{ready} / {totalPoints} points ready · {pct}%</span>
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
@@ -129,6 +151,20 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
             />
           </div>
           <p className="text-[10px] text-slate-400">{WAIT_HINT[queueMode]}</p>
+        </div>
+
+        {/* Elapsed / ETA */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-50 rounded-xl px-3 py-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Elapsed</p>
+            <p className="text-sm font-black text-slate-800 tabular-nums mt-0.5">{formatDuration(elapsedMs)}</p>
+          </div>
+          <div className="bg-slate-50 rounded-xl px-3 py-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Est. remaining</p>
+            <p className="text-sm font-black text-slate-800 tabular-nums mt-0.5">
+              {etaMs != null ? `~${formatDuration(etaMs)}` : '—'}
+            </p>
+          </div>
         </div>
 
         {/* Status line */}

@@ -34,9 +34,25 @@ export function generateGridCoords(
   return coords;
 }
 
-export async function fetchOneGridPoint(
+/** Runs `fn` over `items` with at most `limit` calls in flight at once. */
+async function mapWithConcurrency<T, R>(
+  items: T[], limit: number, fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+async function requestGridPoint(
   keyword: string, lat: number, lng: number, language: string, auth: string,
-): Promise<{ items: LocalPackItem[]; cost: number }> {
+): Promise<{ items: LocalPackItem[]; cost: number; error?: string }> {
   let res: Response;
   try {
     res = await fetch('https://api.dataforseo.com/v3/serp/google/local_finder/live/advanced', {
@@ -48,19 +64,32 @@ export async function fetchOneGridPoint(
         language_name: language,
         depth: 20,
       }]),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(45_000),
     });
-  } catch {
-    return { items: [], cost: 0 };
+  } catch (e) {
+    return { items: [], cost: 0, error: e instanceof Error ? e.name : 'fetch failed' };
   }
-  if (!res.ok) return { items: [], cost: 0 };
+  if (!res.ok) return { items: [], cost: 0, error: `HTTP ${res.status}` };
   const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; cost?: number; result?: Array<{ items?: LocalPackItem[] }> }>;
+    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: LocalPackItem[] }> }>;
   };
   const task = data?.tasks?.[0];
-  if (!task || task.status_code !== 20000) return { items: [], cost: 0 };
+  if (!task || task.status_code !== 20000) {
+    return { items: [], cost: 0, error: task?.status_message ?? 'no task in response' };
+  }
   const items = (task.result?.[0]?.items ?? []).filter((i) => i.type === 'local_pack');
   return { items, cost: task.cost ?? 0 };
+}
+
+export async function fetchOneGridPoint(
+  keyword: string, lat: number, lng: number, language: string, auth: string,
+): Promise<{ items: LocalPackItem[]; cost: number }> {
+  let result = await requestGridPoint(keyword, lat, lng, language, auth);
+  if (result.error) {
+    // Transient failures (timeouts, rate limiting) are common under concurrent load; retry once.
+    result = await requestGridPoint(keyword, lat, lng, language, auth);
+  }
+  return { items: result.items, cost: result.cost };
 }
 
 export async function fetchGridSearch(
@@ -76,8 +105,9 @@ export async function fetchGridSearch(
   const auth = btoa(`${login}:${pass}`);
   const targetLower = target.toLowerCase();
 
-  const pointResults = await Promise.all(
-    coords.map(async ({ row, col, lat, lng }) => {
+  const pointResults = await mapWithConcurrency(
+    coords, 6,
+    async ({ row, col, lat, lng }) => {
       const { items: rawItems, cost } = await fetchOneGridPoint(keyword, lat, lng, language, auth);
 
       const isTarget = (item: LocalPackItem) =>
@@ -98,7 +128,7 @@ export async function fetchGridSearch(
       }));
 
       return { point: { row, col, lat, lng, rank: match ? match.rank_group : null, items }, cost };
-    })
+    },
   );
 
   const results = pointResults.map((r) => r.point);
@@ -108,7 +138,7 @@ export async function fetchGridSearch(
 
 export async function postGridTasksQueue(
   keyword: string, center: string, gridSize: number, spacingKm: number,
-  language: string, login: string, pass: string,
+  language: string, login: string, pass: string, priorityMode: 'priority' | 'standard' = 'standard',
 ): Promise<{ taskPoints: GridTaskPoint[]; cost: number; error?: string }> {
   const parts = center.split(',').map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
@@ -117,6 +147,8 @@ export async function postGridTasksQueue(
   const [centerLat, centerLng] = parts;
   const coords = generateGridCoords(centerLat, centerLng, gridSize, spacingKm);
   const auth = btoa(`${login}:${pass}`);
+  // DataForSEO: priority=2 processes the task faster for a higher per-task cost; priority=1 is the default standard queue.
+  const priority = priorityMode === 'priority' ? 2 : 1;
 
   const CHUNK = 100;
   const allTaskPoints: GridTaskPoint[] = [];
@@ -129,6 +161,7 @@ export async function postGridTasksQueue(
       location_coordinate: `${lat.toFixed(6)},${lng.toFixed(6)}`,
       language_name: language,
       depth: 20,
+      priority,
     }));
     const res = await fetch('https://api.dataforseo.com/v3/serp/google/local_finder/task_post', {
       method: 'POST',

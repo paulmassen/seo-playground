@@ -1,5 +1,7 @@
 # SEO Playground — Local SEO Dashboard
 
+> **New:** Geo-Grid Ranking now includes competitive analysis — see your top competitors across the grid, jump to any of their positions with one click, and check how far your visibility actually reaches by distance. Grid searches are also more reliable and cost-accurate across all three queue modes. See the [changelog](#changelog) below.
+
 > **Work in progress** — new DataForSEO endpoints are being added progressively.
 
 SEO Playground is a self-hosted dashboard that lets you run SEO and local SEO queries directly against the [DataForSEO API](https://dataforseo.com/). Every search is saved locally in a SQLite database, so you can browse your history and revisit results without making additional API calls. There is no cloud infrastructure involved — everything runs on your machine.
@@ -43,7 +45,7 @@ If you find this useful, consider supporting the project:
 - **Backlinks Domain Intersection** — Domains linking to you and a competitor
 - **Bulk Backlinks / Bulk Referring Domains** — Aggregated backlink metrics for a domain list
 - **Local Finder** — Google local pack results for any keyword and location, with map-based coordinate picker
-- **Geo-Grid Ranking** — Local visibility heatmap across a configurable grid of points (3×3 to 11×11). Choose between three API modes: Live (~6 s, instant results), Priority (~1 min, 40% cheaper) or Standard (background queue, 70% cheaper). Results are color-coded by rank position and saved locally for later review.
+- **Geo-Grid Ranking** — Local visibility heatmap across a configurable grid of points (3×3 to 11×11). Choose between three API modes: Live (~6 s, instant results), Priority (~1 min, 40% cheaper) or Standard (background queue, 70% cheaper). Results are color-coded by rank position and saved locally for later review. Includes a competitive landscape panel (top competitors by grid presence, with a one-click "view on grid" toggle) and a visibility-by-distance breakdown.
 - **On-Page Site Audit** — Full site crawl with pages, links, resources, duplicate tags and non-indexable pages
 - **On-Page Instant Pages** — Instant single-page audit without crawling
 - **Microdata Analysis** — Structured data inspection for any crawled URL
@@ -114,6 +116,17 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 - [Lucide React](https://lucide.dev/) — icons
 
 ## Changelog
+
+### 2026-07-25
+
+- **Geo-Grid competitive analysis** — new "Competitive landscape" panel (top 5 competitors by grid presence, visibility score, one-click "view on grid" highlight) and "Visibility by distance" ring breakdown
+- **Geo-Grid cost/duration estimates** — live-updating estimated cost and duration shown on the Live/Priority/Standard mode buttons, scaled to grid size
+- **Geo-Grid pending panel** — added elapsed time and estimated time remaining
+- **Geo-Grid history** — now shows the exact launch time, not just the date
+- **Fix Geo-Grid Live mode returning mostly empty results** — requests are now throttled (6 concurrent, 1 retry) to handle DataForSEO's slower response times, instead of firing the whole grid at once and silently dropping timeouts
+- **Fix Geo-Grid Priority queue mode** — the `priority` field was never actually sent to DataForSEO; Priority now genuinely costs more and completes faster than Standard
+- **Fix Geo-Grid Queue mode indicator** — mode badge, wait-time hint, and poll interval were silently broken due to a value mismatch; polling could fire almost continuously instead of every 10–30s
+- **Fix Geo-Grid Queue mode cost tracking** — final cost could be undercounted to $0.00 on multi-poll completions; points are now accumulated incrementally and never re-queried
 
 ### 2026-06-01
 

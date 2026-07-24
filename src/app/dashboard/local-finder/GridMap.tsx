@@ -2,11 +2,15 @@
 
 import { useEffect, useRef } from 'react';
 import type { GridPoint } from '@/lib/db';
+import { competitorKey } from './grid-insights';
 
 interface Props {
   points: GridPoint[];
   gridSize: number;
   target: string;
+  /** When set, markers show this competitor's rank at each point instead of the target's. */
+  highlightKey?: string;
+  highlightName?: string;
 }
 
 function rankColor(rank: number | null): string {
@@ -27,26 +31,31 @@ function rankTextColor(rank: number): string {
   return '#dc2626';
 }
 
-function buildPopupHtml(point: GridPoint, target: string): string {
+function buildPopupHtml(point: GridPoint, target: string, highlightKey?: string): string {
   const items = point.items ?? [];
-  const half = 0; // unused here, direction computed at call site
-  void half;
 
   const itemRows = items.slice(0, 20).map((item) => {
+    const isHighlighted = !item.is_target && !!highlightKey && competitorKey(item) === highlightKey;
     const nameStyle = item.is_target
       ? 'font-weight:700;color:#059669'
-      : 'font-weight:400;color:#334155';
+      : isHighlighted
+        ? 'font-weight:700;color:#2563eb'
+        : 'font-weight:400;color:#334155';
     const rankColor_ = rankTextColor(item.rank_group);
     const stars = item.rating_value != null
       ? `<span style="color:#f59e0b;font-size:10px">★</span><span style="font-size:10px;color:#64748b"> ${item.rating_value.toFixed(1)}${item.rating_votes != null ? ` (${item.rating_votes.toLocaleString()})` : ''}</span>`
       : '';
-    const targetBg = item.is_target ? 'background:#f0fdf4;border-left:3px solid #10b981;padding-left:5px;margin-left:-5px;border-radius:2px;' : '';
+    const rowBg = item.is_target
+      ? 'background:#f0fdf4;border-left:3px solid #10b981;padding-left:5px;margin-left:-5px;border-radius:2px;'
+      : isHighlighted
+        ? 'background:#eff6ff;border-left:3px solid #3b82f6;padding-left:5px;margin-left:-5px;border-radius:2px;'
+        : '';
     const mapsHref = item.cid
       ? `https://www.google.com/maps?cid=${item.cid}`
       : `https://www.google.com/maps/search/${encodeURIComponent(item.title)}`;
     const mapsLink = `<a href="${mapsHref}" target="_blank" rel="noopener noreferrer" style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;color:#3b82f6;text-decoration:none;white-space:nowrap;margin-top:2px;display:inline-block">Maps ↗</a>`;
     return `
-      <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;${targetBg}">
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;${rowBg}">
         <span style="font-size:12px;font-weight:900;min-width:24px;color:${rankColor_}">#${item.rank_group}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;${nameStyle};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">${item.title}</div>
@@ -72,7 +81,14 @@ function buildPopupHtml(point: GridPoint, target: string): string {
     </div>`;
 }
 
-export default function GridMap({ points, gridSize, target }: Props) {
+/** Resolves the rank to display at a point, given whether a competitor is being highlighted. */
+function pointRank(point: GridPoint, highlightKey?: string): number | null {
+  if (!highlightKey) return point.rank;
+  const match = (point.items ?? []).find((i) => !i.is_target && competitorKey(i) === highlightKey);
+  return match ? match.rank_group : null;
+}
+
+export default function GridMap({ points, gridSize, target, highlightKey, highlightName }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('leaflet').Map | null>(null);
   const half = Math.floor(gridSize / 2);
@@ -114,8 +130,9 @@ export default function GridMap({ points, gridSize, target }: Props) {
 
       geoPoints.forEach((point) => {
         const isCenter = point.row === half && point.col === half;
-        const color = rankColor(point.rank);
-        const label = point.rank != null ? String(point.rank) : '—';
+        const rank = pointRank(point, highlightKey);
+        const color = rankColor(rank);
+        const label = rank != null ? String(rank) : '—';
 
         const border = isCenter
           ? `border: 3px dashed rgba(255,255,255,0.85);`
@@ -148,7 +165,7 @@ export default function GridMap({ points, gridSize, target }: Props) {
         const marker = L.marker([point.lat!, point.lng!], { icon }).addTo(map);
 
         // Popup with full local pack list
-        const popupContent = buildPopupHtml(point, target);
+        const popupContent = buildPopupHtml(point, target, highlightKey);
         marker.bindPopup(popupContent, {
           maxWidth: 280,
           maxHeight: 260,
@@ -198,11 +215,18 @@ export default function GridMap({ points, gridSize, target }: Props) {
           background: white;
         }
       `}</style>
-      <div
-        ref={containerRef}
-        className="w-full rounded-xl overflow-hidden border border-slate-200"
-        style={{ height: 520 }}
-      />
+      <div className="relative">
+        {highlightKey && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
+            Showing: {highlightName ?? 'competitor'}
+          </div>
+        )}
+        <div
+          ref={containerRef}
+          className="w-full rounded-xl overflow-hidden border border-slate-200"
+          style={{ height: 520 }}
+        />
+      </div>
     </>
   );
 }

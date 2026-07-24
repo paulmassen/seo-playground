@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Geo-Grid competitive analysis** — a "Competitive landscape" panel ranks the top 5 competing businesses seen across the grid by presence and a visibility score (same weighted formula as the target's ATO score, so directly comparable), with a "View on grid" toggle that re-colors the map to show that competitor's rank at every point instead of the target's. A new "Visibility by distance" panel breaks down rank and found-rate by concentric ring around the center point, showing how far the target's visibility actually reaches.
+- **Geo-Grid cost & duration estimates** — the Live/Priority/Standard mode buttons in the search form show a live-updating estimated cost and expected duration based on grid size, from DataForSEO's current per-request pricing.
+- **Geo-Grid pending panel** — shows elapsed time and an estimated time remaining (based on progress rate), alongside the existing points-ready progress bar.
+- **Geo-Grid history** — entries now show the exact time a search was launched, not just the date.
 - **AI Prompt Test** (`/dashboard/llm-responses`) — ask ChatGPT, Claude, Gemini, or Perplexity a live prompt and see the model's actual answer, cited sources, token usage, and cost, via DataForSEO's LLM Responses API. Platform/model cascading select, optional system message and web-search country targeting, history sidebar.
 - **AI Keyword Data** (`/dashboard/ai-keyword-data`) — bulk keyword search volume estimates reflecting usage inside AI tools (ChatGPT, Gemini, etc.), with 12-month trend sparklines, via DataForSEO's AI Keyword Data API.
 - **History sidebar** — Google Reviews and Geo-Grid history moved out of the page flow into a sticky right-hand sidebar with client-side pagination (8 entries per page). Reusable `HistorySidebar` component.
@@ -15,6 +19,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Reviews-per-month chart** — native hover tooltip (month, year, count) via `<title>`, plus a month initial under every bar.
 
 ### Fixed
+- **Geo-Grid Live mode returning mostly empty results** — DataForSEO's `local_finder/live/advanced` endpoint got substantially slower recently (~8-10s per request); the grid search fired every point concurrently with no throttling and silently discarded any timeout/error as "not found". Requests are now capped at 6 in-flight with one retry on failure, so a 9×9 grid that previously returned data for ~5% of points now completes fully.
+- **Geo-Grid Priority queue mode was cosmetic** — selecting "Priority" never actually requested DataForSEO's high-priority processing (no `priority` field was sent), so it silently ran and billed as Standard while showing the wrong price/ETA. Wired the real `priority` field (`2` for Priority, `1` for Standard) — Priority now genuinely costs more ($0.0012/req) and completes faster (~1 min).
+- **Geo-Grid Queue mode indicator broken** — the pending-search panel's mode badge, wait-time hint, and poll interval all silently resolved to `undefined` because the run-mode selector's values didn't match the type they were read against, which also caused the poll timer to fire in a near-continuous loop instead of every 10–30s.
+- **Geo-Grid Queue mode cost tracking** — a search's final cost could be undercounted (often reported as $0.00) because completed points were re-queried on every poll, and DataForSEO only reports a task's cost on its first successful check. Points are now accumulated incrementally and never re-queried once collected.
 - **Rating gauge** — average value now renders as an HTML overlay instead of SVG `<text>`, fixing the number being invisible in WebKit when the `font-weight:900` web font wasn't loaded; also fixes the clipped "N reviews" line.
 - **Rating goal** — targets are now display-aware: counts reflect crossing Google's rounding threshold (`T − 0.05`, with `.x5` rounding down) so reaching a *displayed* rating no longer overstates the 5★ reviews needed. Shows both true average and Google-displayed rating.
 - **Build** — escaped unescaped entities (`technologies`, `reddit` pages) and removed an unused `eslint-disable` directive (`MapPicker`) that were failing `next build`.

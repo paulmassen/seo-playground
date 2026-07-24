@@ -1238,10 +1238,30 @@ export function saveGridSearchPending(entry: GridSearchEntry, taskPoints: GridTa
     .run(entry.id, entry.ts, entry.keyword, entry.target, entry.center, entry.grid_size, entry.spacing_km, entry.language, entry.cost ?? null, '[]', 'pending', entry.queue_mode, JSON.stringify(taskPoints));
 }
 
-export function completeGridSearch(id: string, results: GridPoint[], cost: number): void {
+export function getGridProgress(id: string): { results: GridPoint[]; pendingTasks: GridTaskPoint[] } | null {
+  const row = getDb()
+    .prepare('SELECT results, task_ids FROM grid_searches WHERE id = ?')
+    .get(id) as { results: string; task_ids: string | null } | undefined;
+  if (!row) return null;
+  return {
+    results: row.results ? JSON.parse(row.results) as GridPoint[] : [],
+    pendingTasks: row.task_ids ? JSON.parse(row.task_ids) as GridTaskPoint[] : [],
+  };
+}
+
+/**
+ * Merges newly-ready points into a grid search's accumulated results and shrinks the pending task
+ * list accordingly, so an already-collected task is never re-queried on a later poll.
+ * Cost is charged in full by DataForSEO at task-creation time (task_post) and is set once by
+ * saveGridSearchPending — it's deliberately never touched here. task_get's cost field just echoes
+ * that already-billed amount on a task's first ready-check (and reports 0 on any re-check), so
+ * summing it here would double-count spend already captured at posting time.
+ */
+export function updateGridProgress(id: string, accumulatedResults: GridPoint[], stillPendingTasks: GridTaskPoint[]): void {
+  const done = stillPendingTasks.length === 0;
   getDb()
-    .prepare("UPDATE grid_searches SET results = ?, cost = ?, status = 'done', task_ids = NULL WHERE id = ?")
-    .run(JSON.stringify(results), cost, id);
+    .prepare('UPDATE grid_searches SET results = ?, status = ?, task_ids = ? WHERE id = ?')
+    .run(JSON.stringify(accumulatedResults), done ? 'done' : 'pending', done ? null : JSON.stringify(stillPendingTasks), id);
 }
 
 export function getGridResults(id: string): GridPoint[] | null {
