@@ -1,4 +1,4 @@
-# SEO Playground — Local SEO Dashboard
+# SEO Playground — SEO and Local SEO Dashboard
 
 > **New:** Geo-Grid Ranking now includes competitive analysis — see your top competitors across the grid, jump to any of their positions with one click, and check how far your visibility actually reaches by distance. Grid searches are also more reliable and cost-accurate across all three queue modes. See the [changelog](#changelog) below.
 
