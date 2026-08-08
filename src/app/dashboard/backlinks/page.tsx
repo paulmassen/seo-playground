@@ -8,6 +8,7 @@ import {
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
 
 // ---- Types ----
 
@@ -153,7 +154,7 @@ function StatCard({ label, value, new: newVal, lost }: { label: string; value?: 
       <p className="text-2xl font-black text-slate-900 mt-1 tabular-nums">{fmt(value)}</p>
       {(newVal !== undefined || lost !== undefined) && (
         <p className="text-[11px] mt-0.5 text-slate-400">
-          {newVal !== undefined && <><Delta value={newVal} /> nouveaux</>}
+          {newVal !== undefined && <><Delta value={newVal} /> new</>}
           {newVal !== undefined && lost !== undefined && ' · '}
           {lost !== undefined && <><Delta value={-lost} invert /> lost</>}
         </p>
@@ -209,16 +210,25 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
       activeEntry = history.find((e) => e.id === historyId) ?? null;
       linksTotal = activeEntry?.linksTotal ?? links.length;
     } else {
-      error = "Cette recherche n'est plus disponible.";
+      error = 'This search is no longer available.';
     }
   }
 
   if (!historyId && target) {
-    if (!creds) {
+    const clean = cleanTarget(target);
+    const dedupeId = stableSearchId(['backlinks', clean, limit, orderBy, dofollowFilter]);
+    const cachedSummary = getBacklinksResult<BacklinksSummary>(dedupeId);
+
+    if (cachedSummary) {
+      summary = cachedSummary;
+      links = getBacklinksLinks<BacklinkItem>(dedupeId) ?? [];
+      const cachedEntry = getBacklinksHistory().find((e) => e.id === dedupeId);
+      linksTotal = cachedEntry?.linksTotal ?? links.length;
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const auth = btoa(`${creds.login}:${creds.pass}`);
-      const clean = cleanTarget(target);
 
       const [summaryRes, linksRes] = await Promise.all([
         fetchSummary(clean, auth),
@@ -226,7 +236,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
       ]);
 
       if (summaryRes.error || linksRes.error) {
-        error = summaryRes.error ?? linksRes.error ?? 'Error inconnue.';
+        error = summaryRes.error ?? linksRes.error ?? 'Unknown error.';
       } else {
         summary = summaryRes.result ?? null;
         links = linksRes.items;
@@ -235,7 +245,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
 
         if (summary || links.length > 0) {
           const entry: BacklinksSearchEntry = {
-            id: crypto.randomUUID().slice(0, 8),
+            id: dedupeId,
             ts: Date.now(),
             target: clean,
             cost,
@@ -275,7 +285,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
             <input
               type="text" name="target"
               defaultValue={displayTarget}
-              placeholder="ex: example.com"
+              placeholder="e.g. example.com"
               required
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono transition-all"
             />
@@ -284,14 +294,14 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Sort by</label>
             <select name="order_by" defaultValue={orderBy}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="domain_from_rank,desc">DR du domaine source (élevé)</option>
-              <option value="page_from_rank,desc">Rang de la page source (élevé)</option>
-              <option value="first_seen,desc">Plus récents</option>
-              <option value="first_seen,asc">Plus anciens</option>
+              <option value="domain_from_rank,desc">Source domain DR (high)</option>
+              <option value="page_from_rank,desc">Source page rank (high)</option>
+              <option value="first_seen,desc">Most recent</option>
+              <option value="first_seen,asc">Oldest</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Filtre</label>
+            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Filter</label>
             <select name="dofollow" defaultValue={dofollowParam ?? ''}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
               <option value="">All links</option>
@@ -345,13 +355,13 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard label="Backlinks" value={summary.backlinks} new={summary.new_backlinks} lost={summary.lost_backlinks} />
                 <StatCard label="Referring domains" value={summary.referring_domains} new={summary.new_referring_domains} lost={summary.lost_referring_domains} />
-                <StatCard label="IPs référentes" value={summary.referring_ips} />
-                <StatCard label="Pages référentes" value={summary.referring_pages} />
+                <StatCard label="Referring IPs" value={summary.referring_ips} />
+                <StatCard label="Referring pages" value={summary.referring_pages} />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <StatCard label="Backlinks cassés" value={summary.broken_backlinks} />
-                <StatCard label="Pages cassées" value={summary.broken_pages} />
-                <StatCard label="Sous-réseaux" value={summary.referring_subnets} />
+                <StatCard label="Broken backlinks" value={summary.broken_backlinks} />
+                <StatCard label="Broken pages" value={summary.broken_pages} />
+                <StatCard label="Referring subnets" value={summary.referring_subnets} />
               </div>
 
               {/* Link types + TLD */}
@@ -359,7 +369,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {linkTypeEntries.length > 0 && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Types de liens</h2>
+                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Link types</h2>
                       <div className="space-y-2">
                         {linkTypeEntries.map(([type, count]) => {
                           const pct = Math.round(((count ?? 0) / (summary.backlinks ?? 1)) * 100);
@@ -380,7 +390,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
                   )}
                   {tldEntries.length > 0 && (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">TLD des domaines référents</h2>
+                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Referring domains TLD</h2>
                       <div className="space-y-2">
                         {tldEntries.map(([tld, count]) => {
                           const pct = Math.round((count / tldTotal) * 100);
@@ -449,11 +459,11 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
                       <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 w-12">DR</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Page source</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Ancre</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Page cible</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Source page</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Anchor</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Target page</th>
                       <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Type</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Vu le</th>
+                      <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Seen</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -483,7 +493,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
                               <span className={`shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${link.dofollow ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 bg-slate-100'}`}>
                                 {link.dofollow ? 'do' : 'no'}
                               </span>
-                              {isBroken && <span className="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-red-500 bg-red-50">cassé</span>}
+                              {isBroken && <span className="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-red-500 bg-red-50">broken</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3 max-w-[200px] hidden lg:table-cell">

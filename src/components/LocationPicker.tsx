@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { LABS_LOCATIONS } from '@/lib/geo-options';
 
 interface Suggestion {
   code: number;
@@ -15,7 +16,18 @@ interface Props {
   placeholder?: string;
   required?: boolean;
   className?: string;
+  /**
+   * 'serp' (default) searches DataForSEO's full city/region/country dataset — use for SERP,
+   * Local Finder, and Business Data endpoints. 'labs' restricts to the ~94 countries DataForSEO
+   * Labs / AI Optimization endpoints actually support — use for those, since a city/region value
+   * there fails outright.
+   */
+  scope?: 'serp' | 'labs';
 }
+
+const LABS_SUGGESTIONS: Suggestion[] = LABS_LOCATIONS.map((l) => ({
+  code: l.code, name: l.name, countryIso: l.iso, type: 'Country',
+}));
 
 const DEFAULT_CLASS =
   'w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800';
@@ -25,7 +37,7 @@ function isoToFlag(iso: string): string {
   return String.fromCodePoint(...[...iso.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
 }
 
-export default function LocationPicker({ name, defaultValue = '', placeholder, required, className }: Props) {
+export default function LocationPicker({ name, defaultValue = '', placeholder, required, className, scope = 'serp' }: Props) {
   const [text, setText] = useState(defaultValue);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -35,6 +47,12 @@ export default function LocationPicker({ name, defaultValue = '', placeholder, r
   const requestIdRef = useRef(0);
 
   function fetchSuggestions(query: string) {
+    if (scope === 'labs') {
+      const q = query.trim().toLowerCase();
+      setSuggestions(q ? LABS_SUGGESTIONS.filter((s) => s.name.toLowerCase().includes(q)) : LABS_SUGGESTIONS);
+      setActiveIndex(-1);
+      return;
+    }
     const requestId = ++requestIdRef.current;
     fetch(`/api/locations?q=${encodeURIComponent(query)}`)
       .then((res) => res.json())
@@ -103,7 +121,7 @@ export default function LocationPicker({ name, defaultValue = '', placeholder, r
         onChange={(e) => handleChange(e.target.value)}
         onFocus={handleFocus}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder ?? 'e.g. Paris, France'}
+        placeholder={placeholder ?? (scope === 'labs' ? 'e.g. France' : 'e.g. Paris, France')}
         required={required}
         autoComplete="off"
         className={className ?? DEFAULT_CLASS}

@@ -175,6 +175,17 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
             Target: {entry.target} · {entry.spacing_km} km
             {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}
           </p>
+          {entry.summary && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${entry.summary.ato}%` }} />
+              </div>
+              <span className="text-[10px] font-black text-emerald-600 tabular-nums shrink-0">{entry.summary.ato}%</span>
+              <span className="text-[10px] text-slate-400 shrink-0">
+                {entry.summary.avgRank !== null ? `avg #${entry.summary.avgRank}` : 'not found'} · {entry.summary.foundCount}/{entry.summary.totalPoints}
+              </span>
+            </div>
+          )}
         </a>
         <div className="flex items-center justify-between gap-3 mt-1.5">
           <span className="text-[11px] text-slate-400">{formatDate(entry.ts)}</span>

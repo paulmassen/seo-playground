@@ -10,6 +10,7 @@ function getDb(): Database.Database {
     _db.pragma('journal_mode = WAL');
     initSchema(_db);
     seedLocations(_db);
+    seedCategories(_db);
   }
   return _db;
 }
@@ -451,6 +452,12 @@ function initSchema(db: Database.Database) {
       country_iso_code TEXT NOT NULL,
       location_type TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS dfs_categories (
+      category_code INTEGER PRIMARY KEY,
+      category_name TEXT NOT NULL,
+      category_code_parent INTEGER
+    );
   `);
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_dfs_locations_name ON dfs_locations(location_name)`);
@@ -499,13 +506,50 @@ function seedLocations(db: Database.Database): void {
   const csvPath = path.join(process.cwd(), 'data', 'dfs-locations.csv');
   if (!fs.existsSync(csvPath)) return;
 
-  const lines = fs.readFileSync(csvPath, 'utf8').split('\n').filter(Boolean);
+  const lines = fs.readFileSync(csvPath, 'utf8').split(/\r?\n/).filter(Boolean);
   const insert = db.prepare('INSERT OR IGNORE INTO dfs_locations (location_code, location_name, country_iso_code, location_type) VALUES (?, ?, ?, ?)');
   const insertAll = db.transaction((rows: string[][]) => {
     for (const row of rows) insert.run(Number(row[0]), row[1], row[2], row[3]);
   });
   const rows = lines.slice(1).map(parseLocationsCsvLine);
   insertAll(rows);
+}
+
+function seedCategories(db: Database.Database): void {
+  const { count } = db.prepare('SELECT COUNT(*) as count FROM dfs_categories').get() as { count: number };
+  if (count > 0) return;
+
+  const csvPath = path.join(process.cwd(), 'data', 'dfs-categories.csv');
+  if (!fs.existsSync(csvPath)) return;
+
+  const lines = fs.readFileSync(csvPath, 'utf8').split(/\r?\n/).filter(Boolean);
+  const insert = db.prepare('INSERT OR IGNORE INTO dfs_categories (category_code, category_name, category_code_parent) VALUES (?, ?, ?)');
+  const insertAll = db.transaction((rows: string[][]) => {
+    for (const row of rows) insert.run(Number(row[0]), row[1], row[2] ? Number(row[2]) : null);
+  });
+  const rows = lines.slice(1).map(parseLocationsCsvLine);
+  insertAll(rows);
+}
+
+/** Resolves a DataForSEO Labs category code to its full breadcrumb path, e.g. "Home & Garden > Home Improvement > Plumbing". */
+export function getCategoryPath(code: number): string {
+  const db = getDb();
+  const row = db.prepare('SELECT category_code, category_name, category_code_parent FROM dfs_categories WHERE category_code = ?')
+    .get(code) as { category_code: number; category_name: string; category_code_parent: number | null } | undefined;
+  if (!row) return `Category ${code}`;
+
+  const path = [row.category_name];
+  let parentCode = row.category_code_parent;
+  const seen = new Set([row.category_code]);
+  while (parentCode !== null && !seen.has(parentCode)) {
+    seen.add(parentCode);
+    const parent = db.prepare('SELECT category_name, category_code_parent FROM dfs_categories WHERE category_code = ?')
+      .get(parentCode) as { category_name: string; category_code_parent: number | null } | undefined;
+    if (!parent) break;
+    path.unshift(parent.category_name);
+    parentCode = parent.category_code_parent;
+  }
+  return path.join(' > ');
 }
 
 export interface LocationOption {
@@ -1158,6 +1202,14 @@ export function getRelatedKwResults<T>(id: string): T[] | null {
 export type GridQueueMode = 'live' | 'priority' | 'standard';
 export type GridStatus = 'done' | 'pending' | 'error';
 
+export interface GridHistorySummary {
+  totalPoints: number;
+  foundCount: number;
+  avgRank: number | null;
+  top3Count: number;
+  ato: number;
+}
+
 export interface GridSearchEntry {
   id: string;
   ts: number;
@@ -1170,6 +1222,7 @@ export interface GridSearchEntry {
   cost?: number;
   status: GridStatus;
   queue_mode: GridQueueMode;
+  summary?: GridHistorySummary;
 }
 
 export interface GridTaskPoint {
@@ -1200,15 +1253,36 @@ export interface GridPoint {
   items?: GridLocalItem[];
 }
 
+/** Mirrors the ATO/avg-rank formula in grid-insights.ts's computeGridSummary — duplicated (not imported) so lib/ doesn't depend on app/ code. */
+function summarizeGridResults(resultsJson: string | null): GridHistorySummary | undefined {
+  if (!resultsJson) return undefined;
+  let points: GridPoint[];
+  try {
+    points = JSON.parse(resultsJson) as GridPoint[];
+  } catch {
+    return undefined;
+  }
+  const totalPoints = points.length;
+  if (totalPoints === 0) return undefined;
+  const ranked = points.filter((p) => p.rank !== null);
+  const top3Count = points.filter((p) => p.rank !== null && p.rank <= 3).length;
+  const avgRank = ranked.length > 0
+    ? Math.round((ranked.reduce((s, p) => s + p.rank!, 0) / ranked.length) * 10) / 10
+    : null;
+  const ato = Math.round((points.reduce((s, p) => s + (21 - Math.min(p.rank ?? 21, 21)), 0) / (totalPoints * 20)) * 100);
+  return { totalPoints, foundCount: ranked.length, avgRank, top3Count, ato };
+}
+
 export function getGridHistory(): GridSearchEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode FROM grid_searches ORDER BY ts DESC LIMIT 20')
-    .all() as Array<{ id: string; ts: number; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string }>;
+    .prepare('SELECT id, ts, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, results FROM grid_searches ORDER BY ts DESC LIMIT 20')
+    .all() as Array<{ id: string; ts: number; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; results: string | null }>;
   return rows.map((r) => ({
     id: r.id, ts: r.ts, keyword: r.keyword, target: r.target, center: r.center,
     grid_size: r.grid_size, spacing_km: r.spacing_km, language: r.language, cost: r.cost ?? undefined,
     status: (r.status ?? 'done') as GridStatus,
     queue_mode: (r.queue_mode ?? 'live') as GridQueueMode,
+    summary: r.status === 'pending' ? undefined : summarizeGridResults(r.results),
   }));
 }
 

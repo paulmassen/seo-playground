@@ -1,4 +1,4 @@
-import { getCredentials, getSetting, getDomainCategoriesHistory, saveDomainCategoriesSearch, getDomainCategoriesResults, type DomainCategoriesEntry } from '@/lib/db';
+import { getCredentials, getSetting, getDomainCategoriesHistory, saveDomainCategoriesSearch, getDomainCategoriesResults, getCategoryPath, type DomainCategoriesEntry } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
@@ -69,7 +69,7 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
   const totalEtv = items.reduce((sum, i) => sum + (i.metrics?.organic?.etv ?? 0), 0);
 
   const csvData = items.map((item) => ({
-    category_code: item.categories?.[0] ?? '',
+    category: (item.categories ?? []).map((c) => getCategoryPath(c)).join(' | '),
     keywords: item.metrics?.organic?.count ?? '',
     etv: item.metrics?.organic?.etv?.toFixed(0) ?? '',
   }));
@@ -97,7 +97,7 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" />
+            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" scope="labs" />
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
@@ -116,7 +116,7 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} categories — {displayTarget}</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename={`categories-${displayTarget}.csv`} columns={[{key:'category_code',label:'Category Code'},{key:'keywords',label:'Keywords'},{key:'etv',label:'Est. Traffic (ETV)'}]} />}
+              {items.length > 0 && <ExportCSVButton data={csvData} filename={`categories-${displayTarget}.csv`} columns={[{key:'category',label:'Category'},{key:'keywords',label:'Keywords'},{key:'etv',label:'Est. Traffic (ETV)'}]} />}
             </div>
           </div>
           {items.length === 0 ? (
@@ -128,14 +128,14 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
                 const count = item.metrics?.organic?.count ?? 0;
                 const barW = Math.round((etv / maxEtv) * 100);
                 const share = totalEtv > 0 ? ((etv / totalEtv) * 100).toFixed(1) : '0.0';
-                const codes = item.categories ?? [];
+                const categoryPaths = (item.categories ?? []).map((c) => getCategoryPath(c));
                 return (
                   <div key={i} className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="w-10 text-right text-[11px] font-mono text-slate-400 tabular-nums shrink-0">{i + 1}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {codes.map((c) => (
-                          <span key={c} className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded">{c}</span>
+                        {categoryPaths.map((p, ci) => (
+                          <span key={ci} className="text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{p}</span>
                         ))}
                         <span className="text-[11px] text-slate-400">{count.toLocaleString('en-GB')} keywords</span>
                       </div>

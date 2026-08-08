@@ -3,6 +3,8 @@ import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import KeywordIdeasTable from './KeywordIdeasTable';
 
 interface IdeaItem {
   keyword?: string;
@@ -28,19 +30,6 @@ async function fetchIdeas(keyword: string, location: string, language: string, l
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
 }
 
-function KdBadge({ v }: { v?: number }) {
-  if (v == null) return <span className="text-slate-300 text-xs">—</span>;
-  const cls = v >= 70 ? 'bg-red-100 text-red-700' : v >= 50 ? 'bg-orange-100 text-orange-700' : v >= 30 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
-  return <span className={`inline-flex items-center justify-center w-9 h-5 rounded text-[10px] font-black ${cls}`}>{v}</span>;
-}
-
-function IntentBadge({ intent }: { intent?: string }) {
-  if (!intent) return null;
-  const map: Record<string, string> = { informational: 'bg-blue-50 text-blue-600', navigational: 'bg-violet-50 text-violet-600', commercial: 'bg-amber-50 text-amber-700', transactional: 'bg-emerald-50 text-emerald-700' };
-  return <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${map[intent] ?? 'bg-slate-100 text-slate-500'}`}>{intent.slice(0, 4)}</span>;
-}
-
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
 export default async function KeywordIdeasPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -107,7 +96,7 @@ export default async function KeywordIdeasPage({ searchParams }: { searchParams:
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" />
+            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" scope="labs" />
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
@@ -133,42 +122,17 @@ export default async function KeywordIdeasPage({ searchParams }: { searchParams:
               <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} ideas</span>
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
             </div>
-            {items.length > 0 && <ExportCSVButton data={csvData} filename={`keyword-ideas-${displayKeyword}.csv`} columns={[{key:'keyword',label:'Keyword'},{key:'search_volume',label:'Volume'},{key:'kd',label:'KD'},{key:'cpc',label:'CPC'},{key:'competition_level',label:'Competition'},{key:'intent',label:'Intent'},{key:'ref_domains',label:'Avg Ref. Domains'}]} />}
+            {items.length > 0 && (
+              <div className="flex items-center gap-2">
+                <CopyMarkdownButton data={csvData} columns={[{key:'keyword',label:'Keyword'},{key:'search_volume',label:'Volume'},{key:'kd',label:'KD'},{key:'cpc',label:'CPC'},{key:'competition_level',label:'Competition'},{key:'intent',label:'Intent'},{key:'ref_domains',label:'Avg Ref. Domains'}]} />
+                <ExportCSVButton data={csvData} filename={`keyword-ideas-${displayKeyword}.csv`} columns={[{key:'keyword',label:'Keyword'},{key:'search_volume',label:'Volume'},{key:'kd',label:'KD'},{key:'cpc',label:'CPC'},{key:'competition_level',label:'Competition'},{key:'intent',label:'Intent'},{key:'ref_domains',label:'Avg Ref. Domains'}]} />
+              </div>
+            )}
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">KD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Volume</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">CPC</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Intent</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Competition</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Ref. Domains</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => {
-                    const ki = item.keyword_info;
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-200 max-w-[220px]"><span className="truncate block">{item.keyword ?? '—'}</span></td>
-                        <td className="px-4 py-3 text-center"><KdBadge v={item.keyword_properties?.keyword_difficulty} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">{fmt(ki?.search_volume)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{ki?.cpc != null ? `$${ki.cpc.toFixed(2)}` : '—'}</td>
-                        <td className="px-4 py-3 text-center hidden sm:table-cell"><IntentBadge intent={item.search_intent_info?.main_intent} /></td>
-                        <td className="px-4 py-3 text-right text-slate-500 tabular-nums hidden md:table-cell text-xs">{ki?.competition_level ?? '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell">{fmt(item.avg_backlinks_info?.referring_domains)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <KeywordIdeasTable items={items} />
           )}
         </div>
       )}

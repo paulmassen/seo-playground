@@ -1,6 +1,6 @@
 # SEO Playground — Local SEO Dashboard
 
-> **New:** Geo-Grid Ranking now includes competitive analysis — see your top competitors across the grid, jump to any of their positions with one click, and check how far your visibility actually reaches by distance. Grid searches are also more reliable and cost-accurate across all three queue modes. See the [changelog](#changelog) below.
+> **New:** Fixed several DataForSEO Labs pages silently failing on city/region locations (now restricted to the countries that actually work), Domain Categories now shows real category names instead of numeric codes, and searches no longer get re-billed on accidental double-submits. See the [changelog](#changelog) below.
 
 > **Work in progress** — new DataForSEO endpoints are being added progressively.
 
@@ -116,6 +116,16 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 - [Lucide React](https://lucide.dev/) — icons
 
 ## Changelog
+
+### 2026-08-09
+
+- **Location field restricted to supported countries on DataForSEO Labs / AI Optimization pages** — Related Keywords, Keyword Ideas, Keyword Overview, Ranked Keywords, Search Intent, Subdomains, Top Searches, Competitors, Domain/Page Intersection, Historical Rank, Domain Categories, Keyword Difficulty, Traffic Estimation, AI Keyword Data, and AI Optimization only ever accept country-level targeting (verified against DataForSEO's own `locations_and_languages` reference endpoint — no region/city ever works there); the location picker on those pages now only offers the ~94 countries that actually work, instead of the full city/region dataset that silently failed
+- **Domain Categories now shows real category names** — was rendering raw numeric category codes (e.g. `10008`); added a `dfs_categories` reference table (seeded from DataForSEO's `categories` endpoint) and resolves each code to its full breadcrumb path (e.g. "Health > Health Conditions & Concerns")
+- **Fix Bulk Backlinks showing empty New/Lost/Ref. Domains/Ref. IPs/Spam columns** — `backlinks/bulk_backlinks/live` only ever returns `target` and `backlinks`; those columns could never populate. Removed them and linked to the dedicated Bulk Ref. Domains page for that data instead
+- **Keyword Ideas table is now sortable** — click any column header (Keyword, KD, Volume, CPC, Intent, Competition, Ref. Domains) to sort
+- **"Copy as Markdown" button** — added next to CSV export on Keyword Ideas, for pasting results straight into docs/notes
+- **Fix repeated billing on double-submit/refresh** — Backlinks now reuses its result if the same search (domain + filters) runs again within 60 seconds, instead of re-querying and re-billing DataForSEO every time; same protection Geo-Grid already had. Cleaned up 28 pre-existing duplicate history rows caused by this gap
+- **Backlinks — fixed remaining French strings** (sort options, filter label, stat card labels, table headers, error messages)
 
 ### 2026-07-25
 

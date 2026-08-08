@@ -4,15 +4,7 @@ import ExportCSVButton from '@/components/ExportCSVButton';
 
 interface BulkBlItem {
   target?: string;
-  rank?: number;
   backlinks?: number;
-  new_backlinks?: number;
-  lost_backlinks?: number;
-  referring_domains?: number;
-  referring_main_domains?: number;
-  referring_ips?: number;
-  spam_score?: number;
-  broken_backlinks?: number;
 }
 
 interface SearchParams { targets?: string; history_id?: string; }
@@ -29,12 +21,6 @@ async function fetchBulkBacklinks(targets: string[], login: string, pass: string
   if (!task) return { items: [], error: 'Empty API response.' };
   if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
-}
-
-function SpamBadge({ score }: { score?: number }) {
-  if (score == null) return <span className="text-slate-300">—</span>;
-  const cls = score >= 60 ? 'bg-red-50 text-red-600 border-red-200' : score >= 30 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border tabular-nums ${cls}`}>{score}</span>;
 }
 
 function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
@@ -75,13 +61,6 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
   const csvData = sorted.map((item) => ({
     target: item.target ?? '',
     backlinks: item.backlinks ?? '',
-    new_backlinks: item.new_backlinks ?? '',
-    lost_backlinks: item.lost_backlinks ?? '',
-    referring_domains: item.referring_domains ?? '',
-    referring_main_domains: item.referring_main_domains ?? '',
-    referring_ips: item.referring_ips ?? '',
-    spam_score: item.spam_score ?? '',
-    broken_backlinks: item.broken_backlinks ?? '',
   }));
 
   return (
@@ -93,7 +72,10 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
           <span className="text-slate-600">Bulk Backlinks</span>
         </div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Bulk Backlinks</h1>
-        <p className="text-sm text-slate-400 mt-1">Backlink summary for a list of domains in a single request.</p>
+        <p className="text-sm text-slate-400 mt-1">
+          Total backlink count for a list of domains in a single request.{' '}
+          Need referring domains/IPs instead? Use <a href="/dashboard/backlinks/bulk-referring-domains" className="text-blue-600 hover:underline">Bulk Ref. Domains</a>.
+        </p>
       </div>
 
       <SearchForm className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4" btnLabel="Fetch" btnClassName="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors">
@@ -112,7 +94,7 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{sorted.length} domains</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {sorted.length > 0 && <ExportCSVButton data={csvData} filename="bulk-backlinks.csv" columns={[{key:'target',label:'Domain'},{key:'backlinks',label:'Backlinks'},{key:'new_backlinks',label:'New'},{key:'lost_backlinks',label:'Lost'},{key:'referring_domains',label:'Ref. Domains'},{key:'referring_main_domains',label:'Main RD'},{key:'referring_ips',label:'Ref. IPs'},{key:'spam_score',label:'Spam'},{key:'broken_backlinks',label:'Broken'}]} />}
+              {sorted.length > 0 && <ExportCSVButton data={csvData} filename="bulk-backlinks.csv" columns={[{key:'target',label:'Domain'},{key:'backlinks',label:'Backlinks'}]} />}
             </div>
           </div>
           {sorted.length === 0 ? (
@@ -124,11 +106,6 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
                   <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                     <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Domain</th>
                     <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Backlinks</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 text-emerald-600 hidden sm:table-cell">+New</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 text-red-500 hidden sm:table-cell">−Lost</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Ref. Domains</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Ref. IPs</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Spam</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -145,11 +122,6 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
                             <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">{fmt(item.backlinks)}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-emerald-600 tabular-nums hidden sm:table-cell text-xs">{item.new_backlinks ? `+${fmt(item.new_backlinks)}` : '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-red-500 tabular-nums hidden sm:table-cell text-xs">{item.lost_backlinks ? `-${fmt(item.lost_backlinks)}` : '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">{fmt(item.referring_domains)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell">{fmt(item.referring_ips)}</td>
-                        <td className="px-4 py-3 text-center hidden lg:table-cell"><SpamBadge score={item.spam_score} /></td>
                       </tr>
                     );
                   })}

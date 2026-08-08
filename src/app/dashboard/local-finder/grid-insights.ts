@@ -1,5 +1,30 @@
 import type { GridPoint, GridLocalItem } from '@/lib/db';
 
+export interface GridSummary {
+  totalPoints: number;
+  foundCount: number;
+  avgRank: number | null;
+  top3Count: number;
+  top10Count: number;
+  /** Weighted visibility score (0-100): 21 minus rank (capped at 21, "not found" scores 0), averaged across the grid. */
+  ato: number;
+}
+
+/** Same stats shown in the results view (ATO score, avg rank, top 3/10 counts) — shared so history previews stay consistent. */
+export function computeGridSummary(results: GridPoint[]): GridSummary {
+  const totalPoints = results.length;
+  const ranked = results.filter((p) => p.rank !== null);
+  const top3Count = results.filter((p) => p.rank !== null && p.rank <= 3).length;
+  const top10Count = results.filter((p) => p.rank !== null && p.rank <= 10).length;
+  const avgRank = ranked.length > 0
+    ? Math.round((ranked.reduce((s, p) => s + p.rank!, 0) / ranked.length) * 10) / 10
+    : null;
+  const ato = totalPoints > 0
+    ? Math.round((results.reduce((s, p) => s + (21 - Math.min(p.rank ?? 21, 21)), 0) / (totalPoints * 20)) * 100)
+    : 0;
+  return { totalPoints, foundCount: ranked.length, avgRank, top3Count, top10Count, ato };
+}
+
 /** Groups a competitor listing by domain (preferred) or name, so the same business is counted once. */
 export function competitorKey(item: GridLocalItem): string {
   const domain = item.domain?.trim().toLowerCase().replace(/^www\./, '');

@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useMemo, useState } from 'react';
 import type { GridPoint } from '@/lib/db';
-import { computeCompetitors, computeRingStats, type CompetitorSummary } from './grid-insights';
+import { computeCompetitors, computeGridSummary, computeRingStats, type CompetitorSummary } from './grid-insights';
 
 const GridMap = lazy(() => import('./GridMap'));
 
@@ -29,15 +29,7 @@ function rankColor(rank: number | null): string {
 export default function GridResults({ results, gridSize, spacingKm, keyword, target, cost }: Props) {
   const [highlight, setHighlight] = useState<CompetitorSummary | null>(null);
 
-  const ranked = results.filter((p) => p.rank !== null);
-  const top3 = results.filter((p) => p.rank !== null && p.rank <= 3).length;
-  const top10 = results.filter((p) => p.rank !== null && p.rank <= 10).length;
-  const avgRank = ranked.length > 0
-    ? Math.round(ranked.reduce((s, p) => s + p.rank!, 0) / ranked.length * 10) / 10
-    : null;
-  const ato = results.length > 0
-    ? Math.round((results.reduce((s, p) => s + (21 - Math.min(p.rank ?? 21, 21)), 0) / (results.length * 20)) * 100)
-    : 0;
+  const { foundCount, top3Count: top3, top10Count: top10, avgRank, ato } = computeGridSummary(results);
 
   const competitors = useMemo(() => computeCompetitors(results), [results]);
   const topCompetitors = competitors.slice(0, 5);
@@ -66,7 +58,7 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
         <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg rank</p>
           <p className="text-2xl font-black text-slate-900 mt-0.5 tabular-nums">{avgRank ?? '—'}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">{ranked.length}/{results.length} points found</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{foundCount}/{results.length} points found</p>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Top 3</p>
