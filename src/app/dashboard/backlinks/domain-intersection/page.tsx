@@ -1,6 +1,9 @@
 import { getCredentials, getSetting, getBlDomIntHistory, saveBlDomInt, getBlDomIntResults, type BlDomIntEntry } from '@/lib/db';
+import { stableSearchId } from '@/lib/dedupe';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import DomainIntersectionTable from './DomainIntersectionTable';
 
 interface DomIntItem {
   domain_from?: string;
@@ -27,13 +30,6 @@ async function fetchDomInt(target1: string, target2: string, login: string, pass
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
 }
 
-function RankBadge({ rank }: { rank?: number }) {
-  if (rank == null) return <span className="text-slate-300 text-xs">—</span>;
-  const cls = rank >= 70 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rank >= 40 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200';
-  return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border tabular-nums ${cls}`}>DR {rank}</span>;
-}
-
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
 export default async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -54,12 +50,17 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
     if (saved) { items = saved; activeEntry = getBlDomIntHistory().find((e) => e.id === historyId) ?? null; }
     else error = 'Search no longer available.';
   } else if (rawTarget1 && rawTarget2) {
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['bl-domain-intersection', rawTarget1, rawTarget2]);
+    const cached = getBlDomIntResults<DomIntItem>(dedupeId);
+    if (cached) {
+      items = cached;
+      cost = getBlDomIntHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchDomInt(rawTarget1, rawTarget2, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: BlDomIntEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), target1: rawTarget1, target2: rawTarget2, count: items.length, cost };
+        const entry: BlDomIntEntry = { id: dedupeId, ts: Date.now(), target1: rawTarget1, target2: rawTarget2, count: items.length, cost };
         saveBlDomInt(entry, items);
       }
     }
@@ -120,36 +121,14 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
             </div>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
+              {items.length > 0 && <CopyMarkdownButton data={csvData} columns={[{key:'domain_from',label:'Linking Domain'},{key:'domain_from_rank',label:'DR'},{key:'backlinks_to_target1',label:`BL → ${t1}`},{key:'backlinks_to_target2',label:`BL → ${t2}`},{key:'first_seen',label:'First Seen'},{key:'last_seen',label:'Last Seen'}]} />}
               {items.length > 0 && <ExportCSVButton data={csvData} filename={`domain-intersection-${t1}-${t2}.csv`} columns={[{key:'domain_from',label:'Linking Domain'},{key:'domain_from_rank',label:'DR'},{key:'backlinks_to_target1',label:`BL → ${t1}`},{key:'backlinks_to_target2',label:`BL → ${t2}`},{key:'first_seen',label:'First Seen'},{key:'last_seen',label:'Last Seen'}]} />}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No common linking domains found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Linking domain</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">DR</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-blue-600">→ {t1 || 'Target 1'}</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-violet-600">→ {t2 || 'Target 2'}</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Last seen</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => (
-                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-3 font-mono text-sm text-slate-900 dark:text-slate-200">{item.domain_from ?? '—'}</td>
-                      <td className="px-4 py-3 text-center"><RankBadge rank={item.domain_from_rank} /></td>
-                      <td className="px-4 py-3 text-right font-mono text-blue-600 tabular-nums font-bold">{fmt(item.backlinks_from_target1)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-violet-600 tabular-nums font-bold">{fmt(item.backlinks_from_target2)}</td>
-                      <td className="px-4 py-3 text-right text-slate-400 text-[11px] hidden lg:table-cell">{item.last_seen?.slice(0, 10) ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DomainIntersectionTable items={items} t1={t1} t2={t2} />
           )}
         </div>
       )}

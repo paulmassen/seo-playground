@@ -9,9 +9,10 @@ import {
   addKeywordAction, removeKeywordAction, checkOneAction, checkAllAction,
   saveDepthAction, addDomainAction, removeDomainAction, checkDomainAction,
 } from './actions';
-import KeywordRow from './KeywordRow';
+import RankTrackerTable from './RankTrackerTable';
 import PendingButton from '@/components/PendingButton';
 import LocationPicker from '@/components/LocationPicker';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,25 @@ export default async function RankTrackerPage({ searchParams }: { searchParams: 
     const previous = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
     return { kw, history, latest, previous };
   });
+
+  const csvData = rows.map(({ kw, latest, previous }) => ({
+    keyword: kw.keyword,
+    location: kw.location,
+    language: kw.language,
+    position: latest?.position ?? '',
+    previous_position: previous?.position ?? '',
+    checked_at: latest ? new Date(latest.checkedAt).toISOString().split('T')[0] : '',
+    url: latest?.url ?? '',
+  }));
+  const csvColumns = [
+    { key: 'keyword', label: 'Keyword' },
+    { key: 'location', label: 'Location' },
+    { key: 'language', label: 'Language' },
+    { key: 'position', label: 'Position' },
+    { key: 'previous_position', label: 'Previous Position' },
+    { key: 'checked_at', label: 'Checked' },
+    { key: 'url', label: 'Ranked URL' },
+  ];
 
   return (
     <div className="space-y-6 pb-12">
@@ -182,6 +202,7 @@ export default async function RankTrackerPage({ searchParams }: { searchParams: 
                   </span>
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] text-slate-300 hidden sm:block">Click a row to see history</span>
+                    <CopyMarkdownButton data={csvData} columns={csvColumns} />
                     {creds && (
                       <form action={checkDomainAction}>
                         <input type="hidden" name="domain" value={activeDomain} />
@@ -197,32 +218,12 @@ export default async function RankTrackerPage({ searchParams }: { searchParams: 
                     )}
                   </div>
                 </div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-50">
-                      <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Keyword</th>
-                      <th className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pos.</th>
-                      <th className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Trend</th>
-                      <th className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">14d</th>
-                      <th className="text-left px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Checked</th>
-                      <th className="px-3 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {rows.map(({ kw, history, latest, previous }) => (
-                      <KeywordRow
-                        key={kw.id}
-                        kw={kw}
-                        history={history}
-                        latest={latest}
-                        previous={previous}
-                        hasCreds={!!creds}
-                        checkAction={checkOneAction}
-                        removeAction={removeKeywordAction}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                <RankTrackerTable
+                  rows={rows}
+                  hasCreds={!!creds}
+                  checkAction={checkOneAction}
+                  removeAction={removeKeywordAction}
+                />
               </div>
             )}
           </div>

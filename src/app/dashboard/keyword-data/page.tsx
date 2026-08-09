@@ -1,5 +1,7 @@
 import { getCredentials, getKdHistory, saveKdSearch, getKdResults, type KdHistoryEntry } from '@/lib/db';
 import KeywordDataForm from './KeywordDataForm';
+import KeywordDataTable from './KeywordDataTable';
+import { stableSearchId } from '@/lib/dedupe';
 
 interface KeywordItem {
   keyword?: string;
@@ -70,19 +72,11 @@ async function fetchKeywordData(
   return { items: task.result ?? [], cost: task.cost };
 }
 
-const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 const SE_LABELS: Record<string, string> = { google_ads: 'Google Ads', bing: 'Bing Ads' };
 const TYPE_LABELS: Record<string, string> = {
   search_volume: 'Search Volume', keywords_for_site: 'Keywords For Site',
   keywords_for_keywords: 'Keywords For Keywords', ad_traffic_by_keywords: 'Ad Traffic', keyword_performance: 'Performance',
 };
-
-function CompetitionBadge({ value }: { value?: string | number }) {
-  if (value === undefined || value === null) return <span className="text-slate-300">—</span>;
-  const label = typeof value === 'string' ? value : value > 0.66 ? 'HIGH' : value > 0.33 ? 'MEDIUM' : 'LOW';
-  const color = label === 'HIGH' ? 'text-red-500 bg-red-50' : label === 'MEDIUM' ? 'text-amber-500 bg-amber-50' : 'text-emerald-600 bg-emerald-50';
-  return <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${color}`}>{label}</span>;
-}
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
@@ -107,7 +101,7 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
       const index = getKdHistory();
       activeEntry = index.find((e) => e.id === historyId) ?? null;
     } else {
-      error = 'Cette recherche n\'est plus disponible.';
+      error = 'This search is no longer available.';
     }
   }
 
@@ -116,10 +110,16 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
   const hasQuery = historyId || (seType === 'keywords_for_site' ? params.target?.trim() : params.keywords?.trim());
 
   if (!historyId && hasQuery) {
-    if (!creds) {
+    const body = buildRequestBody(params as Record<string, string | undefined>);
+    const dedupeId = stableSearchId(['keyword-data', se, seType, JSON.stringify(body)]);
+    const cachedItems = getKdResults<KeywordItem>(dedupeId);
+
+    if (cachedItems) {
+      items = cachedItems;
+      cost = getKdHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const body = buildRequestBody(params as Record<string, string | undefined>);
       const result = await fetchKeywordData(se, seType, body, creds.login, creds.pass);
       items = result.items;
       cost = result.cost;
@@ -130,7 +130,7 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
           ? (params.target ?? 'site')
           : (params.keywords ?? '').split('\n').filter(Boolean).slice(0, 3).join(', ');
         const entry: KdHistoryEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(), se, seType,
           label: label.length > 60 ? label.slice(0, 57) + '…' : label,
           count: items.length, cost: result.cost,
@@ -159,7 +159,7 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">Keyword Data</h1>
-        <p className="text-sm text-slate-400 mt-1">Volumes de recherche, CPC et données de concurrence via DataForSEO.</p>
+        <p className="text-sm text-slate-400 mt-1">Search volume, CPC and competition data via DataForSEO.</p>
       </div>
 
       <KeywordDataForm defaults={formDefaults} />
@@ -175,56 +175,13 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
             </div>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              <span className="text-xs font-black text-slate-400">{items.length} mot{items.length !== 1 ? 's' : ''}-clé{items.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs font-black text-slate-400">{items.length} keyword{items.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Vol.</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Compét.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Index</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">CPC</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Bid Low</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Bid High</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Tendance</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {items.map((item, i) => {
-                    const monthly = item.monthly_searches?.slice(-12) ?? [];
-                    const maxVol = Math.max(...monthly.map((m) => m.search_volume ?? 0), 1);
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">{item.keyword ?? '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">{item.search_volume?.toLocaleString("en-GB") ?? '—'}</td>
-                        <td className="px-4 py-3 text-center"><CompetitionBadge value={item.competition} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{item.competition_index ?? '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{item.cpc != null ? `$${item.cpc.toFixed(2)}` : '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{item.low_top_of_page_bid != null ? `$${item.low_top_of_page_bid.toFixed(2)}` : '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{item.high_top_of_page_bid != null ? `$${item.high_top_of_page_bid.toFixed(2)}` : '—'}</td>
-                        <td className="px-4 py-3 hidden xl:table-cell">
-                          {monthly.length > 0 ? (
-                            <div className="flex items-end gap-0.5 h-7">
-                              {monthly.map((m, j) => (
-                                <div key={j} title={`${MONTHS[m.month - 1]} ${m.year}: ${m.search_volume?.toLocaleString("en-GB")}`}
-                                  className="w-2.5 bg-blue-400 rounded-sm hover:bg-blue-600 transition-colors"
-                                  style={{ height: `${Math.max(2, Math.round(((m.search_volume ?? 0) / maxVol) * 28))}px` }} />
-                              ))}
-                            </div>
-                          ) : <span className="text-slate-300 text-xs">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <KeywordDataTable items={items} />
           )}
         </div>
       )}

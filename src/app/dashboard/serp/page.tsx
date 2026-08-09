@@ -3,6 +3,7 @@ import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import { addDomainAction, removeDomainAction } from './actions';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
 
 interface SerpItem {
   type: string;
@@ -77,13 +78,20 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
       isFromHistory = true;
       activeEntry = history.find((e) => e.id === historyId) ?? null;
     } else {
-      error = 'Cette recherche n\'est plus disponible.';
+      error = 'This search is no longer available.';
     }
   }
 
   // Fresh search
   if (!historyId && keyword) {
-    if (!creds) {
+    const dedupeId = stableSearchId(['serp', keyword, location, language, device, depth]);
+    const cached = getSerpResults<SerpItem>(dedupeId);
+
+    if (cached) {
+      results = cached;
+      isFromHistory = true;
+      activeEntry = history.find((e) => e.id === dedupeId) ?? null;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       try {
@@ -100,7 +108,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
             .filter((h): h is TargetHit => h !== null);
 
           const entry: SerpHistoryEntry = {
-            id: crypto.randomUUID().slice(0, 8),
+            id: dedupeId,
             ts: Date.now(),
             keyword,
             location,
@@ -113,7 +121,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
           saveSerpSearch(entry, results);
         }
       } catch {
-        error = 'Error lors de la requête DataForSEO.';
+        error = 'Error during the DataForSEO request.';
       }
     }
   }
@@ -147,7 +155,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Keyword</label>
                 <input
                   type="text" name="keyword" defaultValue={activeEntry?.keyword ?? keyword}
-                  placeholder="ex: plombier paris" required
+                  placeholder="e.g. plumber paris" required
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
@@ -233,7 +241,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
                                 {item.title}
                               </a>
                               {isTarget && (
-                                <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">cible</span>
+                                <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">target</span>
                               )}
                             </div>
                             <p className="text-[11px] text-slate-400 mt-0.5 mb-1.5 font-mono truncate">
@@ -264,7 +272,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
               <form action={addDomainAction} className="flex gap-2">
                 <input
                   type="text" name="domain"
-                  placeholder="exemple.com"
+                  placeholder="example.com"
                   className="flex-1 min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button type="submit" className="shrink-0 px-3 py-2 bg-slate-900 text-white text-xs font-black rounded-lg hover:bg-blue-600 transition-colors">
@@ -304,7 +312,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
                         <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.keyword}</p>
                         <span className="shrink-0 text-[10px] text-slate-400">{formatDate(entry.ts)}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 truncate mt-0.5">{entry.location} · {entry.count} rés.</p>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">{entry.location} · {entry.count} results</p>
                       {entry.targetHits && entry.targetHits.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {entry.targetHits.map((h) => (

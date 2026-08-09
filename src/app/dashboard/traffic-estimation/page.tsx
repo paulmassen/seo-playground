@@ -3,6 +3,9 @@ import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import { stableSearchId } from '@/lib/dedupe';
+import TrafficEstimationTable from './TrafficEstimationTable';
 
 interface TrafficMetrics { count?: number; etv?: number; impressions_etv?: number; }
 interface TrafficItem { target?: string; metrics?: { organic?: TrafficMetrics; paid?: TrafficMetrics } }
@@ -61,12 +64,19 @@ export default async function TrafficEstimationPage({ searchParams }: { searchPa
     else error = 'Search no longer available.';
   } else if (rawTargets) {
     const targetList = rawTargets.split('\n').map((t) => t.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')).filter(Boolean).slice(0, 1000);
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['traffic-estimation', location, language, ...targetList]);
+    const cached = getTrafficEstimationResults<TrafficItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      activeEntry = getTrafficEstimationHistory().find((e) => e.id === dedupeId) ?? null;
+      cost = activeEntry?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchTraffic(targetList, location, language, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: TrafficEstimationEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), targets: targetList.join(', '), location, language, count: items.length, cost };
+        const entry: TrafficEstimationEntry = { id: dedupeId, ts: Date.now(), targets: targetList.join(', '), location, language, count: items.length, cost };
         saveTrafficEstimationSearch(entry, items);
       }
     }
@@ -124,37 +134,18 @@ export default async function TrafficEstimationPage({ searchParams }: { searchPa
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} domains</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename="traffic-estimation.csv" columns={[{key:'target',label:'Domain'},{key:'keywords',label:'Keywords'},{key:'traffic',label:'Est. Traffic (ETV)'},{key:'paid_keywords',label:'Paid KWs'}]} />}
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={[{key:'target',label:'Domain'},{key:'keywords',label:'Keywords'},{key:'traffic',label:'Est. Traffic (ETV)'},{key:'paid_keywords',label:'Paid KWs'}]} />
+                  <ExportCSVButton data={csvData} filename="traffic-estimation.csv" columns={[{key:'target',label:'Domain'},{key:'keywords',label:'Keywords'},{key:'traffic',label:'Est. Traffic (ETV)'},{key:'paid_keywords',label:'Paid KWs'}]} />
+                </div>
+              )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Domain</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Est. traffic (ETV)</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Keywords</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Paid KWs</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {sorted.map((item, i) => {
-                    const org = item.metrics?.organic;
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium">{item.target ?? '—'}</td>
-                        <td className="px-4 py-3"><TrafficBar value={org?.etv} max={maxEtv} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{fmt(org?.count)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden sm:table-cell">{fmt(item.metrics?.paid?.count)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <TrafficEstimationTable items={items} />
           )}
         </div>
       )}

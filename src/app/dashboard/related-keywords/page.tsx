@@ -4,9 +4,12 @@ import {
   type RelatedKwSearchEntry,
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { LANGUAGES } from '@/lib/geo-options';
+import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
+import RelatedKeywordsTable from './RelatedKeywordsTable';
 
 interface RelatedKeywordItem {
   keyword_data?: {
@@ -66,20 +69,6 @@ async function fetchRelatedKeywords(
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
 }
 
-function DifficultyBadge({ value }: { value?: number }) {
-  if (value === undefined || value === null) return <span className="text-slate-300 text-xs">—</span>;
-  const color = value >= 70 ? 'bg-red-100 text-red-700'
-    : value >= 50 ? 'bg-orange-100 text-orange-700'
-    : value >= 30 ? 'bg-amber-100 text-amber-700'
-    : 'bg-emerald-100 text-emerald-700';
-  return <span className={`inline-flex items-center justify-center w-9 h-5 rounded text-[10px] font-black ${color}`}>{value}</span>;
-}
-
-function fmt(n?: number) {
-  if (n === undefined || n === null) return '—';
-  return n.toLocaleString("en-GB");
-}
-
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -112,14 +101,21 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
       const history = getRelatedKwHistory();
       activeEntry = history.find((e) => e.id === historyId) ?? null;
     } else {
-      error = "Cette recherche n'est plus disponible.";
+      error = 'This search is no longer available.';
     }
   }
 
   const hasQuery = historyId || keyword;
 
   if (!historyId && keyword) {
-    if (!creds) {
+    const dedupeId = stableSearchId(['related-keywords', keyword, location, language, depth, limit]);
+    const cached = getRelatedKwResults<RelatedKeywordItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      const cachedEntry = getRelatedKwHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const result = await fetchRelatedKeywords(keyword, location, language, depth, limit, creds.login, creds.pass);
@@ -129,7 +125,7 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
 
       if (!error && items.length > 0) {
         const entry: RelatedKwSearchEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           keyword,
           location,
@@ -173,7 +169,7 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
             <input
               type="text" name="keyword"
               defaultValue={displayKeyword}
-              placeholder="ex: plombier"
+              placeholder="e.g. plombier"
               required
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
@@ -194,13 +190,13 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
             <select name="depth" defaultValue={String(displayDepth)}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
               <option value="1">1 — Direct</option>
-              <option value="2">2 — Étendu</option>
-              <option value="3">3 — Large</option>
-              <option value="4">4 — Exhaustif</option>
+              <option value="2">2 — Extended</option>
+              <option value="3">3 — Broad</option>
+              <option value="4">4 — Exhaustive</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Nombre max de results</label>
+            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Max results</label>
             <select name="limit" defaultValue={String(limit)}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
               <option value="50">50</option>
@@ -225,77 +221,29 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
               <span className="text-xs font-black text-slate-400">{items.length} result{items.length !== 1 ? 's' : ''}</span>
-              {items.length > 0 && (
-                <ExportCSVButton
-                  data={csvData}
-                  filename={`related-keywords-${displayKeyword}.csv`}
-                  columns={[
-                    { key: 'keyword', label: 'Keyword' },
-                    { key: 'search_volume', label: 'Search Volume' },
-                    { key: 'difficulty', label: 'Difficulty' },
-                    { key: 'cpc', label: 'CPC' },
-                    { key: 'competition_index', label: 'Competition Index' },
-                    { key: 'ref_domains', label: 'Avg Referring Domains' },
-                    { key: 'related_count', label: 'Related Count' },
-                  ]}
-                />
-              )}
+              {items.length > 0 && (() => {
+                const csvColumns = [
+                  { key: 'keyword', label: 'Keyword' },
+                  { key: 'search_volume', label: 'Search Volume' },
+                  { key: 'difficulty', label: 'Difficulty' },
+                  { key: 'cpc', label: 'CPC' },
+                  { key: 'competition_index', label: 'Competition Index' },
+                  { key: 'ref_domains', label: 'Avg Referring Domains' },
+                  { key: 'related_count', label: 'Related Count' },
+                ];
+                return (
+                  <div className="flex items-center gap-2">
+                    <CopyMarkdownButton data={csvData} columns={csvColumns} />
+                    <ExportCSVButton data={csvData} filename={`related-keywords-${displayKeyword}.csv`} columns={csvColumns} />
+                  </div>
+                );
+              })()}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">KD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Vol.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">CPC</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Comp.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Ref. domains</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Related</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {items.map((item, i) => {
-                    const kd = item.keyword_data;
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-3 font-medium text-slate-900 max-w-[200px]">
-                          <span className="truncate block">{kd?.keyword ?? '—'}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <DifficultyBadge value={item.keyword_difficulty} />
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
-                          {fmt(kd?.search_volume)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">
-                          {kd?.cpc != null ? `$${kd.cpc.toFixed(2)}` : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden sm:table-cell">
-                          {kd?.competition_index ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
-                          {fmt(item.avg_backlinks_info?.referring_domains)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums hidden lg:table-cell">
-                          {item.related_keywords && item.related_keywords.length > 0 ? (
-                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                              {item.related_keywords.length}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 text-xs">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <RelatedKeywordsTable items={items} />
           )}
         </div>
       )}
@@ -315,7 +263,7 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
                     <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.keyword}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       {entry.count} result{entry.count !== 1 ? 's' : ''}
-                      {' · '}{entry.location} · profondeur {entry.depth}
+                      {' · '}{entry.location} · depth {entry.depth}
                       {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}
                     </p>
                   </div>

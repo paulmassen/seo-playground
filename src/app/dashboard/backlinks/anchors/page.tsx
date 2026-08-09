@@ -1,8 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getAnchorsHistory, saveAnchorsSearch, getAnchorsResults, getSetting } from '@/lib/db';
+import { stableSearchId } from '@/lib/dedupe';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SearchForm from '@/components/SearchForm';
+import AnchorsTable from './AnchorsTable';
 
 interface AnchorItem {
   anchor: string;
@@ -64,23 +67,29 @@ export default async function AnchorsPage({ searchParams }: { searchParams: Prom
     const entry = history.find((h) => h.id === historyId);
     total = entry?.total ?? items.length;
   } else if (target && creds) {
-    try {
-      const result = await fetchAnchors(target, limit, creds.login, creds.pass);
-      if (result.error) {
-        error = result.error;
-      } else {
-        items = result.items;
-        total = result.total;
-        cost = result.cost;
-        const id = crypto.randomUUID();
-        saveAnchorsSearch({ id, ts: Date.now(), target, cost, total }, items);
+    const dedupeId = stableSearchId(['anchors', target, limit]);
+    const cached = getAnchorsResults<AnchorItem>(dedupeId);
+    if (cached) {
+      items = cached;
+      const cachedEntry = history.find((h) => h.id === dedupeId);
+      total = cachedEntry?.total ?? items.length;
+      cost = cachedEntry?.cost ?? 0;
+    } else {
+      try {
+        const result = await fetchAnchors(target, limit, creds.login, creds.pass);
+        if (result.error) {
+          error = result.error;
+        } else {
+          items = result.items;
+          total = result.total;
+          cost = result.cost;
+          saveAnchorsSearch({ id: dedupeId, ts: Date.now(), target, cost, total }, items);
+        }
+      } catch (e) {
+        error = String(e);
       }
-    } catch (e) {
-      error = String(e);
     }
   }
-
-  const maxLinks = items[0]?.backlinks ?? 1;
 
   const csvData = items.map((i) => ({
     anchor: i.anchor,
@@ -126,6 +135,18 @@ export default async function AnchorsPage({ searchParams }: { searchParams: Prom
                   {items.length} shown / {total.toLocaleString()} total
                   {cost > 0 && <span className="ml-3 text-slate-300">· ${cost.toFixed(4)}</span>}
                 </p>
+                <CopyMarkdownButton
+                  data={csvData}
+                  columns={[
+                    { key: 'anchor', label: 'Anchor' },
+                    { key: 'backlinks', label: 'Backlinks' },
+                    { key: 'referring_domains', label: 'Ref. Domains' },
+                    { key: 'dofollow', label: 'Dofollow' },
+                    { key: 'nofollow', label: 'Nofollow' },
+                    { key: 'broken', label: 'Broken' },
+                    { key: 'first_seen', label: 'First Seen' },
+                  ]}
+                />
                 <ExportCSVButton
                   data={csvData}
                   filename={`anchors-${target}.csv`}
@@ -141,43 +162,7 @@ export default async function AnchorsPage({ searchParams }: { searchParams: Prom
                 />
               </div>
               <div id="results" className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left px-5 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Anchor Text</th>
-                      <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Links</th>
-                      <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Domains</th>
-                      <th className="text-left px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Split</th>
-                      <th className="text-left px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">First Seen</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {items.map((item, i) => {
-                      const pct = Math.round((item.backlinks / maxLinks) * 100);
-                      const dfPct = item.backlinks > 0 ? Math.round((item.dofollow / item.backlinks) * 100) : 0;
-                      return (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="px-5 py-3">
-                            <div className="font-bold text-slate-800 max-w-xs truncate">{item.anchor || <span className="text-slate-400 italic">empty</span>}</div>
-                            <div className="mt-1 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-400 rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-right font-mono font-bold text-slate-700">{item.backlinks.toLocaleString()}</td>
-                          <td className="px-3 py-3 text-right font-mono text-slate-500">{item.referring_domains.toLocaleString()}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[9px] font-black text-emerald-600">{dfPct}% do</span>
-                              <span className="text-[9px] text-slate-300">/</span>
-                              <span className="text-[9px] font-black text-slate-400">{100 - dfPct}% no</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-slate-400">{item.first_seen?.split('T')[0] ?? '—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <AnchorsTable items={items} />
               </div>
             </div>
           )}

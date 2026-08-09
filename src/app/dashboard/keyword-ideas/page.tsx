@@ -4,6 +4,7 @@ import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import { stableSearchId } from '@/lib/dedupe';
 import KeywordIdeasTable from './KeywordIdeasTable';
 
 interface IdeaItem {
@@ -54,12 +55,19 @@ export default async function KeywordIdeasPage({ searchParams }: { searchParams:
     if (saved) { items = saved; activeEntry = getKeywordIdeasHistory().find((e) => e.id === historyId) ?? null; }
     else error = 'Search no longer available.';
   } else if (keyword) {
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
-    else {
+    const dedupeId = stableSearchId(['keyword-ideas', keyword, location, language, limit]);
+    const cached = getKeywordIdeasResults<IdeaItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      cost = getKeywordIdeasHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) {
+      error = 'DataForSEO credentials missing. Configure them in Settings.';
+    } else {
       const result = await fetchIdeas(keyword, location, language, limit, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: KeywordIdeasEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), keyword, location, language, count: items.length, cost };
+        const entry: KeywordIdeasEntry = { id: dedupeId, ts: Date.now(), keyword, location, language, count: items.length, cost };
         saveKeywordIdeasSearch(entry, items);
       }
     }

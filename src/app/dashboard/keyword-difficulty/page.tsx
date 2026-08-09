@@ -6,6 +6,8 @@ import {
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
+import KeywordDifficultyTable from './KeywordDifficultyTable';
 
 interface DifficultyItem {
   keyword?: string;
@@ -55,31 +57,6 @@ async function fetchDifficulty(
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
 }
 
-function DifficultyBar({ value }: { value?: number }) {
-  if (value === undefined || value === null) return <span className="text-slate-300">—</span>;
-  const color = value >= 70 ? 'bg-red-500'
-    : value >= 50 ? 'bg-orange-400'
-    : value >= 30 ? 'bg-amber-400'
-    : 'bg-emerald-400';
-  const textColor = value >= 70 ? 'text-red-600'
-    : value >= 50 ? 'text-orange-600'
-    : value >= 30 ? 'text-amber-600'
-    : 'text-emerald-600';
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
-      </div>
-      <span className={`text-xs font-black tabular-nums ${textColor}`}>{value}</span>
-    </div>
-  );
-}
-
-function fmt(n?: number) {
-  if (n === undefined || n === null) return '—';
-  return n.toLocaleString("en-GB");
-}
-
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -117,10 +94,16 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
   const hasQuery = historyId || keywords;
 
   if (!historyId && keywords) {
-    if (!creds) {
+    const kwList = keywords.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 1000);
+    const dedupeId = stableSearchId(['keyword-difficulty', kwList.join(','), location, language]);
+    const cachedItems = getKwDifficultyResults<DifficultyItem>(dedupeId);
+
+    if (cachedItems) {
+      items = cachedItems;
+      cost = getKwDifficultyHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const kwList = keywords.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 1000);
       const result = await fetchDifficulty(kwList, location, language, creds.login, creds.pass);
       items = result.items;
       cost = result.cost;
@@ -129,7 +112,7 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
       if (!error && items.length > 0) {
         const label = kwList.slice(0, 3).join(', ') + (kwList.length > 3 ? '…' : '');
         const entry: KwDifficultySearchEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           keywords: label,
           location,
@@ -161,7 +144,7 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
               name="keywords"
               defaultValue={activeEntry ? '' : keywords}
               rows={6}
-              placeholder={"plombier paris\nplombier urgence\ndépannage plomberie"}
+              placeholder={"plumber paris\nemergency plumber\nplumbing repair"}
               required
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono resize-y"
             />
@@ -197,48 +180,7 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Difficulty</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Vol.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">CPC</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Ref. domains</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Results</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {items
-                    .sort((a, b) => (b.keyword_difficulty ?? 0) - (a.keyword_difficulty ?? 0))
-                    .map((item, i) => (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">
-                          {item.keyword ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <DifficultyBar value={item.keyword_difficulty} />
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
-                          {fmt(item.keyword_info?.search_volume)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">
-                          {item.keyword_info?.cpc != null ? `$${item.keyword_info.cpc.toFixed(2)}` : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
-                          {fmt(item.avg_backlinks_info?.referring_domains)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell">
-                          {item.serp_info?.se_results_count != null
-                            ? item.serp_info.se_results_count.toLocaleString("en-GB")
-                            : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+            <KeywordDifficultyTable items={items} />
           )}
         </div>
       )}

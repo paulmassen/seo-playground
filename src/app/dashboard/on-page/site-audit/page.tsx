@@ -6,6 +6,8 @@ import {
 import { redirect } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import SiteAuditPagesTable from './SiteAuditPagesTable';
 import AutoRefresh from '@/components/AutoRefresh';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -796,87 +798,45 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                   <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <span className="text-xs font-black text-slate-400">{auditPages.length} page{auditPages.length !== 1 ? 's' : ''} HTML</span>
                     {auditPages.length > 0 && (
-                      <ExportCSVButton
-                        data={csvData}
-                        filename={`site-audit-${activeTask!.target}.csv`}
-                        columns={[
-                          { key: 'url', label: 'URL' },
-                          { key: 'status_code', label: 'Status' },
-                          { key: 'onpage_score', label: 'Score' },
-                          { key: 'title', label: 'Title' },
-                          { key: 'title_length', label: 'Title Length' },
-                          { key: 'description', label: 'Description' },
-                          { key: 'errors', label: 'Errors' },
-                          { key: 'warnings', label: 'Warnings' },
-                          { key: 'load_time_ms', label: 'Load Time (ms)' },
-                          { key: 'word_count', label: 'Word Count' },
-                        ]}
-                      />
+                      <div className="flex items-center gap-2">
+                        <CopyMarkdownButton
+                          data={csvData}
+                          columns={[
+                            { key: 'url', label: 'URL' },
+                            { key: 'status_code', label: 'Status' },
+                            { key: 'onpage_score', label: 'Score' },
+                            { key: 'title', label: 'Title' },
+                            { key: 'title_length', label: 'Title Length' },
+                            { key: 'description', label: 'Description' },
+                            { key: 'errors', label: 'Errors' },
+                            { key: 'warnings', label: 'Warnings' },
+                            { key: 'load_time_ms', label: 'Load Time (ms)' },
+                            { key: 'word_count', label: 'Word Count' },
+                          ]}
+                        />
+                        <ExportCSVButton
+                          data={csvData}
+                          filename={`site-audit-${activeTask!.target}.csv`}
+                          columns={[
+                            { key: 'url', label: 'URL' },
+                            { key: 'status_code', label: 'Status' },
+                            { key: 'onpage_score', label: 'Score' },
+                            { key: 'title', label: 'Title' },
+                            { key: 'title_length', label: 'Title Length' },
+                            { key: 'description', label: 'Description' },
+                            { key: 'errors', label: 'Errors' },
+                            { key: 'warnings', label: 'Warnings' },
+                            { key: 'load_time_ms', label: 'Load Time (ms)' },
+                            { key: 'word_count', label: 'Word Count' },
+                          ]}
+                        />
+                      </div>
                     )}
                   </div>
                   {auditPages.length === 0 ? (
                     <div className="px-6 py-12 text-center text-sm text-slate-400">No HTML pages found.</div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">#</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">URL</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Score</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">HTTP</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Title</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Issues</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Load</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Words</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {auditPages.map((page, i) => {
-                            const { errors: errCount, warnings: warnCount } = countPageIssues(page);
-                            const path = page.url ? (() => { try { return new URL(page.url).pathname; } catch { return page.url; } })() : '—';
-                            return (
-                              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                <td className="px-4 py-3 text-[11px] font-mono text-slate-400 tabular-nums">{i + 1}</td>
-                                <td className="px-4 py-3 max-w-[280px]">
-                                  <a href={page.url} target="_blank" rel="noopener noreferrer"
-                                    className="text-xs font-mono text-blue-600 hover:text-blue-800 truncate block hover:underline">
-                                    {path}
-                                  </a>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  {page.onpage_score !== undefined ? (
-                                    <span className={`inline-flex items-center justify-center w-12 h-6 rounded text-[11px] font-black border ${scoreBg(page.onpage_score)}`}>
-                                      {page.onpage_score.toFixed(0)}
-                                    </span>
-                                  ) : <span className="text-slate-300">—</span>}
-                                </td>
-                                <td className="px-4 py-3 text-center">{httpBadge(page.status_code)}</td>
-                                <td className="px-4 py-3 max-w-[200px] hidden md:table-cell">
-                                  <span className="text-xs text-slate-700 dark:text-slate-300 truncate block">{page.meta?.title ?? <span className="text-slate-300 italic">no title</span>}</span>
-                                  {page.meta?.title_length !== undefined && (
-                                    <span className={`text-[10px] ${page.meta.title_length > 65 || page.meta.title_length < 30 ? 'text-amber-500' : 'text-slate-400'}`}>{page.meta.title_length} chars</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    {errCount > 0 && <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">{errCount}</span>}
-                                    {warnCount > 0 && <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">{warnCount}</span>}
-                                    {errCount === 0 && warnCount === 0 && <span className="text-emerald-500 text-xs">✓</span>}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell text-xs">
-                                  {formatMs(page.page_timing?.duration_time)}
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden xl:table-cell text-xs">
-                                  {fmt(page.content?.plain_text_word_count)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                    <SiteAuditPagesTable pages={auditPages} />
                   )}
                 </div>
               )}

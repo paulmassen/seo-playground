@@ -6,9 +6,12 @@ import {
   type AiKwDataEntry,
 } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
+import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import HistorySidebar from '@/components/HistorySidebar';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import AiKeywordDataTable from './AiKeywordDataTable';
 
 // ---- Types ----
 
@@ -59,24 +62,6 @@ async function fetchAiKeywordData(
 
 // ---- UI helpers ----
 
-function Sparkline({ monthly }: { monthly?: MonthlyAiSearch[] }) {
-  const data = [...(monthly ?? [])].reverse().slice(-12);
-  if (data.length === 0) return <span className="text-slate-300 dark:text-slate-600">—</span>;
-  const max = Math.max(...data.map((m) => m.ai_search_volume ?? 0), 1);
-  return (
-    <div className="flex items-end gap-0.5 h-6"
-      title={data.map((m) => `${m.month}/${m.year}: ${m.ai_search_volume?.toLocaleString('en-GB')}`).join(' · ')}>
-      {data.map((m, i) => (
-        <div
-          key={i}
-          className="w-1.5 bg-violet-300 dark:bg-violet-500 rounded-sm"
-          style={{ height: `${Math.max(2, Math.round(((m.ai_search_volume ?? 0) / max) * 24))}px` }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function fmt(n?: number) {
   if (n === undefined || n === null) return '—';
   return n.toLocaleString('en-GB');
@@ -120,10 +105,17 @@ export default async function AiKeywordDataPage({ searchParams }: { searchParams
   const hasQuery = !!(historyId || keywords);
 
   if (!historyId && keywords) {
-    if (!creds) {
+    const kwList = keywords.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 1000);
+    const dedupeId = stableSearchId(['ai-keyword-data', kwList.join('\n'), location, language]);
+    const cached = getAiKwDataResults<AiKeywordItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      const cachedEntry = getAiKwDataHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const kwList = keywords.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 1000);
       const result = await fetchAiKeywordData(kwList, location, language, creds.login, creds.pass);
       items = result.items;
       cost = result.cost;
@@ -132,7 +124,7 @@ export default async function AiKeywordDataPage({ searchParams }: { searchParams
       if (!error && items.length > 0) {
         const label = kwList.slice(0, 3).join(', ') + (kwList.length > 3 ? '…' : '');
         const entry: AiKwDataEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           keywords: label,
           location,
@@ -244,37 +236,18 @@ export default async function AiKeywordDataPage({ searchParams }: { searchParams
                 <div className="flex items-center gap-3">
                   {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
                   <span className="text-xs font-black text-slate-400">{items.length} keyword{items.length !== 1 ? 's' : ''}</span>
+                  {items.length > 0 && (
+                    <CopyMarkdownButton
+                      data={items.map((i) => ({ keyword: i.keyword ?? '', ai_search_volume: i.ai_search_volume ?? '' }))}
+                      columns={[{ key: 'keyword', label: 'Keyword' }, { key: 'ai_search_volume', label: 'AI Volume' }]}
+                    />
+                  )}
                 </div>
               </div>
               {items.length === 0 ? (
                 <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
-                        <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                        <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">AI volume</th>
-                        <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">12mo trend</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                      {items
-                        .sort((a, b) => (b.ai_search_volume ?? 0) - (a.ai_search_volume ?? 0))
-                        .map((item, i) => (
-                          <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
-                            <td className="px-6 py-3 font-medium text-slate-900 dark:text-white max-w-xs">{item.keyword ?? '—'}</td>
-                            <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
-                              {fmt(item.ai_search_volume)}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Sparkline monthly={item.ai_monthly_searches} />
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
+                <AiKeywordDataTable items={items} />
               )}
             </div>
           )}

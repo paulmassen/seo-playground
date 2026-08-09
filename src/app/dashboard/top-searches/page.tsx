@@ -4,9 +4,12 @@ import {
   type TopSearchesEntry,
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
+import TopSearchesTable from './TopSearchesTable';
 
 interface MonthlySearch {
   year: number;
@@ -65,7 +68,7 @@ async function fetchTopSearches(
     }]),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!res.ok) return { items: [], error: `Erreur API ${res.status}` };
+  if (!res.ok) return { items: [], error: `API error ${res.status}` };
   const data = await res.json() as {
     tasks?: Array<{
       status_code?: number;
@@ -164,14 +167,24 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
       totalCount = activeEntry?.totalCount;
       cost = activeEntry?.cost;
     } else {
-      error = "Cette recherche n'est plus disponible.";
+      error = 'This search is no longer available.';
     }
   }
 
   const hasQuery = !!(historyId || params.location || params.language || params.limit);
 
   if (!historyId && (params.location || params.language || params.limit)) {
-    if (!creds) {
+    const dedupeId = stableSearchId(['top-searches', location, language, limit, ignoreSynonyms]);
+    const cached = getTopSearchesResults<TopSearchItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      isFromHistory = true;
+      const cachedEntry = getTopSearchesHistory().find((e) => e.id === dedupeId);
+      activeEntry = cachedEntry ?? null;
+      totalCount = cachedEntry?.totalCount;
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const result = await fetchTopSearches(location, language, limit, ignoreSynonyms, creds.login, creds.pass);
@@ -182,7 +195,7 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
 
       if (!error && items.length > 0) {
         const entry: TopSearchesEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           location,
           language,
@@ -218,7 +231,7 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Top Searches</h1>
-        <p className="text-sm text-slate-400 mt-1">Keywords les plus recherchés pour une localisation et langue données via DataForSEO Labs.</p>
+        <p className="text-sm text-slate-400 mt-1">The most searched keywords for a given location and language, via DataForSEO Labs.</p>
       </div>
 
       <SearchForm className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4" btnLabel="Search" btnClassName="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors">
@@ -277,90 +290,42 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
               <span className="text-xs font-black text-slate-400">{items.length} keyword{items.length !== 1 ? 's' : ''}</span>
               {items.length > 0 && (
-                <ExportCSVButton
-                  data={csvData}
-                  filename={`top-searches-${displayLocation}-${displayLanguage}.csv`}
-                  columns={[
-                    { key: 'keyword', label: 'Keyword' },
-                    { key: 'search_volume', label: 'Search Volume' },
-                    { key: 'cpc', label: 'CPC' },
-                    { key: 'competition_level', label: 'Competition' },
-                    { key: 'keyword_difficulty', label: 'KD' },
-                    { key: 'word_count', label: 'Word Count' },
-                    { key: 'intent', label: 'Intent' },
-                    { key: 'ref_domains', label: 'Avg Ref. Domains' },
-                  ]}
-                />
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton
+                    data={csvData}
+                    columns={[
+                      { key: 'keyword', label: 'Keyword' },
+                      { key: 'search_volume', label: 'Search Volume' },
+                      { key: 'cpc', label: 'CPC' },
+                      { key: 'competition_level', label: 'Competition' },
+                      { key: 'keyword_difficulty', label: 'KD' },
+                      { key: 'word_count', label: 'Word Count' },
+                      { key: 'intent', label: 'Intent' },
+                      { key: 'ref_domains', label: 'Avg Ref. Domains' },
+                    ]}
+                  />
+                  <ExportCSVButton
+                    data={csvData}
+                    filename={`top-searches-${displayLocation}-${displayLanguage}.csv`}
+                    columns={[
+                      { key: 'keyword', label: 'Keyword' },
+                      { key: 'search_volume', label: 'Search Volume' },
+                      { key: 'cpc', label: 'CPC' },
+                      { key: 'competition_level', label: 'Competition' },
+                      { key: 'keyword_difficulty', label: 'KD' },
+                      { key: 'word_count', label: 'Word Count' },
+                      { key: 'intent', label: 'Intent' },
+                      { key: 'ref_domains', label: 'Avg Ref. Domains' },
+                    ]}
+                  />
+                </div>
               )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">#</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">KD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Vol.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">CPC</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Intent</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Comp.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Ref. Dom.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Trend</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => {
-                    const ki = item.keyword_info;
-                    const kp = item.keyword_properties;
-                    const compLevel = ki?.competition_level;
-                    const compColor = compLevel === 'HIGH' ? 'text-red-500 bg-red-50 dark:bg-red-950'
-                      : compLevel === 'MEDIUM' ? 'text-amber-600 bg-amber-50 dark:bg-amber-950'
-                      : compLevel === 'LOW' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950'
-                      : 'text-slate-400 bg-slate-100 dark:bg-slate-800';
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 text-[11px] font-mono text-slate-400 tabular-nums">{i + 1}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-white max-w-[220px]">
-                          <span className="truncate block">{item.keyword}</span>
-                          {kp?.word_count !== undefined && (
-                            <span className="text-[10px] text-slate-400">{kp.word_count} mot{kp.word_count !== 1 ? 's' : ''}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <DifficultyBadge value={kp?.keyword_difficulty} />
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
-                          {fmt(ki?.search_volume)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">
-                          {ki?.cpc != null ? `$${ki.cpc.toFixed(2)}` : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-center hidden sm:table-cell">
-                          <IntentBadge intent={item.search_intent_info?.main_intent} />
-                        </td>
-                        <td className="px-4 py-3 text-center hidden md:table-cell">
-                          {compLevel ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black ${compColor}`}>
-                              {compLevel}
-                            </span>
-                          ) : <span className="text-slate-300 text-xs">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell">
-                          {fmt(item.avg_backlinks_info?.referring_domains)}
-                        </td>
-                        <td className="px-4 py-3 text-right hidden xl:table-cell">
-                          <TrendSparkline monthly={ki?.monthly_searches} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <TopSearchesTable items={items} />
           )}
         </div>
       )}

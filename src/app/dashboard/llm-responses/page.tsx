@@ -6,6 +6,7 @@ import {
   type LlmResponseEntry,
 } from '@/lib/db';
 import { PLATFORM_LABELS, MODELS_BY_PLATFORM, isValidPlatform, type LlmPlatform } from '@/lib/llm-options';
+import { stableSearchId } from '@/lib/dedupe';
 import LlmResponseForm from './LlmResponseForm';
 import HistorySidebar from '@/components/HistorySidebar';
 
@@ -174,7 +175,14 @@ export default async function LlmResponsesPage({ searchParams }: { searchParams:
   const hasQuery = !!(historyId || prompt);
 
   if (!historyId && prompt) {
-    if (!creds) {
+    const dedupeId = stableSearchId(['llm-responses', platform, model, prompt, systemMessage, webSearch, countryCode]);
+    const cached = getLlmResponseResult<LlmResponseResult>(dedupeId);
+
+    if (cached) {
+      result = cached;
+      const cachedEntry = getLlmResponseHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const res = await fetchLlmResponse(platform, prompt, model, webSearch, countryCode, systemMessage, creds.login, creds.pass);
@@ -184,7 +192,7 @@ export default async function LlmResponsesPage({ searchParams }: { searchParams:
 
       if (!error && result) {
         const entry: LlmResponseEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           platform,
           model,

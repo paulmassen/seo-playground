@@ -1,6 +1,6 @@
 # SEO Playground — Local SEO Dashboard
 
-> **New:** Fixed several DataForSEO Labs pages silently failing on city/region locations (now restricted to the countries that actually work), Domain Categories now shows real category names instead of numeric codes, and searches no longer get re-billed on accidental double-submits. See the [changelog](#changelog) below.
+> **New:** New AI Visibility page (see how often a domain/brand is mentioned by LLMs, and who dominates a topic). Nearly every results table across the app is now sortable and has a "Copy as Markdown" button. Searches on ~35 pages no longer get re-billed on accidental double-submits. See the [changelog](#changelog) below.
 
 > **Work in progress** — new DataForSEO endpoints are being added progressively.
 
@@ -52,6 +52,7 @@ If you find this useful, consider supporting the project:
 - **Content Parsing** — Quality score, readability (ARI), word count, meta tags, content blocks
 - **Google Reviews** — Fetch and analyze Google Business reviews: rating distribution, monthly chart, and rating goal calculator
 - **AI Optimization** — Visibility in AI-generated answers
+- **AI Visibility** — Target overview (mentions, AI search volume, source/platform breakdown) or topic leaderboard (top mentioned domains and brands) via DataForSEO LLM Mentions
 - **Reddit Mentions** — Discover Reddit threads linking to or discussing your URLs
 - **Top Searches** — Local search trends
 - **Settings** — Store your DataForSEO credentials and defaults locally
@@ -126,6 +127,10 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 - **"Copy as Markdown" button** — added next to CSV export on Keyword Ideas, for pasting results straight into docs/notes
 - **Fix repeated billing on double-submit/refresh** — Backlinks now reuses its result if the same search (domain + filters) runs again within 60 seconds, instead of re-querying and re-billing DataForSEO every time; same protection Geo-Grid already had. Cleaned up 28 pre-existing duplicate history rows caused by this gap
 - **Backlinks — fixed remaining French strings** (sort options, filter label, stat card labels, table headers, error messages)
+- **New: AI Visibility page** — "My domain/brand" mode (total mentions, AI search volume, breakdown by platform/location/source domains/brand entities via `llm_mentions/target_metrics`) and "Topic leaderboard" mode (top mentioned domains and top mentioned brands for a keyword topic, side by side, via `llm_mentions/top_mentioned_domains` and `top_mentioned_brands`)
+- **Sortable tables + "Copy as Markdown" everywhere** — nearly every results table in the app (Backlinks and its 8 sub-pages, Competitors, Domain/Page Intersection, Domain Categories, Domain Technologies, Keyword Data/Difficulty/Overview, Ranked/Related Keywords, Search Intent, Subdomains, Top Searches, Traffic Estimation, Rank Tracker, Site Audit's Pages tab, AI Keyword Data) now has click-to-sort column headers and a one-click "Copy as Markdown" button next to CSV export, for pasting straight into docs/notes
+- **Fix repeated billing on double-submit/refresh, app-wide** — the same 60-second dedupe protection added to Backlinks now covers ~35 pages (Keyword Ideas, Ranked/Related Keywords, Competitors, Domain/Page Intersection, Subdomains, Top Searches, Traffic Estimation, SERP Checker, Reddit, Domain Technologies/Whois, AI Prompt Test, and all Backlinks sub-pages, among others); intentionally left out of task-based flows (Rank Tracker, Google Reviews, Site Audit) where each submission is a deliberate distinct action
+- **Fixed remaining French UI strings** across Keyword Data, Keyword Difficulty, Ranked/Related Keywords, SERP Checker, Top Searches, and Competitors
 
 ### 2026-07-25
 

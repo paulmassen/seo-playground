@@ -3,6 +3,9 @@ import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import { stableSearchId } from '@/lib/dedupe';
+import CategoriesList from './CategoriesList';
 
 interface CategoryItem {
   categories?: number[];
@@ -50,12 +53,18 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
     if (saved) { items = saved; activeEntry = getDomainCategoriesHistory().find((e) => e.id === historyId) ?? null; }
     else error = 'Search no longer available.';
   } else if (rawTarget) {
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['domain-categories', rawTarget, location, language]);
+    const cached = getDomainCategoriesResults<CategoryItem>(dedupeId);
+    if (cached) {
+      items = cached;
+      const cachedEntry = getDomainCategoriesHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchCategories(rawTarget, location, language, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: DomainCategoriesEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), target: rawTarget, location, language, count: items.length, cost };
+        const entry: DomainCategoriesEntry = { id: dedupeId, ts: Date.now(), target: rawTarget, location, language, count: items.length, cost };
         saveDomainCategoriesSearch(entry, items);
       }
     }
@@ -66,15 +75,17 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
   const displayLocation = activeEntry?.location ?? location;
   const displayLanguage = activeEntry?.language ?? language;
 
-  const totalEtv = items.reduce((sum, i) => sum + (i.metrics?.organic?.etv ?? 0), 0);
-
-  const csvData = items.map((item) => ({
-    category: (item.categories ?? []).map((c) => getCategoryPath(c)).join(' | '),
-    keywords: item.metrics?.organic?.count ?? '',
-    etv: item.metrics?.organic?.etv?.toFixed(0) ?? '',
+  const resolvedItems = items.map((item) => ({
+    categoryPaths: (item.categories ?? []).map((c) => getCategoryPath(c)),
+    count: item.metrics?.organic?.count ?? 0,
+    etv: item.metrics?.organic?.etv ?? 0,
   }));
 
-  const maxEtv = Math.max(...items.map((i) => i.metrics?.organic?.etv ?? 0), 1);
+  const csvData = resolvedItems.map((item) => ({
+    category: item.categoryPaths.join(' | '),
+    keywords: item.count,
+    etv: item.etv.toFixed(0),
+  }));
 
   return (
     <div className="space-y-6">
@@ -116,41 +127,18 @@ export default async function DomainCategoriesPage({ searchParams }: { searchPar
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} categories — {displayTarget}</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename={`categories-${displayTarget}.csv`} columns={[{key:'category',label:'Category'},{key:'keywords',label:'Keywords'},{key:'etv',label:'Est. Traffic (ETV)'}]} />}
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={[{key:'category',label:'Category'},{key:'keywords',label:'Keywords'},{key:'etv',label:'Est. Traffic (ETV)'}]} />
+                  <ExportCSVButton data={csvData} filename={`categories-${displayTarget}.csv`} columns={[{key:'category',label:'Category'},{key:'keywords',label:'Keywords'},{key:'etv',label:'Est. Traffic (ETV)'}]} />
+                </div>
+              )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No categories found.</div>
           ) : (
-            <div className="divide-y divide-slate-50 dark:divide-slate-800">
-              {items.map((item, i) => {
-                const etv = item.metrics?.organic?.etv ?? 0;
-                const count = item.metrics?.organic?.count ?? 0;
-                const barW = Math.round((etv / maxEtv) * 100);
-                const share = totalEtv > 0 ? ((etv / totalEtv) * 100).toFixed(1) : '0.0';
-                const categoryPaths = (item.categories ?? []).map((c) => getCategoryPath(c));
-                return (
-                  <div key={i} className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div className="w-10 text-right text-[11px] font-mono text-slate-400 tabular-nums shrink-0">{i + 1}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {categoryPaths.map((p, ci) => (
-                          <span key={ci} className="text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{p}</span>
-                        ))}
-                        <span className="text-[11px] text-slate-400">{count.toLocaleString('en-GB')} keywords</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${barW}%` }} />
-                        </div>
-                        <span className="text-[11px] font-black text-slate-500 tabular-nums shrink-0">{share}%</span>
-                        <span className="text-[11px] font-mono text-slate-400 tabular-nums shrink-0">{Math.round(etv).toLocaleString('en-GB')} ETV</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <CategoriesList items={resolvedItems} />
           )}
         </div>
       )}

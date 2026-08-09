@@ -128,7 +128,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             name="keywords"
             defaultValue={defaults.keywords}
             rows={5}
-            placeholder={"plombier paris\nélectricien lyon\nchauffagiste bordeaux"}
+            placeholder={"plumber paris\nelectrician london\nheating engineer manchester"}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-y"
           />
         </div>
@@ -138,13 +138,13 @@ export default function KeywordDataForm({ defaults }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-              Target <span className="text-slate-300 normal-case font-normal">(domaine ou URL)</span>
+              Target <span className="text-slate-300 normal-case font-normal">(domain or URL)</span>
             </label>
             <input
               type="text"
               name="target"
               defaultValue={defaults.target}
-              placeholder="example.com ou https://example.com/page"
+              placeholder="example.com or https://example.com/page"
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -157,8 +157,8 @@ export default function KeywordDataForm({ defaults }: Props) {
               defaultValue={defaults.targetType || 'site'}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="site">Site (domaine entier)</option>
-              <option value="page">Page (URL exacte)</option>
+              <option value="site">Site (whole domain)</option>
+              <option value="page">Page (exact URL)</option>
             </select>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function KeywordDataForm({ defaults }: Props) {
           <LocationPicker
             name="location"
             defaultValue={defaults.location || 'France'}
-            placeholder="ex: France, Paris"
+            placeholder="e.g. France, Paris"
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -185,7 +185,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             type="text"
             name="language"
             defaultValue={defaults.language || 'French'}
-            placeholder="ex: French, English"
+            placeholder="e.g. French, English"
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

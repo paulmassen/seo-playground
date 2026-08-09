@@ -10,6 +10,7 @@ import PendingButton from '@/components/PendingButton';
 import HistorySidebar from '@/components/HistorySidebar';
 import LocationPicker from '@/components/LocationPicker';
 import DownloadCsvButton from './DownloadCsvButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -613,6 +614,23 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
   const ownerRepliedCount = reviews.filter((r) => r.owner_answer).length;
   const ownerReplyPct = reviews.length > 0 ? ((ownerRepliedCount / reviews.length) * 100).toFixed(0) : null;
 
+  const reviewsCsvData = reviews.slice(0, 100).map((r) => ({
+    date: r.timestamp ?? r.time_ago ?? '',
+    rating: r.rating?.value ?? '',
+    author: r.profile_name ?? '',
+    local_guide: r.local_guide ? 'yes' : 'no',
+    review: (r.review_text ?? '').replace(/<br\s*\/?>/gi, ' '),
+    owner_response: (r.owner_answer ?? '').replace(/<br\s*\/?>/gi, ' '),
+  }));
+  const reviewsCsvColumns = [
+    { key: 'date', label: 'Date' },
+    { key: 'rating', label: 'Rating' },
+    { key: 'author', label: 'Author' },
+    { key: 'local_guide', label: 'Local guide' },
+    { key: 'review', label: 'Review' },
+    { key: 'owner_response', label: 'Owner response' },
+  ];
+
   const pendingCount = tasks.filter((t) => t.status === 'pending').length;
 
   const historyItems = tasks.map((t) => {
@@ -829,6 +847,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Reviews</h2>
               <div className="flex items-center gap-4">
                 <span className="text-xs text-slate-400">{reviews.length} fetched</span>
+                <CopyMarkdownButton data={reviewsCsvData} columns={reviewsCsvColumns} />
                 <DownloadCsvButton
                   reviews={reviews}
                   filename={`${(activeTask.business || 'reviews').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()}-reviews.csv`}

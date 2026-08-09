@@ -6,6 +6,7 @@ import {
   type DomainWhoisEntry,
 } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,7 +158,12 @@ export default async function WhoisPage({ searchParams }: { searchParams: Promis
   }
 
   if (!historyId && domain) {
-    if (!creds) {
+    const dedupeId = stableSearchId(['domain-whois', domain]);
+    const cachedResult = getDomainWhoisResult<WhoisResult>(dedupeId);
+    if (cachedResult) {
+      result = cachedResult;
+      cost = getDomainWhoisHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const auth = btoa(`${creds.login}:${creds.pass}`);
@@ -168,7 +174,7 @@ export default async function WhoisPage({ searchParams }: { searchParams: Promis
         result = res.result;
         cost = res.cost;
         const entry: DomainWhoisEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           domain,
           cost,

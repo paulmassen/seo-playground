@@ -1,8 +1,11 @@
 import { getCredentials, getSetting, getPageIntersectionHistory, savePageIntersectionSearch, getPageIntersectionResults, type PageIntersectionEntry } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
+import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import PageIntersectionTable from './PageIntersectionTable';
 
 interface RankedItem { url?: string; rank_absolute?: number; }
 interface IntersectionItem {
@@ -27,20 +30,7 @@ async function fetchIntersection(pages: string[], location: string, language: st
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
 }
 
-function KdBadge({ v }: { v?: number }) {
-  if (v == null) return <span className="text-slate-300 text-xs">—</span>;
-  const cls = v >= 70 ? 'bg-red-100 text-red-700' : v >= 50 ? 'bg-orange-100 text-orange-700' : v >= 30 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
-  return <span className={`inline-flex items-center justify-center w-9 h-5 rounded text-[10px] font-black ${cls}`}>{v}</span>;
-}
-
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
-
-function RankBadge({ rank }: { rank?: number }) {
-  if (rank == null) return <span className="text-slate-300">—</span>;
-  const cls = rank <= 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rank <= 10 ? 'bg-blue-50 text-blue-700 border-blue-200' : rank <= 30 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-500 border-slate-200';
-  return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${cls}`}>#{rank}</span>;
-}
 
 export default async function PageIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
@@ -70,13 +60,22 @@ export default async function PageIntersectionPage({ searchParams }: { searchPar
   } else if (rawPages) {
     pageList = rawPages.split('\n').map((p) => p.trim()).filter(Boolean).slice(0, 5);
     if (pageList.length < 2) { error = 'Enter at least 2 URLs (one per line).'; }
-    else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
-      const result = await fetchIntersection(pageList, location, language, limit, creds.login, creds.pass);
-      items = result.items; cost = result.cost; error = result.error ?? null;
-      if (!error && items.length > 0) {
-        const entry: PageIntersectionEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), pages: JSON.stringify(pageList), location, language, count: items.length, cost };
-        savePageIntersectionSearch(entry, items);
+      const dedupeId = stableSearchId(['page-intersection', ...pageList, location, language, limit]);
+      const cached = getPageIntersectionResults<IntersectionItem>(dedupeId);
+
+      if (cached) {
+        items = cached;
+        const cachedEntry = getPageIntersectionHistory().find((e) => e.id === dedupeId);
+        cost = cachedEntry?.cost;
+      } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+      else {
+        const result = await fetchIntersection(pageList, location, language, limit, creds.login, creds.pass);
+        items = result.items; cost = result.cost; error = result.error ?? null;
+        if (!error && items.length > 0) {
+          const entry: PageIntersectionEntry = { id: dedupeId, ts: Date.now(), pages: JSON.stringify(pageList), location, language, count: items.length, cost };
+          savePageIntersectionSearch(entry, items);
+        }
       }
     }
   }
@@ -94,6 +93,7 @@ export default async function PageIntersectionPage({ searchParams }: { searchPar
       ...Object.fromEntries(pageList.map((p, i) => [`pos_${i + 1}`, ranked[i]?.rank_absolute ?? ''])),
     };
   });
+  const csvColumns = [{ key: 'keyword', label: 'Keyword' }, { key: 'search_volume', label: 'Volume' }, { key: 'kd', label: 'KD' }, ...pageList.map((_, i) => ({ key: `pos_${i + 1}`, label: `Pos. Page ${i + 1}` }))];
 
   return (
     <div className="space-y-6">
@@ -136,43 +136,18 @@ export default async function PageIntersectionPage({ searchParams }: { searchPar
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} shared keywords</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename="page-intersection.csv" columns={[{key:'keyword',label:'Keyword'},{key:'search_volume',label:'Volume'},{key:'kd',label:'KD'},...pageList.map((_,i)=>({key:`pos_${i+1}`,label:`Pos. Page ${i+1}`}))]} />}
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={csvColumns} />
+                  <ExportCSVButton data={csvData} filename="page-intersection.csv" columns={csvColumns} />
+                </div>
+              )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No common keywords found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">KD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Volume</th>
-                    {pageList.map((p, i) => (
-                      <th key={i} className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 max-w-[100px]" title={p}>
-                        Page {i + 1}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => {
-                    const ranked = item.ranked_serp_element?.items ?? [];
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-200 max-w-[200px]"><span className="truncate block">{item.keyword_data?.keyword ?? '—'}</span></td>
-                        <td className="px-4 py-3 text-center"><KdBadge v={item.keyword_difficulty} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">{fmt(item.keyword_data?.keyword_info?.search_volume)}</td>
-                        {pageList.map((_, pi) => (
-                          <td key={pi} className="px-4 py-3 text-center"><RankBadge rank={ranked[pi]?.rank_absolute} /></td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <PageIntersectionTable items={items} pageList={pageList} />
           )}
         </div>
       )}

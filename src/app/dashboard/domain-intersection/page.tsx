@@ -4,36 +4,11 @@ import {
   getCredentials, getDomainIntersectionHistory,
   saveDomainIntersectionSearch, getDomainIntersectionResults, getSetting,
 } from '@/lib/db';
-import ExportCSVButton from '@/components/ExportCSVButton';
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
-
-interface IntersectionItem {
-  keyword_data: {
-    keyword: string;
-    location_code: number;
-    language_code: string;
-    keyword_info?: {
-      search_volume?: number;
-      competition?: number;
-      cpc?: number;
-    };
-    keyword_properties?: {
-      keyword_difficulty?: number;
-    };
-  };
-  first_domain_serp_element?: {
-    rank_group?: number;
-    rank_absolute?: number;
-    url?: string;
-  };
-  second_domain_serp_element?: {
-    rank_group?: number;
-    rank_absolute?: number;
-    url?: string;
-  };
-}
+import { stableSearchId } from '@/lib/dedupe';
+import IntersectionTable, { type IntersectionItem } from './IntersectionTable';
 
 interface SearchParams {
   target1?: string;
@@ -68,18 +43,6 @@ async function fetchIntersection(target1: string, target2: string, location: str
   };
 }
 
-function PosBadge({ pos }: { pos: number | undefined }) {
-  if (!pos) return <span className="text-slate-300">—</span>;
-  const cls = pos <= 3 ? 'text-emerald-600 font-black' : pos <= 10 ? 'text-blue-600 font-bold' : 'text-slate-500';
-  return <span className={`font-mono tabular-nums text-xs ${cls}`}>#{pos}</span>;
-}
-
-function KdBadge({ kd }: { kd: number | undefined }) {
-  if (kd === undefined) return <span className="text-slate-300">—</span>;
-  const cls = kd >= 70 ? 'bg-red-50 text-red-500 border-red-200' : kd >= 40 ? 'bg-yellow-50 text-yellow-600 border-yellow-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200';
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${cls}`}>{kd}</span>;
-}
-
 export default async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getDomainIntersectionHistory();
@@ -106,27 +69,27 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
     total = entry?.totalCount ?? items.length;
   } else if (target1 && target2 && creds) {
     try {
-      const result = await fetchIntersection(target1, target2, location, language, limit, creds.login, creds.pass);
-      items = result.items;
-      total = result.total;
-      cost = result.cost;
-      const id = crypto.randomUUID();
-      saveDomainIntersectionSearch({
-        id, ts: Date.now(), target1, target2, location, language,
-        count: items.length, totalCount: total, cost,
-      }, items);
+      const dedupeId = stableSearchId(['domain-intersection', target1, target2, location, language, limit]);
+      const cachedItems = getDomainIntersectionResults<IntersectionItem>(dedupeId);
+      if (cachedItems) {
+        items = cachedItems;
+        const cachedEntry = history.find((h) => h.id === dedupeId);
+        total = cachedEntry?.totalCount ?? items.length;
+        cost = cachedEntry?.cost ?? 0;
+      } else {
+        const result = await fetchIntersection(target1, target2, location, language, limit, creds.login, creds.pass);
+        items = result.items;
+        total = result.total;
+        cost = result.cost;
+        saveDomainIntersectionSearch({
+          id: dedupeId, ts: Date.now(), target1, target2, location, language,
+          count: items.length, totalCount: total, cost,
+        }, items);
+      }
     } catch (e) {
       error = String(e);
     }
   }
-
-  const csvData = items.map((i) => ({
-    keyword: i.keyword_data.keyword,
-    volume: i.keyword_data.keyword_info?.search_volume ?? '',
-    kd: i.keyword_data.keyword_properties?.keyword_difficulty ?? '',
-    pos_target1: i.first_domain_serp_element?.rank_absolute ?? '',
-    pos_target2: i.second_domain_serp_element?.rank_absolute ?? '',
-  }));
 
   return (
     <div className="space-y-6 pb-12">
@@ -171,23 +134,10 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
 
           {items.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                  {items.length} shown / {total.toLocaleString()} common keywords
-                  {cost > 0 && <span className="ml-3 text-slate-300">· ${cost.toFixed(4)}</span>}
-                </p>
-                <ExportCSVButton
-                  data={csvData}
-                  filename={`intersection-${target1}-${target2}.csv`}
-                  columns={[
-                    { key: 'keyword', label: 'Keyword' },
-                    { key: 'volume', label: 'Volume' },
-                    { key: 'kd', label: 'KD' },
-                    { key: 'pos_target1', label: `Pos ${target1}` },
-                    { key: 'pos_target2', label: `Pos ${target2}` },
-                  ]}
-                />
-              </div>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                {items.length} shown / {total.toLocaleString()} common keywords
+                {cost > 0 && <span className="ml-3 text-slate-300">· ${cost.toFixed(4)}</span>}
+              </p>
 
               {/* Domain header */}
               <div className="grid grid-cols-2 gap-3">
@@ -201,38 +151,7 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
                 </div>
               </div>
 
-              <div id="results" className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left px-5 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Keyword</th>
-                      <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vol.</th>
-                      <th className="text-center px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">KD</th>
-                      <th className="text-center px-3 py-3.5 text-[10px] font-black text-blue-400 uppercase tracking-widest">D1</th>
-                      <th className="text-center px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">D2</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {items.map((item, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50">
-                        <td className="px-5 py-3 font-bold text-slate-800">{item.keyword_data.keyword}</td>
-                        <td className="px-3 py-3 text-right font-mono text-slate-500">
-                          {(item.keyword_data.keyword_info?.search_volume ?? 0).toLocaleString()}
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <KdBadge kd={item.keyword_data.keyword_properties?.keyword_difficulty} />
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <PosBadge pos={item.first_domain_serp_element?.rank_absolute} />
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <PosBadge pos={item.second_domain_serp_element?.rank_absolute} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <IntersectionTable items={items} target1={target1} target2={target2} />
             </div>
           )}
         </div>

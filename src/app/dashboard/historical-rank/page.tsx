@@ -4,6 +4,7 @@ import { getCredentials, getHistRankHistory, saveHistRankSearch, getHistRankResu
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
 
 interface HistRankItem {
   se_type?: string;
@@ -93,14 +94,20 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
     items = getHistRankResults<HistRankItem>(historyId) ?? [];
   } else if (target && creds) {
     try {
-      const result = await fetchHistRank(target, location, language, creds.login, creds.pass);
-      if (result.error) {
-        error = result.error;
+      const dedupeId = stableSearchId(['historical-rank', target, location, language]);
+      const cachedItems = getHistRankResults<HistRankItem>(dedupeId);
+      if (cachedItems) {
+        items = cachedItems;
+        cost = history.find((h) => h.id === dedupeId)?.cost ?? 0;
       } else {
-        items = result.items;
-        cost = result.cost;
-        const id = crypto.randomUUID();
-        saveHistRankSearch({ id, ts: Date.now(), target, location, language, cost }, items);
+        const result = await fetchHistRank(target, location, language, creds.login, creds.pass);
+        if (result.error) {
+          error = result.error;
+        } else {
+          items = result.items;
+          cost = result.cost;
+          saveHistRankSearch({ id: dedupeId, ts: Date.now(), target, location, language, cost }, items);
+        }
       }
     } catch (e) {
       error = String(e);

@@ -1,8 +1,11 @@
 import { getCredentials, getSetting, getSearchIntentHistory, saveSearchIntentSearch, getSearchIntentResults, type SearchIntentEntry } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
+import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import SearchIntentTable from './SearchIntentTable';
 
 interface IntentItem {
   keyword?: string;
@@ -33,13 +36,6 @@ const INTENT_CONFIG: Record<string, { label: string; cls: string }> = {
   transactional: { label: 'Transactional', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 };
 
-function IntentBadge({ intent }: { intent?: string }) {
-  if (!intent) return <span className="text-slate-300 text-xs">—</span>;
-  const cfg = INTENT_CONFIG[intent];
-  if (!cfg) return <span className="text-xs text-slate-500">{intent}</span>;
-  return <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${cfg.cls}`}>{cfg.label}</span>;
-}
-
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
 export default async function SearchIntentPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -64,12 +60,19 @@ export default async function SearchIntentPage({ searchParams }: { searchParams:
     else error = 'Search no longer available.';
   } else if (rawKeywords) {
     const kwList = rawKeywords.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 1000);
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['search-intent', kwList.join(','), location, language]);
+    const cached = getSearchIntentResults<IntentItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      const cachedEntry = getSearchIntentHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchIntent(kwList, location, language, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: SearchIntentEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), keywords: kwList.join(', '), location, language, count: items.length, cost };
+        const entry: SearchIntentEntry = { id: dedupeId, ts: Date.now(), keywords: kwList.join(', '), location, language, count: items.length, cost };
         saveSearchIntentSearch(entry, items);
       }
     }
@@ -145,41 +148,18 @@ export default async function SearchIntentPage({ searchParams }: { searchParams:
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} keywords</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename="search-intent.csv" columns={[{key:'keyword',label:'Keyword'},{key:'intent',label:'Main Intent'},{key:'secondary',label:'Secondary Intents'}]} />}
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={[{key:'keyword',label:'Keyword'},{key:'intent',label:'Main Intent'},{key:'secondary',label:'Secondary Intents'}]} />
+                  <ExportCSVButton data={csvData} filename="search-intent.csv" columns={[{key:'keyword',label:'Keyword'},{key:'intent',label:'Main Intent'},{key:'secondary',label:'Secondary Intents'}]} />
+                </div>
+              )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">#</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Main intent</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Secondary intents</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => {
-                    const secondary = getSecondaryIntents(item);
-                    return (
-                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-3 text-[11px] font-mono text-slate-400 tabular-nums">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-200">{item.keyword ?? '—'}</td>
-                      <td className="px-4 py-3 text-center"><IntentBadge intent={getMainIntent(item)} /></td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <div className="flex gap-1 flex-wrap">
-                          {secondary?.map((s) => <IntentBadge key={s} intent={s} />)}
-                        </div>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SearchIntentTable items={items} />
           )}
         </div>
       )}

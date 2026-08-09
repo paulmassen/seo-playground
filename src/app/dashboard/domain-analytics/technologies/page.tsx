@@ -10,6 +10,9 @@ import {
   type DomainFindEntry,
 } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import { stableSearchId } from '@/lib/dedupe';
+import TechFindTable from './TechFindTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,11 +128,6 @@ function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function fmtVisited(s?: string) {
-  if (!s) return '—';
-  return new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 const CATEGORY_COLORS: Record<string, string> = {
   'content': 'bg-blue-50 border-blue-100 text-blue-700',
   'analytics': 'bg-violet-50 border-violet-100 text-violet-700',
@@ -150,12 +148,6 @@ function categoryColor(cat: string) {
 
 function formatLabel(slug: string) {
   return slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function DrBadge({ value }: { value?: number }) {
-  if (!value) return <span className="text-slate-300 text-xs">—</span>;
-  const color = value >= 70 ? 'bg-emerald-500 text-white' : value >= 40 ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500';
-  return <span className={`inline-flex items-center justify-center w-9 h-5 rounded text-[10px] font-black ${color}`}>{value}</span>;
 }
 
 function PriceTag({ price }: { price: number }) {
@@ -209,7 +201,12 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
         domainError = "This search is no longer available.";
       }
     } else if (target) {
-      if (!creds) {
+      const dedupeId = stableSearchId(['domain-tech', target]);
+      const cachedResult = getDomainTechResult<DomainTechResult>(dedupeId);
+      if (cachedResult) {
+        domainResult = cachedResult;
+        domainCost = getDomainTechHistory().find((e) => e.id === dedupeId)?.cost;
+      } else if (!creds) {
         domainError = 'DataForSEO credentials missing. Configure them in Settings.';
       } else {
         const auth = btoa(`${creds.login}:${creds.pass}`);
@@ -219,7 +216,7 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
         } else if (res.result) {
           domainResult = res.result;
           domainCost = res.cost;
-          const entry: DomainTechEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), target, cost: domainCost };
+          const entry: DomainTechEntry = { id: dedupeId, ts: Date.now(), target, cost: domainCost };
           saveDomainTechSearch(entry, domainResult);
         } else {
           domainError = 'No data found for this domain.';
@@ -240,7 +237,14 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
         findError = "This search is no longer available.";
       }
     } else if (keyword || technology) {
-      if (!creds) {
+      const dedupeId = stableSearchId(['domain-find', keyword, technology, limit]);
+      const cachedItems = getDomainFindResults<FindDomainItem>(dedupeId);
+      if (cachedItems) {
+        findItems = cachedItems;
+        const cachedEntry = getDomainFindHistory().find((e) => e.id === dedupeId);
+        findTotal = cachedEntry?.totalCount;
+        findCost = cachedEntry?.cost;
+      } else if (!creds) {
         findError = 'DataForSEO credentials missing. Configure them in Settings.';
       } else {
         const auth = btoa(`${creds.login}:${creds.pass}`);
@@ -252,7 +256,7 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
           findTotal = res.total;
           findCost = res.cost;
           if (findItems.length > 0) {
-            const entry: DomainFindEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), keyword: keyword || undefined, technology: technology || undefined, count: findItems.length, totalCount: findTotal, cost: findCost };
+            const entry: DomainFindEntry = { id: dedupeId, ts: Date.now(), keyword: keyword || undefined, technology: technology || undefined, count: findItems.length, totalCount: findTotal, cost: findCost };
             saveDomainFindSearch(entry, findItems);
           }
         }
@@ -545,60 +549,7 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
               No domains found.
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Matching domains</h2>
-                <span className="text-xs font-black text-slate-400">{findItems.length} shown</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
-                      <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 w-14">DR</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Domain</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Title</th>
-                      <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell w-16">Country</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Last seen</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
-                    {findItems.map((item, i) => (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                        <td className="px-4 py-3 text-center"><DrBadge value={item.domain_rank} /></td>
-                        <td className="px-4 py-3">
-                          <a href={`https://${item.domain}`} target="_blank" rel="noopener noreferrer"
-                            className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 transition-colors">
-                            {item.domain}
-                          </a>
-                          {item.technologies && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {Array.from(
-                                new Set(
-                                  Object.values(item.technologies).flatMap((subcats) => Object.values(subcats).flat()),
-                                ),
-                              )
-                                .slice(0, 6)
-                                .map((t) => (
-                                  <span key={t} className="text-[9px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded">{t}</span>
-                                ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 max-w-[200px] hidden md:table-cell">
-                          <span className="text-xs text-slate-600 dark:text-slate-400 truncate block">{item.title ?? '—'}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center hidden sm:table-cell">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">{item.country_iso_code ?? '—'}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right hidden lg:table-cell">
-                          <span className="text-[11px] text-slate-400 tabular-nums">{fmtVisited(item.last_visited)}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <TechFindTable items={findItems} />
           )}
 
           {/* Find history */}

@@ -446,6 +446,16 @@ function initSchema(db: Database.Database) {
       result TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS ai_visibility_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      mode TEXT NOT NULL,
+      target TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      cost REAL,
+      result TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS dfs_locations (
       location_code INTEGER PRIMARY KEY,
       location_name TEXT NOT NULL,
@@ -1866,5 +1876,23 @@ export function saveLlmResponseSearch<T>(entry: LlmResponseEntry, result: T): vo
 }
 export function getLlmResponseResult<T>(id: string): T | null {
   const row = getDb().prepare('SELECT result FROM llm_response_searches WHERE id = ?').get(id) as { result: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.result) as T; } catch { return null; }
+}
+
+// ─── AI Visibility (LLM Mentions: target metrics + top mentioned domains/brands) ────
+
+export type AiVisibilityMode = 'target' | 'leaderboard';
+export interface AiVisibilityEntry { id: string; ts: number; mode: AiVisibilityMode; target: string; platform: string; cost?: number; }
+type AVRow = { id: string; ts: number; mode: string; target: string; platform: string; cost: number | null };
+
+export function getAiVisibilityHistory(): AiVisibilityEntry[] {
+  const rows = getDb().prepare('SELECT id, ts, mode, target, platform, cost FROM ai_visibility_searches ORDER BY ts DESC LIMIT 20').all() as AVRow[];
+  return rows.map((r) => ({ id: r.id, ts: r.ts, mode: r.mode as AiVisibilityMode, target: r.target, platform: r.platform, cost: r.cost ?? undefined }));
+}
+export function saveAiVisibilitySearch<T>(entry: AiVisibilityEntry, result: T): void {
+  getDb().prepare('INSERT OR REPLACE INTO ai_visibility_searches (id, ts, mode, target, platform, cost, result) VALUES (?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.mode, entry.target, entry.platform, entry.cost ?? null, JSON.stringify(result));
+}
+export function getAiVisibilityResult<T>(id: string): T | null {
+  const row = getDb().prepare('SELECT result FROM ai_visibility_searches WHERE id = ?').get(id) as { result: string } | undefined;
   if (!row) return null; try { return JSON.parse(row.result) as T; } catch { return null; }
 }

@@ -9,8 +9,12 @@ import {
   type KwOverviewSearchEntry,
 } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
+import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
+import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import KeywordOverviewTable from './KeywordOverviewTable';
 
 // ---- Types ----
 
@@ -97,70 +101,6 @@ async function fetchKeywordOverview(
 
 // ---- UI helpers ----
 
-const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-
-function DifficultyBar({ value }: { value?: number }) {
-  if (value === undefined) return <span className="text-slate-300">—</span>;
-  const color = value >= 70 ? 'bg-red-500' : value >= 40 ? 'bg-amber-400' : 'bg-emerald-400';
-  const textColor = value >= 70 ? 'text-red-600' : value >= 40 ? 'text-amber-600' : 'text-emerald-600';
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
-      </div>
-      <span className={`text-[11px] font-black tabular-nums ${textColor}`}>{value}</span>
-    </div>
-  );
-}
-
-function IntentBadge({ value }: { value?: string }) {
-  if (!value) return <span className="text-slate-300">—</span>;
-  const map: Record<string, string> = {
-    informational: 'text-blue-600 bg-blue-50 border-blue-100',
-    navigational: 'text-violet-600 bg-violet-50 border-violet-100',
-    transactional: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-    commercial: 'text-amber-600 bg-amber-50 border-amber-100',
-  };
-  const labels: Record<string, string> = {
-    informational: 'Info',
-    navigational: 'Nav',
-    transactional: 'Transac',
-    commercial: 'Commercial',
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${map[value] ?? 'text-slate-500 bg-slate-100 border-slate-200'}`}>
-      {labels[value] ?? value}
-    </span>
-  );
-}
-
-function CompetitionBadge({ level }: { level?: string }) {
-  if (!level) return <span className="text-slate-300">—</span>;
-  const map: Record<string, string> = {
-    HIGH: 'text-red-600 bg-red-50',
-    MEDIUM: 'text-amber-600 bg-amber-50',
-    LOW: 'text-emerald-600 bg-emerald-50',
-  };
-  return <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${map[level] ?? 'text-slate-500 bg-slate-100'}`}>{level}</span>;
-}
-
-function Sparkline({ monthly }: { monthly?: MonthlySearch[] }) {
-  const data = monthly?.slice(-12) ?? [];
-  if (data.length === 0) return <span className="text-slate-300 text-xs">—</span>;
-  const max = Math.max(...data.map((m) => m.search_volume ?? 0), 1);
-  return (
-    <div className="flex items-end gap-0.5 h-7" title={data.map((m) => `${MONTHS[m.month - 1]}: ${m.search_volume?.toLocaleString("en-GB")}`).join(' · ')}>
-      {data.map((m, i) => (
-        <div
-          key={i}
-          className="w-2 bg-blue-400 rounded-sm hover:bg-blue-600 transition-colors"
-          style={{ height: `${Math.max(2, Math.round(((m.search_volume ?? 0) / max) * 28))}px` }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -199,7 +139,14 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
   const keywords = rawKeywords.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 1000);
 
   if (!historyId && keywords.length > 0) {
-    if (!creds) {
+    const dedupeId = stableSearchId(['keyword-overview', keywords.join(','), location, language]);
+    const cached = getKwOverviewResults<KwOverviewItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      const cachedEntry = getKwOverviewHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const res = await fetchKeywordOverview(keywords, location, language, creds.login, creds.pass);
@@ -210,7 +157,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
       if (!error && items.length > 0) {
         const label = keywords.slice(0, 3).join(', ');
         const entry: KwOverviewSearchEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           keywords: label.length > 80 ? label.slice(0, 77) + '…' : label,
           location,
@@ -231,6 +178,23 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
     ? Math.round(items.reduce((s, i) => s + (i.keyword_properties?.keyword_difficulty ?? 0), 0) / items.length)
     : null;
   const totalVolume = items.reduce((s, i) => s + (i.keyword_info?.search_volume ?? 0), 0);
+
+  const csvData = items.map((item) => ({
+    keyword: item.keyword ?? '',
+    search_volume: item.keyword_info?.search_volume ?? '',
+    kd: item.keyword_properties?.keyword_difficulty ?? '',
+    intent: item.search_intent_info?.main_intent ?? '',
+    competition_level: item.keyword_info?.competition_level ?? '',
+    cpc: item.keyword_info?.cpc != null ? item.keyword_info.cpc.toFixed(2) : '',
+  }));
+  const csvColumns = [
+    { key: 'keyword', label: 'Keyword' },
+    { key: 'search_volume', label: 'Volume' },
+    { key: 'kd', label: 'KD' },
+    { key: 'intent', label: 'Intent' },
+    { key: 'competition_level', label: 'Competition' },
+    { key: 'cpc', label: 'CPC' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -299,52 +263,19 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
               <span className="text-xs font-black text-slate-400">{items.length} keyword{items.length !== 1 ? 's' : ''}</span>
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={csvColumns} />
+                  <ExportCSVButton data={csvData} filename="keyword-overview.csv" columns={csvColumns} />
+                </div>
+              )}
             </div>
           </div>
 
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Vol.</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Difficulty KD</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Intent</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Competition</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">CPC</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Trend</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {items.map((item, i) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">{item.keyword ?? '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
-                        {item.keyword_info?.search_volume?.toLocaleString("en-GB") ?? '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <DifficultyBar value={item.keyword_properties?.keyword_difficulty} />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <IntentBadge value={item.search_intent_info?.main_intent} />
-                      </td>
-                      <td className="px-4 py-3 text-center hidden sm:table-cell">
-                        <CompetitionBadge level={item.keyword_info?.competition_level} />
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
-                        {item.keyword_info?.cpc != null ? `$${item.keyword_info.cpc.toFixed(2)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        <Sparkline monthly={item.keyword_info?.monthly_searches} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <KeywordOverviewTable items={items} />
           )}
         </div>
       )}

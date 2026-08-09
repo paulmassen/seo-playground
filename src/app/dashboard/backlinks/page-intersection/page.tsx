@@ -1,14 +1,9 @@
 import { getCredentials, getBlPageIntHistory, saveBlPageInt, getBlPageIntResults, type BlPageIntEntry } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
-
-interface PageIntItem {
-  url_from?: string;
-  domain_from?: string;
-  page_from_rank?: number;
-  backlinks_spam_score?: number;
-  url_to?: string[];
-}
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import { stableSearchId } from '@/lib/dedupe';
+import PageIntersectionTable, { type PageIntItem } from './PageIntersectionTable';
 
 interface SearchParams { targets?: string; history_id?: string; }
 
@@ -24,18 +19,6 @@ async function fetchPageInt(targets: string[], login: string, pass: string): Pro
   if (!task) return { items: [], error: 'Empty API response.' };
   if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
-}
-
-function RankBadge({ rank }: { rank?: number }) {
-  if (rank == null) return <span className="text-slate-300 text-xs">—</span>;
-  const cls = rank >= 70 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rank >= 40 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200';
-  return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border tabular-nums ${cls}`}>DR {rank}</span>;
-}
-
-function SpamBadge({ score }: { score?: number }) {
-  if (score == null) return <span className="text-slate-300">—</span>;
-  const cls = score >= 60 ? 'bg-red-50 text-red-600 border-red-200' : score >= 30 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border tabular-nums ${cls}`}>{score}</span>;
 }
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
@@ -62,13 +45,21 @@ export default async function BacklinksPageIntersectionPage({ searchParams }: { 
   } else if (rawTargets) {
     targetList = rawTargets.split('\n').map((t) => t.trim()).filter(Boolean).slice(0, 20);
     if (targetList.length < 2) { error = 'Enter at least 2 targets (one per line).'; }
-    else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
-      const result = await fetchPageInt(targetList, creds.login, creds.pass);
-      items = result.items; cost = result.cost; error = result.error ?? null;
-      if (!error && items.length > 0) {
-        const entry: BlPageIntEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), targets: targetList.join(', '), count: items.length, cost };
-        saveBlPageInt(entry, items);
+      const dedupeId = stableSearchId(['bl-page-intersection', targetList.join(',')]);
+      const cached = getBlPageIntResults<PageIntItem>(dedupeId);
+      if (cached) {
+        items = cached;
+        const cachedEntry = getBlPageIntHistory().find((e) => e.id === dedupeId);
+        cost = cachedEntry?.cost;
+      } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+      else {
+        const result = await fetchPageInt(targetList, creds.login, creds.pass);
+        items = result.items; cost = result.cost; error = result.error ?? null;
+        if (!error && items.length > 0) {
+          const entry: BlPageIntEntry = { id: dedupeId, ts: Date.now(), targets: targetList.join(', '), count: items.length, cost };
+          saveBlPageInt(entry, items);
+        }
       }
     }
   }
@@ -111,38 +102,18 @@ export default async function BacklinksPageIntersectionPage({ searchParams }: { 
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} pages link to all targets</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename="backlinks-page-intersection.csv" columns={[{key:'url_from',label:'From URL'},{key:'domain_from',label:'Domain'},{key:'page_from_rank',label:'DR'},{key:'spam_score',label:'Spam'},{key:'targets_linked',label:'Targets Linked'}]} />}
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={[{key:'url_from',label:'From URL'},{key:'domain_from',label:'Domain'},{key:'page_from_rank',label:'DR'},{key:'spam_score',label:'Spam'},{key:'targets_linked',label:'Targets Linked'}]} />
+                  <ExportCSVButton data={csvData} filename="backlinks-page-intersection.csv" columns={[{key:'url_from',label:'From URL'},{key:'domain_from',label:'Domain'},{key:'page_from_rank',label:'DR'},{key:'spam_score',label:'Spam'},{key:'targets_linked',label:'Targets Linked'}]} />
+                </div>
+              )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No common linking pages found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">From URL</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">DR</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Spam</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Targets linked</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => (
-                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-3 max-w-[320px]">
-                        <a href={item.url_from} target="_blank" rel="noopener noreferrer"
-                          className="text-[10px] font-mono text-blue-600 hover:underline truncate block">{item.url_from ?? '—'}</a>
-                        <span className="text-[10px] text-slate-400">{item.domain_from}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center"><RankBadge rank={item.page_from_rank} /></td>
-                      <td className="px-4 py-3 text-center hidden sm:table-cell"><SpamBadge score={item.backlinks_spam_score} /></td>
-                      <td className="px-4 py-3 text-right text-slate-500 tabular-nums hidden md:table-cell text-xs font-mono">{item.url_to?.length ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <PageIntersectionTable items={items} />
           )}
         </div>
       )}

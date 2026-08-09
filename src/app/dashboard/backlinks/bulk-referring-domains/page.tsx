@@ -1,6 +1,9 @@
 import { getCredentials, getBlBulkRdHistory, saveBlBulkRd, getBlBulkRdResults, type BlBulkRdEntry } from '@/lib/db';
+import { stableSearchId } from '@/lib/dedupe';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import BulkRdTable from './BulkRdTable';
 
 interface BulkRdItem {
   target?: string;
@@ -48,12 +51,17 @@ export default async function BulkRefDomainsPage({ searchParams }: { searchParam
     else error = 'Search no longer available.';
   } else if (rawTargets) {
     const targetList = rawTargets.split('\n').map((t) => t.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')).filter(Boolean).slice(0, 1000);
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['bulk-referring-domains', targetList.join(',')]);
+    const cached = getBlBulkRdResults<BulkRdItem>(dedupeId);
+    if (cached) {
+      items = cached;
+      cost = getBlBulkRdHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchBulkRd(targetList, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: BlBulkRdEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), targets: targetList.join(', '), count: items.length, cost };
+        const entry: BlBulkRdEntry = { id: dedupeId, ts: Date.now(), targets: targetList.join(', '), count: items.length, cost };
         saveBlBulkRd(entry, items);
       }
     }
@@ -61,7 +69,6 @@ export default async function BulkRefDomainsPage({ searchParams }: { searchParam
 
   const history = getBlBulkRdHistory();
   const sorted = [...items].sort((a, b) => (b.referring_domains ?? 0) - (a.referring_domains ?? 0));
-  const maxRd = Math.max(...sorted.map((i) => i.referring_domains ?? 0), 1);
 
   const csvData = sorted.map((item) => ({
     target: item.target ?? '',
@@ -101,50 +108,14 @@ export default async function BulkRefDomainsPage({ searchParams }: { searchParam
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{sorted.length} domains</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
+              {sorted.length > 0 && <CopyMarkdownButton data={csvData} columns={[{key:'target',label:'Domain'},{key:'referring_domains',label:'Ref. Domains'},{key:'referring_main_domains',label:'Main RD'},{key:'referring_ips',label:'Ref. IPs'},{key:'referring_domains_nofollow',label:'Nofollow RD'},{key:'broken_backlinks',label:'Broken BL'},{key:'broken_pages',label:'Broken Pages'}]} />}
               {sorted.length > 0 && <ExportCSVButton data={csvData} filename="bulk-referring-domains.csv" columns={[{key:'target',label:'Domain'},{key:'referring_domains',label:'Ref. Domains'},{key:'referring_main_domains',label:'Main RD'},{key:'referring_ips',label:'Ref. IPs'},{key:'referring_domains_nofollow',label:'Nofollow RD'},{key:'broken_backlinks',label:'Broken BL'},{key:'broken_pages',label:'Broken Pages'}]} />}
             </div>
           </div>
           {sorted.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Domain</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Ref. Domains</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Main RD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Ref. IPs</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Nofollow RD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Broken BL</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {sorted.map((item, i) => {
-                    const share = Math.round(((item.referring_domains ?? 0) / maxRd) * 100);
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium">{item.target ?? '—'}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${share}%` }} />
-                            </div>
-                            <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">{fmt(item.referring_domains)}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden sm:table-cell">{fmt(item.referring_main_domains)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">{fmt(item.referring_ips)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell">{fmt(item.referring_domains_nofollow)}</td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums hidden lg:table-cell">
-                          {item.broken_backlinks ? <span className="text-red-500">{fmt(item.broken_backlinks)}</span> : <span className="text-slate-300">0</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <BulkRdTable items={sorted} />
           )}
         </div>
       )}

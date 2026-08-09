@@ -3,6 +3,9 @@ import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import { stableSearchId } from '@/lib/dedupe';
+import SubdomainsTable from './SubdomainsTable';
 
 interface SubdomainItem {
   subdomain?: string;
@@ -56,12 +59,20 @@ export default async function SubdomainsPage({ searchParams }: { searchParams: P
     if (saved) { items = saved; activeEntry = getSubdomainsHistory().find((e) => e.id === historyId) ?? null; }
     else error = 'Search no longer available.';
   } else if (rawTarget) {
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['subdomains', rawTarget, location, language, limit]);
+    const cached = getSubdomainsResults<SubdomainItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      const cachedEntry = getSubdomainsHistory().find((e) => e.id === dedupeId);
+      activeEntry = cachedEntry ?? null;
+      cost = cachedEntry?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchSubdomains(rawTarget, location, language, limit, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: SubdomainsEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), target: rawTarget, location, language, count: items.length, cost };
+        const entry: SubdomainsEntry = { id: dedupeId, ts: Date.now(), target: rawTarget, location, language, count: items.length, cost };
         saveSubdomainsSearch(entry, items);
       }
     }
@@ -71,8 +82,6 @@ export default async function SubdomainsPage({ searchParams }: { searchParams: P
   const displayTarget = activeEntry?.target ?? rawTarget;
   const displayLocation = activeEntry?.location ?? location;
   const displayLanguage = activeEntry?.language ?? language;
-
-  const maxTraffic = Math.max(...items.map((i) => i.metrics?.organic?.etv ?? 0), 1);
 
   const csvData = items.map((item) => ({
     subdomain: item.subdomain ?? '',
@@ -122,52 +131,18 @@ export default async function SubdomainsPage({ searchParams }: { searchParams: P
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} subdomains — {displayTarget}</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
-              {items.length > 0 && <ExportCSVButton data={csvData} filename={`subdomains-${displayTarget}.csv`} columns={[{key:'subdomain',label:'Subdomain'},{key:'keywords',label:'Keywords'},{key:'traffic',label:'Est. Traffic (ETV)'},{key:'traffic_cost',label:'Traffic Value ($)'}]} />}
+              {items.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={csvData} columns={[{key:'subdomain',label:'Subdomain'},{key:'keywords',label:'Keywords'},{key:'traffic',label:'Est. Traffic (ETV)'},{key:'traffic_cost',label:'Traffic Value ($)'}]} />
+                  <ExportCSVButton data={csvData} filename={`subdomains-${displayTarget}.csv`} columns={[{key:'subdomain',label:'Subdomain'},{key:'keywords',label:'Keywords'},{key:'traffic',label:'Est. Traffic (ETV)'},{key:'traffic_cost',label:'Traffic Value ($)'}]} />
+                </div>
+              )}
             </div>
           </div>
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No subdomains found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Subdomain</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Keywords</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Traffic</th>
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Share</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Traffic value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {items.map((item, i) => {
-                    const org = item.metrics?.organic;
-                    const etv = org?.etv ?? 0;
-                    const share = maxTraffic > 0 ? Math.round((etv / maxTraffic) * 100) : 0;
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 font-mono text-sm text-blue-600 dark:text-blue-400 max-w-[240px]">
-                          <a href={`https://${item.subdomain}`} target="_blank" rel="noopener noreferrer" className="hover:underline truncate block">{item.subdomain ?? '—'}</a>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">{fmt(org?.count)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums font-bold">{fmt(Math.round(etv))}</td>
-                        <td className="px-6 py-3 hidden md:table-cell">
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-400 rounded-full" style={{ width: `${share}%` }} />
-                            </div>
-                            <span className="text-[10px] text-slate-400 tabular-nums">{share}%</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden lg:table-cell">
-                          {org?.estimated_paid_traffic_cost != null ? `$${Math.round(org.estimated_paid_traffic_cost).toLocaleString('en-GB')}` : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SubdomainsTable items={items} />
           )}
         </div>
       )}

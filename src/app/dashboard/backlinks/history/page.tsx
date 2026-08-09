@@ -1,6 +1,9 @@
 import { getCredentials, getSetting, getBlHistHistory, saveBlHist, getBlHistResults, type BlHistEntry } from '@/lib/db';
+import { stableSearchId } from '@/lib/dedupe';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import BacklinksHistoryTable from './BacklinksHistoryTable';
 
 interface HistoryPoint {
   date?: string;
@@ -82,12 +85,17 @@ export default async function BacklinksHistoryPage({ searchParams }: { searchPar
     if (saved) { items = saved; activeEntry = getBlHistHistory().find((e) => e.id === historyId) ?? null; }
     else error = 'Search no longer available.';
   } else if (rawTarget) {
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['backlinks-history', rawTarget]);
+    const cached = getBlHistResults<HistoryPoint>(dedupeId);
+    if (cached) {
+      items = cached;
+      cost = getBlHistHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchHistory(rawTarget, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: BlHistEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), target: rawTarget, count: items.length, cost };
+        const entry: BlHistEntry = { id: dedupeId, ts: Date.now(), target: rawTarget, count: items.length, cost };
         saveBlHist(entry, items);
       }
     }
@@ -182,37 +190,11 @@ export default async function BacklinksHistoryPage({ searchParams }: { searchPar
               <span className="text-xs font-black uppercase tracking-widest text-slate-400">{sorted.length} data points</span>
               <div className="flex items-center gap-3">
                 {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
+                <CopyMarkdownButton data={csvData} columns={[{key:'date',label:'Date'},{key:'backlinks',label:'Backlinks'},{key:'new_backlinks',label:'New'},{key:'lost_backlinks',label:'Lost'},{key:'referring_domains',label:'Ref. Domains'},{key:'new_referring_domains',label:'New RD'},{key:'lost_referring_domains',label:'Lost RD'}]} />
                 <ExportCSVButton data={csvData} filename={`backlinks-history-${displayTarget}.csv`} columns={[{key:'date',label:'Date'},{key:'backlinks',label:'Backlinks'},{key:'new_backlinks',label:'New'},{key:'lost_backlinks',label:'Lost'},{key:'referring_domains',label:'Ref. Domains'},{key:'new_referring_domains',label:'New RD'},{key:'lost_referring_domains',label:'Lost RD'}]} />
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Date</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Backlinks</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 text-emerald-600">+New</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 text-red-500">−Lost</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Ref. Domains</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell text-emerald-600">+New RD</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell text-red-500">−Lost RD</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {[...sorted].reverse().map((p, i) => (
-                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-3 font-mono text-slate-700 dark:text-slate-300">{p.date ?? '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">{fmt(p.backlinks)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-emerald-600 tabular-nums">{p.new_backlinks ? `+${fmt(p.new_backlinks)}` : '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono text-red-500 tabular-nums">{p.lost_backlinks ? `-${fmt(p.lost_backlinks)}` : '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums hidden sm:table-cell">{fmt(p.referring_domains)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-emerald-600 tabular-nums hidden md:table-cell">{p.new_referring_domains ? `+${fmt(p.new_referring_domains)}` : '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono text-red-500 tabular-nums hidden md:table-cell">{p.lost_referring_domains ? `-${fmt(p.lost_referring_domains)}` : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <BacklinksHistoryTable points={sorted} />
           </div>
         </div>
       )}

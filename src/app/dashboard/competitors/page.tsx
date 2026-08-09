@@ -6,9 +6,12 @@ import {
   type CompetitorsSearchEntry,
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
+import { stableSearchId } from '@/lib/dedupe';
+import CompetitorsTable from './CompetitorsTable';
 
 // ---- Types ----
 
@@ -86,25 +89,6 @@ async function fetchCompetitors(
 
 // ---- UI helpers ----
 
-function fmt(n?: number, decimals = 0) {
-  if (n === undefined || n === null) return '—';
-  return decimals > 0 ? n.toFixed(decimals) : n.toLocaleString("en-GB");
-}
-
-function TrafficBadge({ value }: { value?: number }) {
-  if (!value) return <span className="text-slate-300">—</span>;
-  const color = value >= 10000 ? 'text-emerald-700 bg-emerald-50'
-    : value >= 1000 ? 'text-blue-700 bg-blue-50'
-    : 'text-slate-600 bg-slate-100';
-  return <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tabular-nums ${color}`}>{n(value)}</span>;
-}
-
-function n(v: number) {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-  return String(v);
-}
-
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -135,12 +119,20 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
       const history = getCompetitorsHistory();
       activeEntry = history.find((e) => e.id === historyId) ?? null;
     } else {
-      error = 'Cette recherche n\'est plus disponible.';
+      error = 'This search is no longer available.';
     }
   }
 
   if (!historyId && target) {
-    if (!creds) {
+    const cleanTarget = target.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    const dedupeId = stableSearchId(['competitors', cleanTarget, location, language, limit]);
+    const cached = getCompetitorsResults<CompetitorItem>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      const cachedEntry = getCompetitorsHistory().find((e) => e.id === dedupeId);
+      cost = cachedEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const res = await fetchCompetitors(target, location, language, limit, creds.login, creds.pass);
@@ -150,9 +142,9 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
 
       if (!error && items.length > 0) {
         const entry: CompetitorsSearchEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
-          target: target.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0],
+          target: cleanTarget,
           location,
           language,
           count: items.length,
@@ -185,7 +177,7 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
             <input
               type="text" name="target"
               defaultValue={activeEntry?.target ?? target}
-              placeholder="ex: example.com"
+              placeholder="e.g. example.com"
               required
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono transition-all"
             />
@@ -224,7 +216,7 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
                 {displayTarget
                   ? <><span className="text-slate-900">{displayTarget}</span> — competitors</>
-                  : 'Concurrents'}
+                  : 'Competitors'}
               </h2>
               {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">History</span>}
             </div>
@@ -232,23 +224,41 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
               <span className="text-xs font-black text-slate-400">{items.length} competitor{items.length !== 1 ? 's' : ''}</span>
               {items.length > 0 && (
-                <ExportCSVButton
-                  data={items.map((item) => ({
-                    domain: item.domain ?? '',
-                    intersections: item.intersections ?? '',
-                    avg_position: item.avg_position ?? '',
-                    traffic: item.full_domain_metrics?.organic?.estimated_traffic ?? item.metrics?.organic?.estimated_traffic ?? '',
-                    total_kw: item.full_domain_metrics?.organic?.count ?? item.metrics?.organic?.count ?? '',
-                  }))}
-                  filename={`competitors-${displayTarget}.csv`}
-                  columns={[
-                    { key: 'domain', label: 'Domain' },
-                    { key: 'intersections', label: 'Common KWs' },
-                    { key: 'avg_position', label: 'Avg Position' },
-                    { key: 'traffic', label: 'Est. Traffic' },
-                    { key: 'total_kw', label: 'Total KWs' },
-                  ]}
-                />
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton
+                    data={items.map((item) => ({
+                      domain: item.domain ?? '',
+                      intersections: item.intersections ?? '',
+                      avg_position: item.avg_position ?? '',
+                      traffic: item.full_domain_metrics?.organic?.estimated_traffic ?? item.metrics?.organic?.estimated_traffic ?? '',
+                      total_kw: item.full_domain_metrics?.organic?.count ?? item.metrics?.organic?.count ?? '',
+                    }))}
+                    columns={[
+                      { key: 'domain', label: 'Domain' },
+                      { key: 'intersections', label: 'Common KWs' },
+                      { key: 'avg_position', label: 'Avg Position' },
+                      { key: 'traffic', label: 'Est. Traffic' },
+                      { key: 'total_kw', label: 'Total KWs' },
+                    ]}
+                  />
+                  <ExportCSVButton
+                    data={items.map((item) => ({
+                      domain: item.domain ?? '',
+                      intersections: item.intersections ?? '',
+                      avg_position: item.avg_position ?? '',
+                      traffic: item.full_domain_metrics?.organic?.estimated_traffic ?? item.metrics?.organic?.estimated_traffic ?? '',
+                      total_kw: item.full_domain_metrics?.organic?.count ?? item.metrics?.organic?.count ?? '',
+                    }))}
+                    filename={`competitors-${displayTarget}.csv`}
+                    columns={[
+                      { key: 'domain', label: 'Domain' },
+                      { key: 'intersections', label: 'Common KWs' },
+                      { key: 'avg_position', label: 'Avg Position' },
+                      { key: 'traffic', label: 'Est. Traffic' },
+                      { key: 'total_kw', label: 'Total KWs' },
+                    ]}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -256,65 +266,7 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No competitors found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="px-5 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 w-10">#</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Competitor domain</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Common keywords</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Avg pos.</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Est. traffic</th>
-                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Total KW</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {items.map((item, i) => {
-                    const intersections = item.intersections ?? 0;
-                    const barPct = Math.round((intersections / maxIntersections) * 100);
-                    const traffic = item.metrics?.organic?.estimated_traffic;
-                    const totalKw = item.full_domain_metrics?.organic?.count;
-
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-5 py-3 text-center">
-                          <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 text-xs font-black flex items-center justify-center mx-auto">
-                            {i + 1}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <a
-                            href={`https://${item.domain}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono font-bold text-slate-900 hover:text-blue-600 transition-colors text-sm"
-                          >
-                            {item.domain}
-                          </a>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-black text-slate-900 tabular-nums w-10 shrink-0">{fmt(intersections)}</span>
-                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
-                              <div className="h-full bg-blue-400 rounded-full" style={{ width: `${barPct}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-600 tabular-nums">
-                          {item.avg_position ? item.avg_position.toFixed(1) : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right hidden sm:table-cell">
-                          <TrafficBadge value={traffic} />
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
-                          {fmt(totalKw)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <CompetitorsTable items={items} maxIntersections={maxIntersections} />
           )}
         </div>
       )}

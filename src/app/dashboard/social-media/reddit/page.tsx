@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { getCredentials, getRedditHistory, saveRedditSearch, getRedditResults, type RedditSearchEntry } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import { MessageSquare, Users, ExternalLink } from 'lucide-react';
+import { stableSearchId } from '@/lib/dedupe';
 
 // ---- Types ----
 
@@ -105,8 +106,18 @@ export default async function RedditPage({ searchParams }: { searchParams: Promi
 
   const targets = rawTargets.split('\n').map((t) => t.trim()).filter(Boolean).slice(0, 10);
 
+  const dedupeId = stableSearchId(['reddit', ...targets]);
+
   if (!historyId && targets.length > 0) {
-    if (!creds) {
+    const cached = getRedditResults<RedditPageResult>(dedupeId);
+
+    if (cached) {
+      items = cached;
+      isFromHistory = true;
+      const history = getRedditHistory();
+      activeEntry = history.find((e) => e.id === dedupeId) ?? null;
+      cost = activeEntry?.cost;
+    } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       const res = await fetchReddit(targets, creds.login, creds.pass);
@@ -118,7 +129,7 @@ export default async function RedditPage({ searchParams }: { searchParams: Promi
       if (!error && items.length > 0) {
         const totalMentions = items.reduce((s, p) => s + (p.reddit_reviews?.length ?? 0), 0);
         const entry: RedditSearchEntry = {
-          id: crypto.randomUUID().slice(0, 8),
+          id: dedupeId,
           ts: Date.now(),
           targets: targets.slice(0, 2).join(', ') + (targets.length > 2 ? ` +${targets.length - 2}` : ''),
           count: totalMentions,

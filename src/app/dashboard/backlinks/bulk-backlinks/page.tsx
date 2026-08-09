@@ -1,6 +1,9 @@
 import { getCredentials, getBlBulkBlHistory, saveBlBulkBl, getBlBulkBlResults, type BlBulkBlEntry } from '@/lib/db';
+import { stableSearchId } from '@/lib/dedupe';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import BulkBacklinksTable from './BulkBacklinksTable';
 
 interface BulkBlItem {
   target?: string;
@@ -23,7 +26,6 @@ async function fetchBulkBacklinks(targets: string[], login: string, pass: string
   return { items: task.result?.[0]?.items ?? [], cost: task.cost };
 }
 
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
 export default async function BulkBacklinksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -43,12 +45,17 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
     else error = 'Search no longer available.';
   } else if (rawTargets) {
     const targetList = rawTargets.split('\n').map((t) => t.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')).filter(Boolean).slice(0, 1000);
-    if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
+    const dedupeId = stableSearchId(['bulk-backlinks', targetList.join(',')]);
+    const cached = getBlBulkBlResults<BulkBlItem>(dedupeId);
+    if (cached) {
+      items = cached;
+      cost = getBlBulkBlHistory().find((e) => e.id === dedupeId)?.cost;
+    } else if (!creds) { error = 'DataForSEO credentials missing. Configure them in Settings.'; }
     else {
       const result = await fetchBulkBacklinks(targetList, creds.login, creds.pass);
       items = result.items; cost = result.cost; error = result.error ?? null;
       if (!error && items.length > 0) {
-        const entry: BlBulkBlEntry = { id: crypto.randomUUID().slice(0, 8), ts: Date.now(), targets: targetList.join(', '), count: items.length, cost };
+        const entry: BlBulkBlEntry = { id: dedupeId, ts: Date.now(), targets: targetList.join(', '), count: items.length, cost };
         saveBlBulkBl(entry, items);
       }
     }
@@ -56,7 +63,6 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
 
   const history = getBlBulkBlHistory();
   const sorted = [...items].sort((a, b) => (b.backlinks ?? 0) - (a.backlinks ?? 0));
-  const maxBl = Math.max(...sorted.map((i) => i.backlinks ?? 0), 1);
 
   const csvData = sorted.map((item) => ({
     target: item.target ?? '',
@@ -94,40 +100,14 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{sorted.length} domains</span>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
+              {sorted.length > 0 && <CopyMarkdownButton data={csvData} columns={[{key:'target',label:'Domain'},{key:'backlinks',label:'Backlinks'}]} />}
               {sorted.length > 0 && <ExportCSVButton data={csvData} filename="bulk-backlinks.csv" columns={[{key:'target',label:'Domain'},{key:'backlinks',label:'Backlinks'}]} />}
             </div>
           </div>
           {sorted.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Domain</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Backlinks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                  {sorted.map((item, i) => {
-                    const share = Math.round(((item.backlinks ?? 0) / maxBl) * 100);
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-3 font-mono text-sm text-slate-900 dark:text-slate-200 font-medium">{item.target ?? '—'}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-400 rounded-full" style={{ width: `${share}%` }} />
-                            </div>
-                            <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">{fmt(item.backlinks)}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <BulkBacklinksTable items={sorted} />
           )}
         </div>
       )}

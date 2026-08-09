@@ -7,8 +7,10 @@ import {
   type BacklinksSearchEntry,
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import BacklinksTable from './BacklinksTable';
 
 // ---- Types ----
 
@@ -165,17 +167,6 @@ function StatCard({ label, value, new: newVal, lost }: { label: string; value?: 
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function formatSeenDate(s?: string) {
-  if (!s) return '—';
-  return new Date(s).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function DRBadge({ value }: { value?: number }) {
-  if (!value) return <span className="text-slate-300 text-xs">—</span>;
-  const color = value >= 70 ? 'bg-emerald-500 text-white' : value >= 40 ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500';
-  return <span className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-black ${color}`}>{value}</span>;
 }
 
 // ---- Page ----
@@ -424,29 +415,53 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
                   {linksTotal > links.length && <span className="text-slate-300"> / {fmt(linksTotal)} total</span>}
                 </span>
                 {links.length > 0 && (
-                  <ExportCSVButton
-                    data={links.map((l) => ({
-                      source: l.url_from,
-                      domain_from: l.domain_from,
-                      anchor: l.anchor,
-                      target: l.url_to,
-                      dr: l.domain_from_rank,
-                      dofollow: l.dofollow ? 'yes' : 'no',
-                      broken: l.is_broken ? 'yes' : 'no',
-                      first_seen: l.first_seen?.split('T')[0] ?? '',
-                    }))}
-                    filename={`backlinks-${target}.csv`}
-                    columns={[
-                      { key: 'source', label: 'Source URL' },
-                      { key: 'domain_from', label: 'Source Domain' },
-                      { key: 'anchor', label: 'Anchor' },
-                      { key: 'target', label: 'Target URL' },
-                      { key: 'dr', label: 'DR' },
-                      { key: 'dofollow', label: 'Dofollow' },
-                      { key: 'broken', label: 'Broken' },
-                      { key: 'first_seen', label: 'First Seen' },
-                    ]}
-                  />
+                  <>
+                    <CopyMarkdownButton
+                      data={links.map((l) => ({
+                        source: l.url_from,
+                        domain_from: l.domain_from,
+                        anchor: l.anchor,
+                        target: l.url_to,
+                        dr: l.domain_from_rank,
+                        dofollow: l.dofollow ? 'yes' : 'no',
+                        broken: l.is_broken ? 'yes' : 'no',
+                        first_seen: l.first_seen?.split('T')[0] ?? '',
+                      }))}
+                      columns={[
+                        { key: 'source', label: 'Source URL' },
+                        { key: 'domain_from', label: 'Source Domain' },
+                        { key: 'anchor', label: 'Anchor' },
+                        { key: 'target', label: 'Target URL' },
+                        { key: 'dr', label: 'DR' },
+                        { key: 'dofollow', label: 'Dofollow' },
+                        { key: 'broken', label: 'Broken' },
+                        { key: 'first_seen', label: 'First Seen' },
+                      ]}
+                    />
+                    <ExportCSVButton
+                      data={links.map((l) => ({
+                        source: l.url_from,
+                        domain_from: l.domain_from,
+                        anchor: l.anchor,
+                        target: l.url_to,
+                        dr: l.domain_from_rank,
+                        dofollow: l.dofollow ? 'yes' : 'no',
+                        broken: l.is_broken ? 'yes' : 'no',
+                        first_seen: l.first_seen?.split('T')[0] ?? '',
+                      }))}
+                      filename={`backlinks-${target}.csv`}
+                      columns={[
+                        { key: 'source', label: 'Source URL' },
+                        { key: 'domain_from', label: 'Source Domain' },
+                        { key: 'anchor', label: 'Anchor' },
+                        { key: 'target', label: 'Target URL' },
+                        { key: 'dr', label: 'DR' },
+                        { key: 'dofollow', label: 'Dofollow' },
+                        { key: 'broken', label: 'Broken' },
+                        { key: 'first_seen', label: 'First Seen' },
+                      ]}
+                    />
+                  </>
                 )}
               </div>
             </div>
@@ -454,66 +469,7 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
             {links.length === 0 ? (
               <div className="px-6 py-12 text-center text-sm text-slate-400">No backlinks found.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 w-12">DR</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Source page</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Anchor</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Target page</th>
-                      <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Type</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Seen</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {links.map((link, i) => {
-                      const isBroken = link.is_broken;
-                      return (
-                        <tr key={i} className={`hover:bg-slate-50 transition-colors ${isBroken ? 'opacity-50' : ''}`}>
-                          <td className="px-4 py-3 text-center">
-                            <DRBadge value={link.domain_from_rank} />
-                          </td>
-                          <td className="px-4 py-3 max-w-[220px]">
-                            <a href={link.url_from} target="_blank" rel="noopener noreferrer"
-                              className="text-xs font-mono text-slate-700 hover:text-blue-600 transition-colors truncate block">
-                              {link.url_from}
-                            </a>
-                            <span className="text-[10px] text-slate-400">{link.domain_from}</span>
-                          </td>
-                          <td className="px-4 py-3 max-w-[160px]">
-                            <div className="flex items-center gap-1.5">
-                              {link.anchor ? (
-                                <span className="text-xs text-slate-800 font-medium truncate">{link.anchor}</span>
-                              ) : link.image_url ? (
-                                <span className="text-[10px] text-slate-400 italic">Image</span>
-                              ) : (
-                                <span className="text-slate-300 text-xs">—</span>
-                              )}
-                              <span className={`shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${link.dofollow ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 bg-slate-100'}`}>
-                                {link.dofollow ? 'do' : 'no'}
-                              </span>
-                              {isBroken && <span className="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded text-red-500 bg-red-50">broken</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 max-w-[200px] hidden lg:table-cell">
-                            <a href={link.url_to} target="_blank" rel="noopener noreferrer"
-                              className="text-xs font-mono text-slate-500 hover:text-blue-600 transition-colors truncate block">
-                              {link.url_to}
-                            </a>
-                          </td>
-                          <td className="px-4 py-3 text-center hidden sm:table-cell">
-                            <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{link.type ?? '—'}</span>
-                          </td>
-                          <td className="px-4 py-3 text-right hidden md:table-cell">
-                            <span className="text-[11px] text-slate-400 tabular-nums">{formatSeenDate(link.first_seen)}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <BacklinksTable links={links} />
             )}
           </div>
         </>
