@@ -8,6 +8,10 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SiteAuditPagesTable from './SiteAuditPagesTable';
+import KeywordDensityTable from './KeywordDensityTable';
+import LinksTable from './LinksTable';
+import ResourcesTable from './ResourcesTable';
+import NonIndexableTable from './NonIndexableTable';
 import AutoRefresh from '@/components/AutoRefresh';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -158,12 +162,6 @@ function auth(login: string, pass: string) { return `Basic ${btoa(`${login}:${pa
 
 function fmt(n?: number) { return n !== undefined && n !== null ? n.toLocaleString('en-GB') : '—'; }
 
-function formatMs(ms?: number) {
-  if (ms === undefined || ms === null) return '—';
-  if (ms < 1000) return `${Math.round(ms)} ms`;
-  return `${(ms / 1000).toFixed(1)} s`;
-}
-
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -180,15 +178,6 @@ function scoreBg(score?: number) {
   if (score >= 80) return 'bg-emerald-50 border-emerald-200 text-emerald-700';
   if (score >= 50) return 'bg-amber-50 border-amber-200 text-amber-700';
   return 'bg-red-50 border-red-200 text-red-700';
-}
-
-function httpBadge(code?: number) {
-  if (!code) return null;
-  const cls = code < 300 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    : code < 400 ? 'bg-blue-50 text-blue-700 border-blue-200'
-    : code < 500 ? 'bg-amber-50 text-amber-700 border-amber-200'
-    : 'bg-red-50 text-red-700 border-red-200';
-  return <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${cls}`}>{code}</span>;
 }
 
 function countPageIssues(page: AuditPage) {
@@ -754,40 +743,7 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                   )}
 
                   {kwDensityItems && kwDensityItems.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">#</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Keyword</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Frequency</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Density</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Pages</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Emphasized</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {kwDensityItems.map((item, i) => {
-                            const density = item.density ?? 0;
-                            const densityCls = density >= 3 ? 'text-red-500' : density >= 1.5 ? 'text-amber-500' : 'text-slate-600';
-                            return (
-                              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                <td className="px-4 py-2.5 text-[11px] font-mono text-slate-400 tabular-nums">{i + 1}</td>
-                                <td className="px-4 py-2.5">
-                                  <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{item.keyword ?? '—'}</span>
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-700 dark:text-slate-300 tabular-nums">{item.frequency ?? '—'}</td>
-                                <td className={`px-4 py-2.5 text-right font-mono font-bold tabular-nums ${densityCls}`}>
-                                  {item.density !== undefined ? `${item.density.toFixed(2)}%` : '—'}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono text-slate-500 tabular-nums hidden sm:table-cell">{item.url_count ?? '—'}</td>
-                                <td className="px-4 py-2.5 text-right font-mono text-slate-400 tabular-nums hidden lg:table-cell">{item.emphasized_keyword_frequency ?? '—'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                    <KeywordDensityTable items={kwDensityItems} />
                   )}
                 </div>
               )}
@@ -846,65 +802,11 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                   {linksError && <div className="px-6 py-4 text-sm text-red-600">{linksError}</div>}
                   {!linkItems && !linksError && <div className="px-6 py-12 text-center text-sm text-slate-400">Loading…</div>}
                   {linkItems && (
-                    <>
-                      <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex gap-3 flex-wrap text-[11px] font-bold">
-                        <span className="text-slate-500">{linkItems.length} links total</span>
-                        <span className="text-red-500">{linkItems.filter((l) => l.is_broken).length} broken</span>
-                        <span className="text-slate-400">{linkItems.filter((l) => l.is_nofollowed).length} nofollow</span>
-                        <span className="text-blue-500">{linkItems.filter((l) => l.direction === 'external').length} external</span>
-                      </div>
-                      {linkItems.length === 0 ? (
-                        <div className="px-6 py-12 text-center text-sm text-slate-400">No links found.</div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">From</th>
-                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">To</th>
-                                <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Type</th>
-                                <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
-                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">Anchor</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                              {linkItems.map((link, i) => {
-                                const fromPath = (() => { try { return new URL(link.link_from ?? '').pathname; } catch { return link.link_from ?? '—'; } })();
-                                const isExternal = link.direction === 'external';
-                                return (
-                                  <tr key={i} className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${link.is_broken ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
-                                    <td className="px-4 py-2.5 max-w-[180px]">
-                                      <span className="font-mono text-slate-600 dark:text-slate-400 truncate block text-[10px]" title={link.link_from}>{fromPath}</span>
-                                    </td>
-                                    <td className="px-4 py-2.5 max-w-[200px]">
-                                      <a href={link.link_to} target="_blank" rel="noopener noreferrer"
-                                        className="font-mono text-blue-600 hover:underline truncate block text-[10px]" title={link.link_to}>
-                                        {link.link_to ?? '—'}
-                                      </a>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-center">
-                                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${isExternal ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-500'}`}>
-                                        {isExternal ? 'ext' : 'int'}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-center">
-                                      <div className="flex justify-center gap-1">
-                                        {link.is_broken && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">broken</span>}
-                                        {link.is_nofollowed && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">nofollow</span>}
-                                        {!link.is_broken && !link.is_nofollowed && <span className="text-emerald-500 text-xs">✓</span>}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2.5 hidden lg:table-cell max-w-[160px]">
-                                      <span className="text-slate-500 truncate block">{link.anchor || <span className="text-slate-300 italic">no anchor</span>}</span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </>
+                    linkItems.length === 0 ? (
+                      <div className="px-6 py-12 text-center text-sm text-slate-400">No links found.</div>
+                    ) : (
+                      <LinksTable links={linkItems} />
+                    )
                   )}
                 </div>
               )}
@@ -915,58 +817,11 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                   {resourcesError && <div className="px-6 py-4 text-sm text-red-600">{resourcesError}</div>}
                   {!resourceItems && !resourcesError && <div className="px-6 py-12 text-center text-sm text-slate-400">Loading…</div>}
                   {resourceItems && (
-                    <>
-                      <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex gap-3 flex-wrap text-[11px] font-bold">
-                        {['image','script','stylesheet','other'].map((type) => (
-                          <span key={type} className="text-slate-500">
-                            {resourceItems!.filter((r) => (type === 'other' ? !['image','script','stylesheet'].includes(r.resource_type ?? '') : r.resource_type === type)).length} {type}
-                          </span>
-                        ))}
-                        <span className="text-red-500">{resourceItems.filter((r) => r.checks?.broken_resources).length} broken</span>
-                      </div>
-                      {resourceItems.length === 0 ? (
-                        <div className="px-6 py-12 text-center text-sm text-slate-400">No resources found.</div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                                <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">URL</th>
-                                <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Type</th>
-                                <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">HTTP</th>
-                                <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Size</th>
-                                <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Load</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                              {resourceItems.map((res, i) => {
-                                const sizeKb = res.size != null ? (res.size / 1024).toFixed(1) : null;
-                                const typeCls: Record<string, string> = { image: 'bg-blue-50 text-blue-600', script: 'bg-amber-50 text-amber-700', stylesheet: 'bg-violet-50 text-violet-600' };
-                                const cls = typeCls[res.resource_type ?? ''] ?? 'bg-slate-100 text-slate-500';
-                                return (
-                                  <tr key={i} className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${res.checks?.broken_resources ? 'bg-red-50/30' : ''}`}>
-                                    <td className="px-4 py-2.5 max-w-[300px]">
-                                      <a href={res.url} target="_blank" rel="noopener noreferrer"
-                                        className="font-mono text-[10px] text-blue-600 hover:underline truncate block">{res.url ?? '—'}</a>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-center">
-                                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${cls}`}>{res.resource_type ?? '—'}</span>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-center">{httpBadge(res.status_code)}</td>
-                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-500">
-                                      {sizeKb != null ? (
-                                        <span className={parseFloat(sizeKb) > 500 ? 'text-amber-600 font-bold' : ''}>{sizeKb} KB</span>
-                                      ) : '—'}
-                                    </td>
-                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-500 hidden md:table-cell">{formatMs(res.fetch_time)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </>
+                    resourceItems.length === 0 ? (
+                      <div className="px-6 py-12 text-center text-sm text-slate-400">No resources found.</div>
+                    ) : (
+                      <ResourcesTable resources={resourceItems} />
+                    )
                   )}
                 </div>
               )}
@@ -1024,45 +879,7 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                     </div>
                   )}
                   {nonIndexItems && nonIndexItems.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">#</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">URL</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">HTTP</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden md:table-cell">Title</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Issues</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {nonIndexItems.map((page, i) => {
-                            const { errors: errCount, warnings: warnCount } = countPageIssues(page);
-                            const path = page.url ? (() => { try { return new URL(page.url).pathname; } catch { return page.url; } })() : '—';
-                            return (
-                              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                <td className="px-4 py-3 text-[11px] font-mono text-slate-400 tabular-nums">{i + 1}</td>
-                                <td className="px-4 py-3 max-w-[280px]">
-                                  <a href={page.url} target="_blank" rel="noopener noreferrer"
-                                    className="text-[10px] font-mono text-blue-600 hover:underline truncate block">{path}</a>
-                                </td>
-                                <td className="px-4 py-3 text-center">{httpBadge(page.status_code)}</td>
-                                <td className="px-4 py-3 max-w-[200px] hidden md:table-cell">
-                                  <span className="text-xs text-slate-700 dark:text-slate-300 truncate block">{page.meta?.title ?? <span className="text-slate-300 italic">no title</span>}</span>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    {errCount > 0 && <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">{errCount}</span>}
-                                    {warnCount > 0 && <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">{warnCount}</span>}
-                                    {errCount === 0 && warnCount === 0 && <span className="text-emerald-500 text-xs">✓</span>}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                    <NonIndexableTable pages={nonIndexItems} />
                   )}
                 </div>
               )}
