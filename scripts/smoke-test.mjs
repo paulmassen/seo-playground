@@ -33,7 +33,7 @@ const S = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(ke
 
 const login    = S('dfs-login');
 const pass     = S('dfs-pass');
-const domain   = S('default_domain')      || 'plomberie5etoiles.com';
+const domain   = S('default_domain')      || 'example.com';
 const location = S('default_location')    || 'France';
 const language = S('default_language')    || 'French';
 const coords   = S('default_coordinates') || '48.8566,2.3522';
@@ -239,14 +239,14 @@ await test(
 await test(
   'page_intersection (Backlinks)',
   'backlinks/page_intersection/live',
-  { targets: [{ url: domain, type: 'url' }, { url: 'drain5etoiles.com', type: 'url' }], limit: 1 },
+  { targets: [{ url: domain, type: 'url' }, { url: 'example.org', type: 'url' }], limit: 1 },
   { fields: ['url_from', 'domain_from', 'page_from_rank'] },
 );
 
 await test(
   'domain_intersection (Backlinks)',
   'backlinks/domain_intersection/live',
-  { target1: domain, target2: 'drain5etoiles.com', limit: 1 },
+  { target1: domain, target2: 'example.org', limit: 1 },
   { fields: ['domain_from', 'domain_from_rank'] },
 );
 
