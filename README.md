@@ -1,4 +1,4 @@
-# SEO Playground — Local SEO Dashboard
+# SEO Playground — SEO and Local SEO Dashboard
 
 > **New:** New AI Visibility page (see how often a domain/brand is mentioned by LLMs, and who dominates a topic). Nearly every results table across the app is now sortable and has a "Copy as Markdown" button. Searches on ~35 pages no longer get re-billed on accidental double-submits. See the [changelog](#changelog) below.
 
