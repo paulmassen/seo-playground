@@ -118,66 +118,12 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 
 ## Changelog
 
-### 2026-08-09
+Full detailed history: [CHANGELOG.md](CHANGELOG.md).
 
-- **Location field restricted to supported countries on DataForSEO Labs / AI Optimization pages** — Related Keywords, Keyword Ideas, Keyword Overview, Ranked Keywords, Search Intent, Subdomains, Top Searches, Competitors, Domain/Page Intersection, Historical Rank, Domain Categories, Keyword Difficulty, Traffic Estimation, AI Keyword Data, and AI Optimization only ever accept country-level targeting (verified against DataForSEO's own `locations_and_languages` reference endpoint — no region/city ever works there); the location picker on those pages now only offers the ~94 countries that actually work, instead of the full city/region dataset that silently failed
-- **Domain Categories now shows real category names** — was rendering raw numeric category codes (e.g. `10008`); added a `dfs_categories` reference table (seeded from DataForSEO's `categories` endpoint) and resolves each code to its full breadcrumb path (e.g. "Health > Health Conditions & Concerns")
-- **Fix Bulk Backlinks showing empty New/Lost/Ref. Domains/Ref. IPs/Spam columns** — `backlinks/bulk_backlinks/live` only ever returns `target` and `backlinks`; those columns could never populate. Removed them and linked to the dedicated Bulk Ref. Domains page for that data instead
-- **Keyword Ideas table is now sortable** — click any column header (Keyword, KD, Volume, CPC, Intent, Competition, Ref. Domains) to sort
-- **"Copy as Markdown" button** — added next to CSV export on Keyword Ideas, for pasting results straight into docs/notes
-- **Fix repeated billing on double-submit/refresh** — Backlinks now reuses its result if the same search (domain + filters) runs again within 60 seconds, instead of re-querying and re-billing DataForSEO every time; same protection Geo-Grid already had. Cleaned up 28 pre-existing duplicate history rows caused by this gap
-- **Backlinks — fixed remaining French strings** (sort options, filter label, stat card labels, table headers, error messages)
-- **New: AI Visibility page** — "My domain/brand" mode (total mentions, AI search volume, breakdown by platform/location/source domains/brand entities via `llm_mentions/target_metrics`) and "Topic leaderboard" mode (top mentioned domains and top mentioned brands for a keyword topic, side by side, via `llm_mentions/top_mentioned_domains` and `top_mentioned_brands`)
-- **Sortable tables + "Copy as Markdown" everywhere** — nearly every results table in the app (Backlinks and its 8 sub-pages, Competitors, Domain/Page Intersection, Domain Categories, Domain Technologies, Keyword Data/Difficulty/Overview, Ranked/Related Keywords, Search Intent, Subdomains, Top Searches, Traffic Estimation, Rank Tracker, all 5 Site Audit tabs (Pages, Keyword Density, Links, Resources, Non-Indexable), AI Keyword Data) now has click-to-sort column headers and a one-click "Copy as Markdown" button next to CSV export, for pasting straight into docs/notes
-- **Fix repeated billing on double-submit/refresh, app-wide** — the same 60-second dedupe protection added to Backlinks now covers ~35 pages (Keyword Ideas, Ranked/Related Keywords, Competitors, Domain/Page Intersection, Subdomains, Top Searches, Traffic Estimation, SERP Checker, Reddit, Domain Technologies/Whois, AI Prompt Test, and all Backlinks sub-pages, among others); intentionally left out of task-based flows (Rank Tracker, Google Reviews, Site Audit) where each submission is a deliberate distinct action
-- **Fixed remaining French UI strings** across Keyword Data, Keyword Difficulty, Ranked/Related Keywords, SERP Checker, Top Searches, and Competitors
-
-### 2026-07-25
-
-- **Geo-Grid competitive analysis** — new "Competitive landscape" panel (top 5 competitors by grid presence, visibility score, one-click "view on grid" highlight) and "Visibility by distance" ring breakdown
-- **Geo-Grid cost/duration estimates** — live-updating estimated cost and duration shown on the Live/Priority/Standard mode buttons, scaled to grid size
-- **Geo-Grid pending panel** — added elapsed time and estimated time remaining
-- **Geo-Grid history** — now shows the exact launch time, not just the date
-- **Fix Geo-Grid Live mode returning mostly empty results** — requests are now throttled (6 concurrent, 1 retry) to handle DataForSEO's slower response times, instead of firing the whole grid at once and silently dropping timeouts
-- **Fix Geo-Grid Priority queue mode** — the `priority` field was never actually sent to DataForSEO; Priority now genuinely costs more and completes faster than Standard
-- **Fix Geo-Grid Queue mode indicator** — mode badge, wait-time hint, and poll interval were silently broken due to a value mismatch; polling could fire almost continuously instead of every 10–30s
-- **Fix Geo-Grid Queue mode cost tracking** — final cost could be undercounted to $0.00 on multi-poll completions; points are now accumulated incrementally and never re-queried
-
-### 2026-06-01
-
-- **Local Finder simplified** — grid search removed from Local Finder and now lives exclusively in its own dedicated Geo-Grid Ranking page
-- **Geo-Grid highlighted** — three queue modes (Live / Priority / Standard), grid sizes from 3×3 to 11×11, color-coded heatmap, auto-polling, local history
-- **README: run options clarified** — Docker and `npm run build && npm start` recommended over `npm run dev`; dev mode noted as slow by design (no optimization, recompiles on every request)
-- **Next.js dev indicator removed** — `devIndicators: false`
-
-### 2026-05-31
-
-- **Fix Labs API field mappings** — corrected response parsing for Keyword Ideas (`keyword_properties.keyword_difficulty`, flat structure with no `keyword_data` wrapper), Search Intent (`keyword_intent.label` and `secondary_keyword_intents` array), Subdomains (removed unsupported `order_by` parameter), and Traffic Estimation (removed non-existent position columns, added Paid KWs column)
-- **Fix Keyword Ideas request** — endpoint requires `keywords` as an array, not a single `keyword` string
-- **Remove Next.js dev indicator** — `devIndicators: false` in next.config.ts
-- **Update banner translated to English**
-- **Keyword Difficulty** — fixed remaining French strings
-
-### 2026-05-30
-
-- **Labs endpoints** — added Keyword Ideas, Search Intent, Page Intersection, Subdomains, Traffic Estimation
-- **Domain Analytics** — added Categories page
-- **OnPage** — added Site Audit tabs: Links, Resources, Duplicate Tags, Non-Indexable; added Content Parsing standalone page
-- **Backlinks** — added Referring Networks, Page Intersection, Domain Intersection, History (with sparkline charts), Bulk Backlinks, Bulk Referring Domains
-- **Fix microdata `field.value.join is not a function`** — DataForSEO returns `value` and `types` as strings in some responses; added `Array.isArray()` guards
-- **Fix microdata "page not submitted"** — URL mismatch due to redirect normalization; fetch actual crawled URL from `on_page/pages` first
-- **Docker support** — added Dockerfile, `.dockerignore`, and `docker-compose.yml` with persistent SQLite volume
-- **Auto-refresh** — Site Audit page polls automatically while a crawl is in progress
-- **UI redesign** — sidebar overhaul (blue active state, readable nav labels, section grouping), header cleanup, smooth scroll, focus rings
-- **All UI text translated to English**
-
-### Earlier
-
-- **Google Reviews** — async task flow, rating distribution, monthly chart, rating goal calculator
-- **On-Page Instant Pages** — full single-page audit via DataForSEO live endpoint
-- **Geo-Grid Ranking** — heatmap across a geographic grid, async task polling
-- **Site Audit fixes** — resolved INSERT OR REPLACE data wipe bug and invalid `order_by` parameter causing crawls to never complete
-- **Initial release** — Rank Tracker, SERP Checker, Ranked Keywords, Keyword Overview, Keyword Data, Keyword Difficulty, Related Keywords, Competitors, Domain Intersection, Historical Rank, Backlinks, Local Finder, On-Page, AI Optimization, Reddit, Top Searches
+- **2026-08-09** — New AI Visibility page (LLM mention tracking). Sortable tables + "Copy as Markdown" across ~30 pages. Fixed location targeting on Labs pages, Domain Categories names, Bulk Backlinks columns, and repeated billing on double-submits app-wide.
+- **2026-07-25** — Geo-Grid competitive analysis (top competitors, visibility-by-distance) and several Geo-Grid reliability/cost-tracking fixes.
+- **2026-06-01** — Geo-Grid Ranking split out into its own dedicated page.
+- **2026-05-31 and earlier** — Labs endpoint field-mapping fixes, Docker support, UI redesign, initial release of core rank tracking, keyword research, backlinks, and on-page features.
 
 ## License
 
