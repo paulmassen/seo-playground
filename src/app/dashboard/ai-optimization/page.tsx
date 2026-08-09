@@ -61,16 +61,18 @@ async function fetchLlmMentions(
       ? { domain: targetValue, search_filter: 'include', search_scope: ['any'] }
       : { keyword: targetValue, search_filter: 'include', search_scope: ['any'], match_type: 'word_match' };
 
+  // ChatGPT isn't geo/language-targeted like Google AI is — the API rejects location_name/
+  // language_name outright ("Invalid Field") when platform is chat_gpt, so only send them for google.
+  const body: Record<string, unknown> = { target: [targetObj], platform, limit };
+  if (platform === 'google') {
+    body.location_name = location;
+    body.language_name = language;
+  }
+
   const res = await fetch('https://api.dataforseo.com/v3/ai_optimization/llm_mentions/search/live', {
     method: 'POST',
     headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      target: [targetObj],
-      platform,
-      location_name: location,
-      language_name: language,
-      limit,
-    }]),
+    body: JSON.stringify([body]),
   });
 
   if (!res.ok) return { items: [], error: `API error ${res.status}: ${res.statusText}` };
@@ -242,6 +244,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
             <LocationPicker name="location" defaultValue={location} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white" scope="labs" />
+            {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Ignored for ChatGPT — only Google AI supports location targeting.</p>}
           </div>
 
           {/* Language */}
@@ -251,6 +254,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
               {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>
+            {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Ignored for ChatGPT — only Google AI supports language targeting.</p>}
           </div>
         </div>
       </SearchForm>
