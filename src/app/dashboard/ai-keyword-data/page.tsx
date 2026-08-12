@@ -5,9 +5,9 @@ import {
   getAiKwDataHistory, saveAiKwDataSearch, getAiKwDataResults,
   type AiKwDataEntry,
 } from '@/lib/db';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
+import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
-import LocationPicker from '@/components/LocationPicker';
+import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import HistorySidebar from '@/components/HistorySidebar';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -197,17 +197,11 @@ export default async function AiKeywordDataPage({ searchParams }: { searchParams
                   className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all font-mono resize-y dark:bg-slate-800"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-                <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800" scope="labs" />
-              </div>
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-                <select name="language" defaultValue={displayLanguage}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
-                  {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
-              </div>
+              <LabsLocationLanguageFields
+                defaultLocation={displayLocation}
+                defaultLanguage={displayLanguage}
+                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800"
+              />
             </div>
           </SearchForm>
 

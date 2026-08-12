@@ -8,9 +8,9 @@ import {
   getSetting,
   type KwOverviewSearchEntry,
 } from '@/lib/db';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
+import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
-import LocationPicker from '@/components/LocationPicker';
+import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -218,17 +218,11 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-y"
             />
           </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={activeEntry?.location ?? location} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" scope="labs" />
-          </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-            <select name="language" defaultValue={activeEntry?.language ?? language}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-          </div>
+          <LabsLocationLanguageFields
+            defaultLocation={activeEntry?.location ?? location}
+            defaultLanguage={activeEntry?.language ?? language}
+            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
         </div>
       </SearchForm>
 

@@ -4,8 +4,8 @@ import {
   getCredentials, getDomainIntersectionHistory,
   saveDomainIntersectionSearch, getDomainIntersectionResults, getSetting,
 } from '@/lib/db';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
-import LocationPicker from '@/components/LocationPicker';
+import { toLabsCountry } from '@/lib/geo-options';
+import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
 import IntersectionTable, { type IntersectionItem } from './IntersectionTable';
@@ -110,16 +110,13 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Domain 2</label>
                 <input name="target2" type="text" defaultValue={target2} placeholder="competitor.com" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-sm font-medium text-slate-900 transition-all" />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</label>
-                <LocationPicker name="location" defaultValue={location} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" scope="labs" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Language</label>
-                <select name="language" defaultValue={language} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900">
-                  {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
-              </div>
+              <LabsLocationLanguageFields
+                defaultLocation={location}
+                defaultLanguage={language}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900"
+                wrapperClassName="space-y-1.5"
+                labelClassName="text-[10px] font-black text-slate-400 uppercase tracking-widest"
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Limit</label>

@@ -17,6 +17,9 @@ interface Props {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  /** Fires on every keystroke/selection with the current text — for callers that need to react
+   * to the location live (e.g. filtering a paired Language field to what that country supports). */
+  onChange?: (value: string) => void;
   /**
    * 'serp' (default) searches DataForSEO's full city/region/country dataset — use for SERP,
    * Local Finder, and Business Data endpoints. 'labs' restricts to the ~94 countries DataForSEO
@@ -38,7 +41,7 @@ function isoToFlag(iso: string): string {
   return String.fromCodePoint(...[...iso.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
 }
 
-export default function LocationPicker({ name, defaultValue = '', placeholder, required, disabled, className, scope = 'serp' }: Props) {
+export default function LocationPicker({ name, defaultValue = '', placeholder, required, disabled, className, scope = 'serp', onChange }: Props) {
   const [text, setText] = useState(defaultValue);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -67,6 +70,7 @@ export default function LocationPicker({ name, defaultValue = '', placeholder, r
 
   function handleChange(value: string) {
     setText(value);
+    onChange?.(value);
     setOpen(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchSuggestions(value), 200);
@@ -79,6 +83,7 @@ export default function LocationPicker({ name, defaultValue = '', placeholder, r
 
   function selectSuggestion(s: Suggestion) {
     setText(s.name);
+    onChange?.(s.name);
     setOpen(false);
     setSuggestions([]);
   }

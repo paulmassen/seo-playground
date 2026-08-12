@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getSetting } from '@/lib/db';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
-import LocationPicker from '@/components/LocationPicker';
+import { toLabsCountry } from '@/lib/geo-options';
 import SearchForm from '@/components/SearchForm';
+import AiOptimizationTargetingFields from './AiOptimizationTargetingFields';
 
 // ---- Types ----
 
@@ -160,8 +160,9 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
   const targetValue = (params.target ?? '').trim();
   const targetType = (params.target_type === 'domain' ? 'domain' : 'keyword') as 'keyword' | 'domain';
   const platform = ['google', 'chat_gpt'].includes(params.platform ?? '') ? params.platform! : 'google';
-  const location = params.location ?? defaultLocation;
-  const language = params.language ?? defaultLanguage;
+  // Per DataForSEO's docs, ChatGPT mentions are available for United States / English only.
+  const location = platform === 'chat_gpt' ? 'United States' : (params.location ?? defaultLocation);
+  const language = platform === 'chat_gpt' ? 'English' : (params.language ?? defaultLanguage);
   const limit = Math.min(Math.max(parseInt(params.limit ?? '20', 10) || 20, 1), 100);
 
   let items: MentionItem[] = [];
@@ -220,43 +221,12 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
             </div>
           </div>
 
-          {/* Platform */}
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Platform</label>
-            <select name="platform" defaultValue={platform}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-              <option value="google">Google AI</option>
-              <option value="chat_gpt">ChatGPT</option>
-            </select>
-          </div>
-
-          {/* Limit */}
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Results limit</label>
-            <select name="limit" defaultValue={String(limit)}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-              {[10, 20, 50, 100].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={location} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white" scope="labs" />
-            {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Ignored for ChatGPT — only Google AI supports location targeting.</p>}
-          </div>
-
-          {/* Language */}
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-            <select name="language" defaultValue={language}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-            {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Ignored for ChatGPT — only Google AI supports language targeting.</p>}
-          </div>
+          <AiOptimizationTargetingFields
+            defaultPlatform={platform}
+            defaultLimit={String(limit)}
+            defaultLocation={location}
+            defaultLanguage={language}
+          />
         </div>
       </SearchForm>
 

@@ -5,9 +5,9 @@ import {
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
+import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
-import LocationPicker from '@/components/LocationPicker';
+import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import RelatedKeywordsTable from './RelatedKeywordsTable';
 
@@ -174,17 +174,11 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
           </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" scope="labs" />
-          </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-            <select name="language" defaultValue={displayLanguage}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-          </div>
+          <LabsLocationLanguageFields
+            defaultLocation={displayLocation}
+            defaultLanguage={displayLanguage}
+            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Depth</label>
             <select name="depth" defaultValue={String(displayDepth)}

@@ -5,8 +5,8 @@ import {
 } from '@/lib/db';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
-import LocationPicker from '@/components/LocationPicker';
+import { toLabsCountry } from '@/lib/geo-options';
+import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
 import TopSearchesTable from './TopSearchesTable';
@@ -236,17 +236,11 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
 
       <SearchForm className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4" btnLabel="Search" btnClassName="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" scope="labs" />
-          </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-            <select name="language" defaultValue={displayLanguage}
-              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800">
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-          </div>
+          <LabsLocationLanguageFields
+            defaultLocation={displayLocation}
+            defaultLanguage={displayLanguage}
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
+          />
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Number of results</label>
             <select name="limit" defaultValue={String(displayLimit)}

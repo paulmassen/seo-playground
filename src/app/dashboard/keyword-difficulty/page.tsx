@@ -3,8 +3,8 @@ import {
   getKwDifficultyHistory, saveKwDifficultySearch, getKwDifficultyResults,
   type KwDifficultySearchEntry,
 } from '@/lib/db';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
-import LocationPicker from '@/components/LocationPicker';
+import { toLabsCountry } from '@/lib/geo-options';
+import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
 import KeywordDifficultyTable from './KeywordDifficultyTable';
@@ -149,17 +149,11 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
               className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono resize-y"
             />
           </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-            <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" scope="labs" />
-          </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-            <select name="language" defaultValue={displayLanguage}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-          </div>
+          <LabsLocationLanguageFields
+            defaultLocation={displayLocation}
+            defaultLanguage={displayLanguage}
+            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
         </div>
       </SearchForm>
 
