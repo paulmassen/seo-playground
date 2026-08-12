@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import {
   getCredentials, getSetting, getGridHistory, getGridEntry, saveGridSearch,
   saveGridSearchPending, getGridResults, type GridSearchEntry, type GridPoint, type GridQueueMode,
@@ -52,7 +53,6 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
   let gridEntry: GridSearchEntry | null = null;
   let gridPending: { id: string; totalPoints: number; queueMode: GridQueueMode } | null = null;
   let gridError: string | null = null;
-  let gridCost: number | undefined;
 
   // Load from history
   if (gridHistoryId) {
@@ -81,16 +81,7 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
         params.keyword, params.location_coordinate, gridSize, spacingKm, params.grid_target, queueMode,
       );
 
-      const alreadySaved = getGridEntry(id);
-      if (alreadySaved) {
-        gridEntry = alreadySaved;
-        if (alreadySaved.status === 'pending') {
-          gridPending = { id, totalPoints: gridSize ** 2, queueMode };
-        } else {
-          gridResults = getGridResults(id);
-          gridCost = alreadySaved.cost;
-        }
-      } else {
+      if (!getGridEntry(id)) {
         const baseEntry: GridSearchEntry = {
           id, ts: Date.now(),
           keyword: params.keyword,
@@ -112,10 +103,7 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
           if (result.error) {
             gridError = result.error;
           } else {
-            gridResults = result.results;
-            gridCost = result.cost;
-            gridEntry = { ...baseEntry, cost: result.cost };
-            saveGridSearch(gridEntry, result.results);
+            saveGridSearch({ ...baseEntry, cost: result.cost }, result.results);
           }
         } else {
           const result = await postGridTasksQueue(
@@ -126,11 +114,17 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
           if (result.error) {
             gridError = result.error;
           } else {
-            gridEntry = { ...baseEntry, status: 'pending', cost: result.cost };
-            saveGridSearchPending(gridEntry, result.taskPoints);
-            gridPending = { id, totalPoints: gridSize ** 2, queueMode };
+            saveGridSearchPending({ ...baseEntry, status: 'pending', cost: result.cost }, result.taskPoints);
           }
         }
+      }
+
+      // Redirect to a stable history-id URL so every subsequent poll / router.refresh() looks up
+      // this exact entry by id instead of recomputing stableGridId() — which is time-windowed and
+      // would otherwise mint a new id (and restart the whole grid from scratch) once enough time
+      // has passed, which is exactly what happens on long-running standard/priority queue searches.
+      if (!gridError) {
+        redirect(`/dashboard/geo-grid?grid_history_id=${id}#results`);
       }
     }
   }
@@ -138,11 +132,11 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
   const gridHistory = getGridHistory();
 
   const formDefaults = {
-    keyword: (params.keyword ?? '').toString(),
+    keyword: (params.keyword ?? gridEntry?.keyword ?? '').toString(),
     location: '',
-    locationCoordinate: (params.location_coordinate ?? '').toString(),
+    locationCoordinate: (params.location_coordinate ?? gridEntry?.center ?? '').toString(),
     defaultCenter: defaultCoordinates,
-    language: (params.language ?? defaultLanguage).toString(),
+    language: (params.language ?? gridEntry?.language ?? defaultLanguage).toString(),
     device: 'desktop',
     os: 'windows',
     depth: '20',
@@ -150,10 +144,10 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
     timeFilter: '',
     gridMode: true,
     forceGridMode: true,
-    gridSize: (params.grid_size ?? '5').toString(),
-    spacingKm: (params.spacing_km ?? '1').toString(),
-    gridTarget: (params.grid_target ?? '').toString(),
-    queueMode: (params.queue_mode ?? 'live').toString(),
+    gridSize: (params.grid_size ?? gridEntry?.grid_size ?? '5').toString(),
+    spacingKm: (params.spacing_km ?? gridEntry?.spacing_km ?? '1').toString(),
+    gridTarget: (params.grid_target ?? gridEntry?.target ?? '').toString(),
+    queueMode: (params.queue_mode ?? gridEntry?.queue_mode ?? 'live').toString(),
   };
 
   const historyItems = gridHistory.map((entry) => {
@@ -234,7 +228,7 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
                 spacingKm={gridEntry.spacing_km}
                 keyword={gridEntry.keyword}
                 target={gridEntry.target}
-                cost={gridCost ?? gridEntry.cost}
+                cost={gridEntry.cost}
               />
             )}
           </div>
