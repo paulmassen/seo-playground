@@ -3,7 +3,7 @@ import {
   getKwDifficultyHistory, saveKwDifficultySearch, getKwDifficultyResults,
   type KwDifficultySearchEntry,
 } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
@@ -66,7 +66,7 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
   const params = await searchParams;
   const historyId = params.history_id;
 
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
 
   const keywords = params.keywords?.trim() ?? '';

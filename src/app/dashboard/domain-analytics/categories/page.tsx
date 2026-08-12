@@ -1,5 +1,5 @@
 import { getCredentials, getSetting, getDomainCategoriesHistory, saveDomainCategoriesSearch, getDomainCategoriesResults, getCategoryPath, type DomainCategoriesEntry } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -35,7 +35,7 @@ function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB'
 export default async function DomainCategoriesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
 
   const rawTarget = params.target?.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') ?? '';

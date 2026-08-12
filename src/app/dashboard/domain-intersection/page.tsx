@@ -4,7 +4,7 @@ import {
   getCredentials, getDomainIntersectionHistory,
   saveDomainIntersectionSearch, getDomainIntersectionResults, getSetting,
 } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
@@ -46,7 +46,7 @@ async function fetchIntersection(target1: string, target2: string, location: str
 export default async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getDomainIntersectionHistory();
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
   const defaultDomain = getSetting('default_domain') ?? '';
 

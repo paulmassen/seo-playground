@@ -8,7 +8,7 @@ import {
   getSetting,
   type KwOverviewSearchEntry,
 } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
@@ -113,7 +113,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
   const historyId = params.history_id;
 
   const rawKeywords = params.keywords ?? '';
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
   const location = params.location ?? defaultLocation;
   const language = params.language ?? defaultLanguage;

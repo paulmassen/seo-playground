@@ -1,5 +1,5 @@
 import { getCredentials, getSetting, getTrafficEstimationHistory, saveTrafficEstimationSearch, getTrafficEstimationResults, type TrafficEstimationEntry } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -45,7 +45,7 @@ function TrafficBar({ value, max }: { value?: number; max: number }) {
 export default async function TrafficEstimationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
 
   const rawTargets = params.targets?.trim() ?? '';

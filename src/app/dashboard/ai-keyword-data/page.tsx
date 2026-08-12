@@ -5,7 +5,7 @@ import {
   getAiKwDataHistory, saveAiKwDataSearch, getAiKwDataResults,
   type AiKwDataEntry,
 } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
@@ -78,7 +78,7 @@ export default async function AiKeywordDataPage({ searchParams }: { searchParams
   const params = await searchParams;
   const historyId = params.history_id;
 
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
 
   const keywords = params.keywords?.trim() ?? '';

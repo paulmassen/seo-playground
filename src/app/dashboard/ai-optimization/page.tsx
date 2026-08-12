@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getSetting } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 
@@ -154,7 +154,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
   const creds = getCredentials();
   const params = await searchParams;
 
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
 
   const targetValue = (params.target ?? '').trim();

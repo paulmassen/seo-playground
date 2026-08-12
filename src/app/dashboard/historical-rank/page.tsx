@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getHistRankHistory, saveHistRankSearch, getHistRankResults, getSetting } from '@/lib/db';
-import { LANGUAGES } from '@/lib/geo-options';
+import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
@@ -76,7 +76,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 export default async function HistoricalRankPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getHistRankHistory();
-  const defaultLocation = getSetting('default_location') ?? 'France';
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
   const defaultDomain = getSetting('default_domain') ?? '';
 
