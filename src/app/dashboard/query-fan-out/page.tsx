@@ -5,13 +5,13 @@ import {
   getFanOutHistory, saveFanOutSearch, getFanOutResults, getFanOutSeedSummary,
   type FanOutEntry,
 } from '@/lib/db';
-import { LANGUAGES, toLabsCountry } from '@/lib/geo-options';
+import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
-import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import HistorySidebar from '@/components/HistorySidebar';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import FanOutQueryTable from './FanOutQueryTable';
+import FanOutTargetingFields from './FanOutTargetingFields';
 
 // ---- Types ----
 
@@ -345,39 +345,12 @@ export default async function QueryFanOutPage({ searchParams }: { searchParams: 
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Platform</label>
-                <select name="platform" defaultValue={displayPlatform}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
-                  <option value="google">Google AI</option>
-                  <option value="chat_gpt">ChatGPT</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Mentions checked per seed</label>
-                <select name="limit" defaultValue={String(limit)}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
-                  {[10, 20, 50, 100].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-                <LocationPicker name="location" defaultValue={displayLocation} disabled={platform === 'chat_gpt'} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed" scope="labs" />
-                {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Always United States for ChatGPT — DataForSEO only supports ChatGPT mentions for that market.</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-                <select name="language" defaultValue={displayLanguage} disabled={platform === 'chat_gpt'}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                  {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
-                {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Always English for ChatGPT — DataForSEO only supports ChatGPT mentions in that language.</p>}
-              </div>
+              <FanOutTargetingFields
+                defaultPlatform={displayPlatform}
+                defaultLimit={String(limit)}
+                defaultLocation={displayLocation}
+                defaultLanguage={displayLanguage}
+              />
             </div>
           </SearchForm>
 
