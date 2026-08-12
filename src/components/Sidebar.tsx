@@ -7,7 +7,7 @@ import {
   TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
   Gauge, Lightbulb, BrainCircuit, MessageSquare, Star, Flame, Cpu, ShieldCheck, Grid3X3,
   Sparkles, Target, Layers, Network, LineChart, Tag, ScanText,
-  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye,
+  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints,
 } from 'lucide-react';
 
 const sections = [
@@ -77,6 +77,7 @@ const sections = [
       { name: 'AI Visibility', href: '/dashboard/ai-visibility', icon: Eye },
       { name: 'AI Prompt Test', href: '/dashboard/llm-responses', icon: Bot },
       { name: 'AI Keyword Data', href: '/dashboard/ai-keyword-data', icon: Radar },
+      { name: 'Query Fan-Out', href: '/dashboard/query-fan-out', icon: Waypoints },
     ],
   },
   {

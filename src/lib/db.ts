@@ -456,6 +456,20 @@ function initSchema(db: Database.Database) {
       result TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS fan_out_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      seeds TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      location TEXT NOT NULL,
+      language TEXT NOT NULL,
+      seed_count INTEGER NOT NULL,
+      query_count INTEGER NOT NULL,
+      cost REAL,
+      items TEXT NOT NULL,
+      seed_summary TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS dfs_locations (
       location_code INTEGER PRIMARY KEY,
       location_name TEXT NOT NULL,
@@ -1895,4 +1909,26 @@ export function saveAiVisibilitySearch<T>(entry: AiVisibilityEntry, result: T): 
 export function getAiVisibilityResult<T>(id: string): T | null {
   const row = getDb().prepare('SELECT result FROM ai_visibility_searches WHERE id = ?').get(id) as { result: string } | undefined;
   if (!row) return null; try { return JSON.parse(row.result) as T; } catch { return null; }
+}
+
+// ─── Query Fan-Out (LLM Mentions scoped to fan_out_queries + AI Keyword Data volumes) ────
+
+export interface FanOutEntry { id: string; ts: number; seeds: string; platform: string; location: string; language: string; seedCount: number; queryCount: number; cost?: number; }
+type FORow = { id: string; ts: number; seeds: string; platform: string; location: string; language: string; seed_count: number; query_count: number; cost: number | null };
+
+export function getFanOutHistory(): FanOutEntry[] {
+  const rows = getDb().prepare('SELECT id, ts, seeds, platform, location, language, seed_count, query_count, cost FROM fan_out_searches ORDER BY ts DESC LIMIT 20').all() as FORow[];
+  return rows.map((r) => ({ id: r.id, ts: r.ts, seeds: r.seeds, platform: r.platform, location: r.location, language: r.language, seedCount: r.seed_count, queryCount: r.query_count, cost: r.cost ?? undefined }));
+}
+export function saveFanOutSearch(entry: FanOutEntry, items: unknown[], seedSummary: unknown[]): void {
+  getDb().prepare('INSERT OR REPLACE INTO fan_out_searches (id, ts, seeds, platform, location, language, seed_count, query_count, cost, items, seed_summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.seeds, entry.platform, entry.location, entry.language, entry.seedCount, entry.queryCount, entry.cost ?? null, JSON.stringify(items), JSON.stringify(seedSummary));
+}
+export function getFanOutResults<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT items FROM fan_out_searches WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.items) as T[]; } catch { return null; }
+}
+export function getFanOutSeedSummary<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT seed_summary FROM fan_out_searches WHERE id = ?').get(id) as { seed_summary: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.seed_summary) as T[]; } catch { return null; }
 }

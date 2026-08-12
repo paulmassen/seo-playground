@@ -28,7 +28,8 @@ interface MentionItem {
   ai_search_volume?: number;
   monthly_searches?: MonthlySearch[];
   brand_entities?: Array<{ title?: string; category?: string }>;
-  fan_out_queries?: Array<{ keyword?: string }>;
+  // The API returns these as plain strings, not { keyword } objects.
+  fan_out_queries?: string[];
   first_response_at?: string;
   last_response_at?: string;
 }
@@ -366,7 +367,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
                         <div className="flex flex-wrap gap-1">
                           {item.fan_out_queries!.slice(0, 5).map((q, qi) => (
                             <span key={qi} className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                              {q.keyword}
+                              {q}
                             </span>
                           ))}
                         </div>

@@ -104,6 +104,21 @@ export const LABS_LOCATIONS = [
   { code: 2704, name: 'Vietnam', iso: 'VN' },
 ];
 
+/**
+ * The global `default_location` setting stores a full "City,Region,Country" string (needed for
+ * SERP-based tools like Local Finder). Labs/AI Optimization endpoints only accept a bare country
+ * name, so pull the country segment out of that string — checked from the end, since country is
+ * always last — and fall back if none of the segments match a supported Labs country.
+ */
+export function toLabsCountry(location: string, fallback = 'France'): string {
+  const segments = location.split(',').map((s) => s.trim()).filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const match = LABS_LOCATIONS.find((l) => l.name.toLowerCase() === segments[i].toLowerCase());
+    if (match) return match.name;
+  }
+  return fallback;
+}
+
 export const LOCATIONS = [
   // Europe
   { value: 'France',          label: '🇫🇷 France' },

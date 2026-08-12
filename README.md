@@ -1,6 +1,6 @@
 # SEO Playground — SEO and Local SEO Dashboard
 
-> **New:** New AI Visibility page (see how often a domain/brand is mentioned by LLMs, and who dominates a topic). Nearly every results table across the app is now sortable and has a "Copy as Markdown" button. Searches on ~35 pages no longer get re-billed on accidental double-submits. See the [changelog](#changelog) below.
+> **New:** New Query Fan-Out page (surfaces the hidden sub-queries AI models generate when answering prompts, with their AI search volume). New AI Visibility page (see how often a domain/brand is mentioned by LLMs, and who dominates a topic). Nearly every results table across the app is now sortable and has a "Copy as Markdown" button. See the [changelog](#changelog) below.
 
 > **Work in progress** — new DataForSEO endpoints are being added progressively.
 
@@ -120,7 +120,7 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 
 Full detailed history: [CHANGELOG.md](CHANGELOG.md).
 
-- **2026-08-09** — New AI Visibility page (LLM mention tracking). Sortable tables + "Copy as Markdown" across ~30 pages. Fixed location targeting on Labs pages, Domain Categories names, Bulk Backlinks columns, and repeated billing on double-submits app-wide.
+- **2026-08-09** — New Query Fan-Out page (hidden AI sub-queries + their search volume). New AI Visibility page (LLM mention tracking). Sortable tables + "Copy as Markdown" across ~30 pages. Fixed location targeting on Labs pages, Domain Categories names, Bulk Backlinks columns, repeated billing on double-submits app-wide, and blank "Related queries" pills on AI Optimization.
 - **2026-07-25** — Geo-Grid competitive analysis (top competitors, visibility-by-distance) and several Geo-Grid reliability/cost-tracking fixes.
 - **2026-06-01** — Geo-Grid Ranking split out into its own dedicated page.
 - **2026-05-31 and earlier** — Labs endpoint field-mapping fixes, Docker support, UI redesign, initial release of core rank tracking, keyword research, backlinks, and on-page features.
