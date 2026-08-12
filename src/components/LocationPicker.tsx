@@ -15,6 +15,7 @@ interface Props {
   defaultValue?: string;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   className?: string;
   /**
    * 'serp' (default) searches DataForSEO's full city/region/country dataset — use for SERP,
@@ -37,7 +38,7 @@ function isoToFlag(iso: string): string {
   return String.fromCodePoint(...[...iso.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
 }
 
-export default function LocationPicker({ name, defaultValue = '', placeholder, required, className, scope = 'serp' }: Props) {
+export default function LocationPicker({ name, defaultValue = '', placeholder, required, disabled, className, scope = 'serp' }: Props) {
   const [text, setText] = useState(defaultValue);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -123,6 +124,7 @@ export default function LocationPicker({ name, defaultValue = '', placeholder, r
         onKeyDown={handleKeyDown}
         placeholder={placeholder ?? (scope === 'labs' ? 'e.g. France' : 'e.g. Paris, France')}
         required={required}
+        disabled={disabled}
         autoComplete="off"
         className={className ?? DEFAULT_CLASS}
       />

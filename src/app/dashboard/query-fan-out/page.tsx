@@ -212,8 +212,12 @@ export default async function QueryFanOutPage({ searchParams }: { searchParams: 
 
   const seedsRaw = params.seeds?.trim() ?? '';
   const platform = ['google', 'chat_gpt'].includes(params.platform ?? '') ? params.platform! : 'google';
-  const location = params.location ?? defaultLocation;
-  const language = params.language ?? defaultLanguage;
+  // Per DataForSEO's docs, ChatGPT mentions are available for United States / English only — force
+  // both rather than letting the picker desync the AI-volume lookup from the market the fan-out
+  // queries actually came from (and so identical ChatGPT searches share one cache entry regardless
+  // of what location/language happened to be selected).
+  const location = platform === 'chat_gpt' ? 'United States' : (params.location ?? defaultLocation);
+  const language = platform === 'chat_gpt' ? 'English' : (params.language ?? defaultLanguage);
   const limit = Math.min(Math.max(parseInt(params.limit ?? '20', 10) || 20, 1), 100);
 
   let items: FanOutQueryItem[] = [];
@@ -362,17 +366,17 @@ export default async function QueryFanOutPage({ searchParams }: { searchParams: 
 
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-                <LocationPicker name="location" defaultValue={displayLocation} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800" scope="labs" />
-                {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Ignored for ChatGPT — only Google AI supports location targeting.</p>}
+                <LocationPicker name="location" defaultValue={displayLocation} disabled={platform === 'chat_gpt'} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed" scope="labs" />
+                {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Always United States for ChatGPT — DataForSEO only supports ChatGPT mentions for that market.</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
-                <select name="language" defaultValue={displayLanguage}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
+                <select name="language" defaultValue={displayLanguage} disabled={platform === 'chat_gpt'}
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed">
                   {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
-                {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Ignored for ChatGPT — only Google AI supports language targeting.</p>}
+                {platform === 'chat_gpt' && <p className="text-[11px] text-slate-400 mt-1">Always English for ChatGPT — DataForSEO only supports ChatGPT mentions in that language.</p>}
               </div>
             </div>
           </SearchForm>
