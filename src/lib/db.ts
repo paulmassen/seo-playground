@@ -470,6 +470,18 @@ function initSchema(db: Database.Database) {
       seed_summary TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS web_mentions_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      keyword TEXT NOT NULL,
+      page_types TEXT NOT NULL,
+      limit_count INTEGER NOT NULL,
+      total_count INTEGER,
+      cost REAL,
+      items TEXT NOT NULL,
+      summary TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS dfs_locations (
       location_code INTEGER PRIMARY KEY,
       location_name TEXT NOT NULL,
@@ -1895,7 +1907,7 @@ export function getLlmResponseResult<T>(id: string): T | null {
 
 // ─── AI Visibility (LLM Mentions: target metrics + top mentioned domains/brands) ────
 
-export type AiVisibilityMode = 'target' | 'leaderboard';
+export type AiVisibilityMode = 'target' | 'leaderboard' | 'historical';
 export interface AiVisibilityEntry { id: string; ts: number; mode: AiVisibilityMode; target: string; platform: string; cost?: number; }
 type AVRow = { id: string; ts: number; mode: string; target: string; platform: string; cost: number | null };
 
@@ -1931,4 +1943,37 @@ export function getFanOutResults<T>(id: string): T[] | null {
 export function getFanOutSeedSummary<T>(id: string): T[] | null {
   const row = getDb().prepare('SELECT seed_summary FROM fan_out_searches WHERE id = ?').get(id) as { seed_summary: string } | undefined;
   if (!row) return null; try { return JSON.parse(row.seed_summary) as T[]; } catch { return null; }
+}
+
+// ─── Web Mentions (Content Analysis: search + summary) ────
+
+export interface WebMentionsEntry {
+  id: string;
+  ts: number;
+  keyword: string;
+  pageTypes: string;
+  limit: number;
+  totalCount?: number;
+  cost?: number;
+}
+type WMRow = { id: string; ts: number; keyword: string; page_types: string; limit_count: number; total_count: number | null; cost: number | null };
+
+export function getWebMentionsHistory(): WebMentionsEntry[] {
+  const rows = getDb().prepare('SELECT id, ts, keyword, page_types, limit_count, total_count, cost FROM web_mentions_searches ORDER BY ts DESC LIMIT 20').all() as WMRow[];
+  return rows.map((r) => ({
+    id: r.id, ts: r.ts, keyword: r.keyword, pageTypes: r.page_types, limit: r.limit_count,
+    totalCount: r.total_count ?? undefined, cost: r.cost ?? undefined,
+  }));
+}
+export function saveWebMentionsSearch<I, S>(entry: WebMentionsEntry, items: I, summary: S): void {
+  getDb().prepare('INSERT OR REPLACE INTO web_mentions_searches (id, ts, keyword, page_types, limit_count, total_count, cost, items, summary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.keyword, entry.pageTypes, entry.limit, entry.totalCount ?? null, entry.cost ?? null, JSON.stringify(items), JSON.stringify(summary));
+}
+export function getWebMentionsItems<T>(id: string): T | null {
+  const row = getDb().prepare('SELECT items FROM web_mentions_searches WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.items) as T; } catch { return null; }
+}
+export function getWebMentionsSummary<T>(id: string): T | null {
+  const row = getDb().prepare('SELECT summary FROM web_mentions_searches WHERE id = ?').get(id) as { summary: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.summary) as T; } catch { return null; }
 }

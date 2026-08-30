@@ -7,7 +7,7 @@ import {
   TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
   Gauge, Lightbulb, BrainCircuit, MessageSquare, Star, Flame, Cpu, ShieldCheck, Grid3X3,
   Sparkles, Target, Layers, Network, LineChart, Tag, ScanText,
-  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints,
+  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone,
 } from 'lucide-react';
 
 const sections = [
@@ -84,6 +84,7 @@ const sections = [
     label: 'Business',
     items: [
       { name: 'Google Reviews', href: '/dashboard/google-reviews', icon: Star },
+      { name: 'Web Mentions', href: '/dashboard/web-mentions', icon: Megaphone },
     ],
   },
   {

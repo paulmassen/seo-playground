@@ -1,14 +1,17 @@
 import {
   getCredentials,
+  getSetting,
   getAiVisibilityHistory,
   saveAiVisibilitySearch,
   getAiVisibilityResult,
   type AiVisibilityEntry,
   type AiVisibilityMode,
 } from '@/lib/db';
+import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
 import SearchForm from '@/components/SearchForm';
 import LeaderboardTables from './LeaderboardTables';
+import HistoricalTargetingFields from './HistoricalTargetingFields';
 
 // ---- Types ----
 
@@ -45,12 +48,27 @@ interface LeaderboardResult {
   brands: LeaderboardItem[];
 }
 
+interface HistoricalItem {
+  year: number;
+  month: number;
+  metrics: { mentions: number; ai_search_volume: number };
+}
+
+interface HistoricalResult {
+  items_count: number;
+  items: HistoricalItem[];
+}
+
 interface SearchParams {
   mode?: string;
   target?: string;
   target_type?: string;
   platform?: string;
   limit?: string;
+  location?: string;
+  language?: string;
+  date_from?: string;
+  date_to?: string;
   history_id?: string;
 }
 
@@ -112,6 +130,23 @@ async function fetchLeaderboard(
   };
 }
 
+async function fetchHistorical(
+  value: string, type: 'domain' | 'keyword', platform: string, location: string, language: string,
+  dateFrom: string, dateTo: string, login: string, pass: string,
+): Promise<{ result?: HistoricalResult; cost?: number; error?: string }> {
+  const body: Record<string, unknown> = { target: [buildTargetObj(value, type)], platform };
+  // ChatGPT mentions are only tracked for United States / English, and the API rejects
+  // location_name/language_name outright when platform is chat_gpt (same as the other LLM Mentions
+  // endpoints) — so only send geo/language targeting for Google AI.
+  if (platform === 'google') {
+    body.location_name = location;
+    body.language_name = language;
+  }
+  if (dateFrom) body.date_from = dateFrom;
+  if (dateTo) body.date_to = dateTo;
+  return callLlmMentions<HistoricalResult>('historical', body, login, pass);
+}
+
 // ---- UI helpers ----
 
 const PLATFORM_LABELS: Record<string, string> = { google: 'Google AI', chat_gpt: 'ChatGPT' };
@@ -145,6 +180,52 @@ function BreakdownList({ title, items, unit }: { title: string; items?: AggMetri
   );
 }
 
+function monthLabel(year: number, month: number) {
+  return new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+}
+
+function MonthlyTrendChart({ title, items, metric }: { title: string; items: HistoricalItem[]; metric: 'mentions' | 'ai_search_volume' }) {
+  if (items.length === 0) return null;
+  const sorted = [...items].sort((a, b) => (a.year - b.year) || (a.month - b.month));
+  const values = sorted.map((i) => i.metrics[metric]);
+  const max = Math.max(...values, 1);
+  const first = values[0];
+  const last = values[values.length - 1];
+  const delta = last - first;
+  const trendLabel = delta > 0 ? 'increasing' : delta < 0 ? 'declining' : 'flat';
+  const trendColor = delta > 0
+    ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950 border-emerald-100 dark:border-emerald-900'
+    : delta < 0
+      ? 'text-red-600 bg-red-50 dark:bg-red-950 border-red-100 dark:border-red-900'
+      : 'text-slate-500 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700';
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">{title}</h2>
+        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${trendColor}`}>
+          {trendLabel}{sorted.length > 1 ? ` (${delta > 0 ? '+' : ''}${fmt(delta)})` : ''}
+        </span>
+      </div>
+      <div className="flex items-end gap-1.5 h-36">
+        {sorted.map((item, i) => {
+          const val = item.metrics[metric];
+          const h = Math.max(3, Math.round((val / max) * 128));
+          return (
+            <div key={i} className="flex-1 min-w-0 flex flex-col items-center justify-end gap-1.5 group relative h-full">
+              <span className="absolute -top-4 text-[10px] font-mono text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                {fmt(val)}
+              </span>
+              <div className="w-full bg-violet-300 dark:bg-violet-500/60 group-hover:bg-violet-500 rounded-t-md transition-colors" style={{ height: `${h}px` }} />
+              <span className="text-[9px] text-slate-400 whitespace-nowrap shrink-0">{monthLabel(item.year, item.month)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ---- Page ----
 
 export default async function AiVisibilityPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -152,14 +233,22 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const historyId = params.history_id;
 
-  const mode: AiVisibilityMode = params.mode === 'leaderboard' ? 'leaderboard' : 'target';
+  const mode: AiVisibilityMode =
+    params.mode === 'leaderboard' ? 'leaderboard' : params.mode === 'historical' ? 'historical' : 'target';
   const targetValue = (params.target ?? '').trim();
   const targetType = (params.target_type === 'domain' ? 'domain' : 'keyword') as 'keyword' | 'domain';
   const platform = ['google', 'chat_gpt'].includes(params.platform ?? '') ? params.platform! : 'chat_gpt';
   const limit = Math.min(Math.max(parseInt(params.limit ?? '10', 10) || 10, 1), 50);
+  const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
+  const defaultLanguage = getSetting('default_language') ?? 'French';
+  const location = platform === 'chat_gpt' ? 'United States' : (params.location ?? defaultLocation);
+  const language = platform === 'chat_gpt' ? 'English' : (params.language ?? defaultLanguage);
+  const dateFrom = params.date_from ?? '';
+  const dateTo = params.date_to ?? '';
 
   let targetResult: TargetMetricsResult | null = null;
   let leaderboardResult: LeaderboardResult | null = null;
+  let historicalResult: HistoricalResult | null = null;
   let cost: number | undefined;
   let error: string | null = null;
   let isFromHistory = false;
@@ -167,8 +256,9 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
 
   if (historyId) {
     if (mode === 'target') targetResult = getAiVisibilityResult<TargetMetricsResult>(historyId);
-    else leaderboardResult = getAiVisibilityResult<LeaderboardResult>(historyId);
-    if (targetResult || leaderboardResult) {
+    else if (mode === 'leaderboard') leaderboardResult = getAiVisibilityResult<LeaderboardResult>(historyId);
+    else historicalResult = getAiVisibilityResult<HistoricalResult>(historyId);
+    if (targetResult || leaderboardResult || historicalResult) {
       isFromHistory = true;
       activeEntry = getAiVisibilityHistory().find((e) => e.id === historyId) ?? null;
     } else {
@@ -178,24 +268,30 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
     if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const dedupeId = stableSearchId(['ai-visibility', mode, targetValue, targetType, platform, limit]);
-      const cached = getAiVisibilityResult<TargetMetricsResult | LeaderboardResult>(dedupeId);
+      const dedupeId = mode === 'historical'
+        ? stableSearchId(['ai-visibility', mode, targetValue, targetType, platform, location, language, dateFrom, dateTo])
+        : stableSearchId(['ai-visibility', mode, targetValue, targetType, platform, limit]);
+      const cached = getAiVisibilityResult<TargetMetricsResult | LeaderboardResult | HistoricalResult>(dedupeId);
 
       if (cached) {
         if (mode === 'target') targetResult = cached as TargetMetricsResult;
-        else leaderboardResult = cached as LeaderboardResult;
+        else if (mode === 'leaderboard') leaderboardResult = cached as LeaderboardResult;
+        else historicalResult = cached as HistoricalResult;
         cost = getAiVisibilityHistory().find((e) => e.id === dedupeId)?.cost;
       } else {
         const res = mode === 'target'
           ? await fetchTargetMetrics(targetValue, targetType, platform, creds.login, creds.pass)
-          : await fetchLeaderboard(targetValue, targetType, platform, limit, creds.login, creds.pass);
+          : mode === 'leaderboard'
+            ? await fetchLeaderboard(targetValue, targetType, platform, limit, creds.login, creds.pass)
+            : await fetchHistorical(targetValue, targetType, platform, location, language, dateFrom, dateTo, creds.login, creds.pass);
 
         error = res.error ?? null;
         cost = res.cost;
 
         if (!error && res.result) {
           if (mode === 'target') targetResult = res.result as TargetMetricsResult;
-          else leaderboardResult = res.result as LeaderboardResult;
+          else if (mode === 'leaderboard') leaderboardResult = res.result as LeaderboardResult;
+          else historicalResult = res.result as HistoricalResult;
 
           const entry: AiVisibilityEntry = { id: dedupeId, ts: Date.now(), mode, target: targetValue, platform, cost };
           saveAiVisibilitySearch(entry, res.result);
@@ -218,11 +314,11 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
 
       <SearchForm
         className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4"
-        btnLabel={mode === 'target' ? 'Analyze' : 'Get leaderboard'}
+        btnLabel={mode === 'target' ? 'Analyze' : mode === 'leaderboard' ? 'Get leaderboard' : 'Show trend'}
         btnClassName="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-violet-600 transition-colors"
       >
-        <div className="flex gap-2 mb-2">
-          {(['target', 'leaderboard'] as const).map((m) => (
+        <div className="flex gap-2 mb-2 flex-wrap">
+          {(['target', 'leaderboard', 'historical'] as const).map((m) => (
             <a
               key={m}
               href={`/dashboard/ai-visibility?mode=${m}`}
@@ -230,7 +326,7 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
                 mode === m ? 'bg-violet-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
-              {m === 'target' ? 'My domain/brand' : 'Topic leaderboard'}
+              {m === 'target' ? 'My domain/brand' : m === 'leaderboard' ? 'Topic leaderboard' : 'Trend over time'}
             </a>
           ))}
         </div>
@@ -248,36 +344,48 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
             </div>
             <div className="flex-1">
               <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-                {mode === 'target' ? 'Target' : 'Topic'}
+                {mode === 'leaderboard' ? 'Topic' : 'Target'}
               </label>
               <input
                 name="target"
                 type="text"
                 defaultValue={displayTarget}
-                placeholder={targetType === 'domain' ? 'example.com' : mode === 'target' ? 'your brand name' : 'best plumber'}
+                placeholder={targetType === 'domain' ? 'example.com' : mode === 'leaderboard' ? 'best plumber' : 'your brand name'}
                 required
                 className="w-full h-[42px] px-4 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Platform</label>
-            <select name="platform" defaultValue={platform}
-              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
-              <option value="chat_gpt">ChatGPT</option>
-              <option value="google">Google AI</option>
-            </select>
-          </div>
+          {mode === 'historical' ? (
+            <HistoricalTargetingFields
+              defaultPlatform={platform}
+              defaultLocation={location}
+              defaultLanguage={language}
+              defaultDateFrom={dateFrom}
+              defaultDateTo={dateTo}
+            />
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Platform</label>
+                <select name="platform" defaultValue={platform}
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
+                  <option value="chat_gpt">ChatGPT</option>
+                  <option value="google">Google AI</option>
+                </select>
+              </div>
 
-          {mode === 'leaderboard' && (
-            <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Results per list</label>
-              <select name="limit" defaultValue={String(limit)}
-                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
-                {[10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
+              {mode === 'leaderboard' && (
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Results per list</label>
+                  <select name="limit" defaultValue={String(limit)}
+                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
+                    {[10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+              )}
+            </>
           )}
         </div>
       </SearchForm>
@@ -333,6 +441,47 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
         </div>
       )}
 
+      {hasQuery && !error && mode === 'historical' && historicalResult && (
+        <div id="results" className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-black uppercase tracking-widest text-slate-400">Target</span>
+            <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{displayTarget}</span>
+            {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-md">History</span>}
+            {cost !== undefined && <span className="text-[10px] font-mono text-slate-400 ml-auto">cost: ${cost.toFixed(4)}</span>}
+          </div>
+
+          {historicalResult.items.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-6 py-12 text-center text-sm text-slate-400">
+              No historical LLM mentions found for this target on {PLATFORM_LABELS[platform]}.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Months tracked</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{historicalResult.items.length}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total mentions</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">
+                    {fmt(historicalResult.items.reduce((s, i) => s + i.metrics.mentions, 0))}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total AI search volume</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">
+                    {fmt(historicalResult.items.reduce((s, i) => s + i.metrics.ai_search_volume, 0))}
+                  </p>
+                </div>
+              </div>
+
+              <MonthlyTrendChart title="Mentions per month" items={historicalResult.items} metric="mentions" />
+              <MonthlyTrendChart title="AI search volume per month" items={historicalResult.items} metric="ai_search_volume" />
+            </>
+          )}
+        </div>
+      )}
+
       {history.length > 0 && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
@@ -348,7 +497,7 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
                     <div className="flex items-center gap-2">
                       <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.target}</p>
                       <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
-                        {entry.mode === 'target' ? 'Overview' : 'Leaderboard'}
+                        {entry.mode === 'target' ? 'Overview' : entry.mode === 'leaderboard' ? 'Leaderboard' : 'Trend'}
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
