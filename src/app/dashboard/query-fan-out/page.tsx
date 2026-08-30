@@ -7,6 +7,7 @@ import {
 } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 import HistorySidebar from '@/components/HistorySidebar';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -74,7 +75,7 @@ async function fetchFanOutMentions(
   login: string,
   pass: string,
 ): Promise<{ perSeed: Array<{ seed: string; items: MentionItem[]; error?: string }>; totalCost: number }> {
-  const auth = btoa(`${login}:${pass}`);
+  const creds = { login, pass };
 
   const perSeed = await Promise.all(seeds.map(async (seed) => {
     const targetObj = { keyword: seed, search_filter: 'include', search_scope: ['fan_out_queries'], match_type: 'word_match' };
@@ -86,27 +87,11 @@ async function fetchFanOutMentions(
       body.language_name = language;
     }
 
-    const res = await fetch('https://api.dataforseo.com/v3/ai_optimization/llm_mentions/search/live', {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([body]),
-    });
-
-    if (!res.ok) return { seed, items: [] as MentionItem[], error: `API error ${res.status}: ${res.statusText}`, cost: 0 };
-
-    const data = await res.json() as {
-      tasks?: Array<{
-        status_code?: number;
-        status_message?: string;
-        cost?: number;
-        result?: Array<{ items?: MentionItem[] }>;
-      }>;
-    };
-
-    const task = data?.tasks?.[0];
-    if (!task) return { seed, items: [] as MentionItem[], error: 'Empty API response.', cost: 0 };
-    if (task.status_code && task.status_code !== 20000) return { seed, items: [] as MentionItem[], error: `DataForSEO: ${task.status_message}`, cost: 0 };
-    return { seed, items: task.result?.[0]?.items ?? [], cost: task.cost ?? 0 };
+    const { result, cost, error } = await callDataForSeoFirst<{ items?: MentionItem[] }>(
+      'ai_optimization/llm_mentions/search/live', body, creds,
+    );
+    if (error) return { seed, items: [] as MentionItem[], error, cost: 0 };
+    return { seed, items: result?.items ?? [], cost: cost ?? 0 };
   }));
 
   const totalCost = perSeed.reduce((s, r) => s + r.cost, 0);
@@ -121,21 +106,13 @@ async function fetchAiKeywordVolume(
   pass: string,
 ): Promise<{ items: AiKeywordVolumeItem[]; cost?: number; error?: string }> {
   if (keywords.length === 0) return { items: [] };
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/ai_optimization/ai_keyword_data/keywords_search_volume/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ keywords, location_name: location, language_name: language }]),
-  });
-  if (!res.ok) return { items: [], error: `API error ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: AiKeywordVolumeItem[] }> }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: AiKeywordVolumeItem[] }>(
+    'ai_optimization/ai_keyword_data/keywords_search_volume/live',
+    { keywords, location_name: location, language_name: language },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 /** Runs both stages: discover fan-out queries per seed, then enrich the deduped set with AI search volume. */

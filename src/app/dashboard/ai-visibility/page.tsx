@@ -9,6 +9,7 @@ import {
 } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 import LeaderboardTables from './LeaderboardTables';
 import HistoricalTargetingFields from './HistoricalTargetingFields';
@@ -87,20 +88,7 @@ function buildTargetObj(value: string, type: 'domain' | 'keyword') {
 async function callLlmMentions<T>(
   fn: string, body: Record<string, unknown>, login: string, pass: string,
 ): Promise<{ result?: T; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch(`https://api.dataforseo.com/v3/ai_optimization/llm_mentions/${fn}/live`, {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-  });
-  if (!res.ok) return { error: `API error ${res.status}: ${res.statusText}` };
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: T[] }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { error: `DataForSEO: ${task.status_message}` };
-  return { result: task.result?.[0], cost: task.cost };
+  return callDataForSeoFirst<T>(`ai_optimization/llm_mentions/${fn}/live`, body, { login, pass });
 }
 
 async function fetchTargetMetrics(

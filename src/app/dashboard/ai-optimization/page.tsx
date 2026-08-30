@@ -7,6 +7,7 @@ import {
 } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 import AiOptimizationTargetingFields from './AiOptimizationTargetingFields';
 
@@ -61,8 +62,6 @@ async function fetchLlmMentions(
   login: string,
   pass: string,
 ): Promise<{ items: MentionItem[]; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-
   const targetObj =
     targetType === 'domain'
       ? { domain: targetValue, search_filter: 'include', search_scope: ['any'] }
@@ -76,29 +75,11 @@ async function fetchLlmMentions(
     body.language_name = language;
   }
 
-  const res = await fetch('https://api.dataforseo.com/v3/ai_optimization/llm_mentions/search/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-  });
-
-  if (!res.ok) return { items: [], error: `API error ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: Array<{ items?: MentionItem[] }>;
-    }>;
-  };
-
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], error: `DataForSEO: ${task.status_message}` };
-  }
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: MentionItem[] }>(
+    'ai_optimization/llm_mentions/search/live', body, { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 // ---- UI helpers ----

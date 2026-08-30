@@ -9,6 +9,7 @@ import {
   type WebMentionsEntry,
 } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 
 // ---- Types ----
@@ -68,9 +69,7 @@ function normalizePageTypes(value: string | string[] | undefined): PageType[] {
 async function fetchWebMentions(
   keyword: string, pageTypes: PageType[], limit: number, login: string, pass: string,
 ): Promise<{ items?: SearchResult; summary?: SummaryResult; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const headers = { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' };
-
+  const creds = { login, pass };
   const searchBody: Record<string, unknown> = { keyword, limit };
   const summaryBody: Record<string, unknown> = { keyword, internal_list_limit: 10 };
   if (pageTypes.length > 0) {
@@ -79,32 +78,17 @@ async function fetchWebMentions(
   }
 
   const [searchRes, summaryRes] = await Promise.all([
-    fetch('https://api.dataforseo.com/v3/content_analysis/search/live', {
-      method: 'POST', headers, body: JSON.stringify([searchBody]),
-    }),
-    fetch('https://api.dataforseo.com/v3/content_analysis/summary/live', {
-      method: 'POST', headers, body: JSON.stringify([summaryBody]),
-    }),
+    callDataForSeoFirst<SearchResult>('content_analysis/search/live', searchBody, creds),
+    callDataForSeoFirst<SummaryResult>('content_analysis/summary/live', summaryBody, creds),
   ]);
 
-  if (!searchRes.ok) return { error: `API error ${searchRes.status}: ${searchRes.statusText}` };
-  if (!summaryRes.ok) return { error: `API error ${summaryRes.status}: ${summaryRes.statusText}` };
-
-  type Envelope<T> = { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: T[] }> };
-
-  const searchData = await searchRes.json() as Envelope<SearchResult>;
-  const summaryData = await summaryRes.json() as Envelope<SummaryResult>;
-
-  const searchTask = searchData?.tasks?.[0];
-  const summaryTask = summaryData?.tasks?.[0];
-  if (!searchTask || !summaryTask) return { error: 'Empty API response.' };
-  if (searchTask.status_code && searchTask.status_code !== 20000) return { error: `DataForSEO: ${searchTask.status_message}` };
-  if (summaryTask.status_code && summaryTask.status_code !== 20000) return { error: `DataForSEO: ${summaryTask.status_message}` };
+  if (searchRes.error) return { error: searchRes.error };
+  if (summaryRes.error) return { error: summaryRes.error };
 
   return {
-    items: searchTask.result?.[0],
-    summary: summaryTask.result?.[0],
-    cost: (searchTask.cost ?? 0) + (summaryTask.cost ?? 0),
+    items: searchRes.result,
+    summary: summaryRes.result,
+    cost: (searchRes.cost ?? 0) + (summaryRes.cost ?? 0),
   };
 }
 
