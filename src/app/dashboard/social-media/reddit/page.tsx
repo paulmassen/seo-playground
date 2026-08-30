@@ -4,6 +4,7 @@ import { getCredentials, getRedditHistory, saveRedditSearch, getRedditResults, t
 import SearchForm from '@/components/SearchForm';
 import { MessageSquare, Users, ExternalLink } from 'lucide-react';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeo } from '@/lib/dataforseo';
 
 // ---- Types ----
 
@@ -32,36 +33,14 @@ async function fetchReddit(
   login: string,
   pass: string,
 ): Promise<{ items: RedditPageResult[]; cost?: number; error?: string; debug?: string }> {
-  const auth = btoa(`${login}:${pass}`);
   // One task with all targets (max 10) — the API only accepts 1 task per POST call
-  const res = await fetch('https://api.dataforseo.com/v3/business_data/social_media/reddit/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ targets }]),
-  });
+  const { result, cost, error } = await callDataForSeo<RedditPageResult>(
+    'business_data/social_media/reddit/live', { targets }, { login, pass },
+  );
+  if (error) return { items: [], error, debug: error };
 
-  if (!res.ok) return { items: [], error: `API error ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: RedditPageResult[];
-    }>;
-  };
-
-  if (!data.tasks?.length) return { items: [], error: 'Empty API response.' };
-
-  const task = data.tasks[0];
-  const debug = `status ${task.status_code} — ${task.status_message} — ${task.result?.length ?? 0} result(s)`;
-
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], error: `DataForSEO: ${task.status_message}`, debug };
-  }
-
-  const items = task.result ?? [];
-  return { items, cost: task.cost, debug };
+  const items = result ?? [];
+  return { items, cost, debug: `${items.length} result(s)` };
 }
 
 // ---- Helpers ----

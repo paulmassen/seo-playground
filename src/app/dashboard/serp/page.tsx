@@ -4,6 +4,7 @@ import LocationPicker from '@/components/LocationPicker';
 import { addDomainAction, removeDomainAction } from './actions';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 
 interface SerpItem {
   type: string;
@@ -36,16 +37,14 @@ function extractDomain(url?: string): string {
 async function fetchSerp(
   keyword: string, location: string, language: string, device: string, depth: number,
   login: string, pass: string,
-): Promise<SerpItem[]> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/advanced', {
-    method: 'POST',
-    headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ keyword, location_name: location, language_name: language, device, depth }]),
-  });
-  if (!res.ok) return [];
-  const data = await res.json() as { tasks?: Array<{ result?: Array<{ items?: SerpItem[] }> }> };
-  return data?.tasks?.[0]?.result?.[0]?.items?.filter((i) => i.type === 'organic') ?? [];
+): Promise<{ items: SerpItem[]; error?: string }> {
+  const { result, error } = await callDataForSeoFirst<{ items?: SerpItem[] }>(
+    'serp/google/organic/live/advanced',
+    { keyword, location_name: location, language_name: language, device, depth },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items?.filter((i) => i.type === 'organic') ?? [] };
 }
 
 function formatDate(ts: number) {
@@ -95,7 +94,9 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
       try {
-        results = await fetchSerp(keyword, location, language, device, depth, creds.login, creds.pass);
+        const res = await fetchSerp(keyword, location, language, device, depth, creds.login, creds.pass);
+        results = res.items;
+        error = res.error ?? null;
         if (results.length > 0) {
           const hits: TargetHit[] = targetDomains
             .map((td) => {

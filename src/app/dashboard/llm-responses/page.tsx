@@ -7,6 +7,7 @@ import {
 } from '@/lib/db';
 import { PLATFORM_LABELS, MODELS_BY_PLATFORM, isValidPlatform, type LlmPlatform } from '@/lib/llm-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LlmResponseForm from './LlmResponseForm';
 import HistorySidebar from '@/components/HistorySidebar';
 
@@ -63,27 +64,12 @@ async function fetchLlmResponse(
   login: string,
   pass: string,
 ): Promise<{ result?: LlmResponseResult; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-
   const body: Record<string, unknown> = { user_prompt: prompt, model_name: model };
   if (platform !== 'perplexity') body.web_search = webSearch;
   if (systemMessage) body.system_message = systemMessage;
   if (countryCode && (webSearch || platform === 'perplexity')) body.web_search_country_iso_code = countryCode.toUpperCase();
 
-  const res = await fetch(`https://api.dataforseo.com/v3/ai_optimization/${platform}/llm_responses/live`, {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-  });
-  if (!res.ok) return { error: `API error ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: LlmResponseResult[] }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { error: `DataForSEO: ${task.status_message}` };
-  return { result: task.result?.[0], cost: task.cost };
+  return callDataForSeoFirst<LlmResponseResult>(`ai_optimization/${platform}/llm_responses/live`, body, { login, pass });
 }
 
 // ---- UI helpers ----

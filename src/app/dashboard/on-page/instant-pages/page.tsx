@@ -1,4 +1,5 @@
 import { getCredentials, getInstantPageHistory, saveInstantPageResult, getInstantPageResult, type InstantPageEntry } from '@/lib/db';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import { redirect } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
 import { randomUUID } from 'crypto';
@@ -150,10 +151,6 @@ const CHECK_META: Record<string, { label: string; severity: CheckSeverity }> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function authHeader(login: string, pass: string) {
-  return `Basic ${btoa(`${login}:${pass}`)}`;
-}
-
 function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -188,24 +185,9 @@ function scoreBg(score?: number): string {
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 async function fetchInstantPage(url: string, login: string, pass: string): Promise<{ result?: ApiResult; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/on_page/instant_pages', {
-    method: 'POST',
-    headers: { Authorization: authHeader(login, pass), 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ url, load_resources: false, enable_javascript: false }]),
-  });
-  if (!res.ok) return { error: `HTTP ${res.status}` };
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: ApiResult[];
-    }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { error: `DataForSEO: ${task.status_message}` };
-  return { result: task.result?.[0], cost: task.cost };
+  return callDataForSeoFirst<ApiResult>(
+    'on_page/instant_pages', { url, load_resources: false, enable_javascript: false }, { login, pass },
+  );
 }
 
 // ─── UI components ────────────────────────────────────────────────────────────
