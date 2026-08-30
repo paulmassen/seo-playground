@@ -5,6 +5,7 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import CategoriesList from './CategoriesList';
 
 interface CategoryItem {
@@ -17,17 +18,13 @@ interface CategoryItem {
 interface SearchParams { target?: string; location?: string; language?: string; history_id?: string; }
 
 async function fetchCategories(target: string, location: string, language: string, login: string, pass: string): Promise<{ items: CategoryItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/categories_for_domain/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target, location_name: location, language_name: language }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: CategoryItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: CategoryItem[] }>(
+    'dataforseo_labs/google/categories_for_domain/live',
+    { target, location_name: location, language_name: language },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }

@@ -1,6 +1,7 @@
 import { getCredentials, getSetting, getPageIntersectionHistory, savePageIntersectionSearch, getPageIntersectionResults, type PageIntersectionEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -17,17 +18,13 @@ interface IntersectionItem {
 interface SearchParams { pages?: string; location?: string; language?: string; limit?: string; history_id?: string; }
 
 async function fetchIntersection(pages: string[], location: string, language: string, limit: number, login: string, pass: string): Promise<{ items: IntersectionItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/page_intersection/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ pages: pages.map((url) => ({ url, type: 'url' })), location_name: location, language_name: language, limit, intersections: true }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: IntersectionItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: IntersectionItem[] }>(
+    'dataforseo_labs/google/page_intersection/live',
+    { pages: pages.map((url) => ({ url, type: 'url' })), location_name: location, language_name: language, limit, intersections: true },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }

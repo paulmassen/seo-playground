@@ -5,6 +5,7 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import TrafficEstimationTable from './TrafficEstimationTable';
 
 interface TrafficMetrics { count?: number; etv?: number; impressions_etv?: number; }
@@ -13,17 +14,13 @@ interface TrafficItem { target?: string; metrics?: { organic?: TrafficMetrics; p
 interface SearchParams { targets?: string; location?: string; language?: string; history_id?: string; }
 
 async function fetchTraffic(targets: string[], location: string, language: string, login: string, pass: string): Promise<{ items: TrafficItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/bulk_traffic_estimation/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ targets, location_name: location, language_name: language }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: TrafficItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: TrafficItem[] }>(
+    'dataforseo_labs/google/bulk_traffic_estimation/live',
+    { targets, location_name: location, language_name: language },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }

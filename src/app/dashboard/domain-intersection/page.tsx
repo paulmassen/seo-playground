@@ -8,6 +8,7 @@ import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import IntersectionTable, { type IntersectionItem } from './IntersectionTable';
 
 interface SearchParams {
@@ -19,28 +20,22 @@ interface SearchParams {
   history_id?: string;
 }
 
-async function fetchIntersection(target1: string, target2: string, location: string, language: string, limit: number, login: string, pass: string): Promise<{ items: IntersectionItem[]; total: number; cost: number }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/domain_intersection/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
+async function fetchIntersection(target1: string, target2: string, location: string, language: string, limit: number, login: string, pass: string): Promise<{ items: IntersectionItem[]; total: number; cost: number; error?: string }> {
+  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: IntersectionItem[] }>(
+    'dataforseo_labs/google/domain_intersection/live',
+    {
       target1,
       target2,
       location_name: location,
       language_name: language,
       limit,
       order_by: ['keyword_data.keyword_info.search_volume,desc'],
-    }]),
-  });
-  if (!res.ok) return { items: [], total: 0, cost: 0 };
-  const data = await res.json() as { tasks?: Array<{ cost?: number; result?: Array<{ total_count?: number; items?: IntersectionItem[] }> }> };
-  const result = data.tasks?.[0]?.result?.[0];
-  return {
-    items: result?.items ?? [],
-    total: result?.total_count ?? 0,
-    cost: data.tasks?.[0]?.cost ?? 0,
-  };
+    },
+    { login, pass },
+  );
+  // This endpoint used to silently swallow any DataForSEO-level error (bad status_code, invalid
+  // field, etc.) as an empty result with cost 0 — never shown to the user. Now surfaced via `error`.
+  return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0, error };
 }
 
 export default async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -78,13 +73,17 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
         cost = cachedEntry?.cost ?? 0;
       } else {
         const result = await fetchIntersection(target1, target2, location, language, limit, creds.login, creds.pass);
-        items = result.items;
-        total = result.total;
-        cost = result.cost;
-        saveDomainIntersectionSearch({
-          id: dedupeId, ts: Date.now(), target1, target2, location, language,
-          count: items.length, totalCount: total, cost,
-        }, items);
+        if (result.error) {
+          error = result.error;
+        } else {
+          items = result.items;
+          total = result.total;
+          cost = result.cost;
+          saveDomainIntersectionSearch({
+            id: dedupeId, ts: Date.now(), target1, target2, location, language,
+            count: items.length, totalCount: total, cost,
+          }, items);
+        }
       }
     } catch (e) {
       error = String(e);

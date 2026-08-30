@@ -5,6 +5,7 @@ import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 
 interface HistRankItem {
   se_type?: string;
@@ -38,23 +39,13 @@ interface SearchParams {
 }
 
 async function fetchHistRank(target: string, location: string, language: string, login: string, pass: string): Promise<{ items: HistRankItem[]; cost: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/historical_rank_overview/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target, location_name: location, language_name: language }]),
-  });
-  if (!res.ok) return { items: [], cost: 0, error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: HistRankItem[] }> }> };
-  const task = data.tasks?.[0];
-  if (!task) return { items: [], cost: 0, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], cost: 0, error: `DataForSEO: ${task.status_message} (${task.status_code})` };
-  }
-  return {
-    items: task.result?.[0]?.items ?? [],
-    cost: task.cost ?? 0,
-  };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: HistRankItem[] }>(
+    'dataforseo_labs/google/historical_rank_overview/live',
+    { target, location_name: location, language_name: language },
+    { login, pass },
+  );
+  if (error) return { items: [], cost: 0, error };
+  return { items: result?.items ?? [], cost: cost ?? 0 };
 }
 
 function formatMonth(year: number, month: number) {
