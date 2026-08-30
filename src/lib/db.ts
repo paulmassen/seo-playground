@@ -8,6 +8,7 @@ function getDb(): Database.Database {
   if (!_db) {
     _db = new Database(process.env.DB_PATH ?? path.join(process.cwd(), 'seo-playground.db'));
     _db.pragma('journal_mode = WAL');
+    _db.pragma('busy_timeout = 5000');
     initSchema(_db);
     seedLocations(_db);
     seedCategories(_db);
@@ -513,16 +514,27 @@ function initSchema(db: Database.Database) {
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_rank_checks_kw ON rank_checks(keyword_id, checked_at DESC)`);
 
-  // Migrations — add columns that may not exist in older DBs
-  try { db.exec('ALTER TABLE serp_searches ADD COLUMN target_hits TEXT'); } catch { /* already exists */ }
-  try { db.exec('ALTER TABLE backlinks_searches ADD COLUMN links TEXT'); } catch { /* already exists */ }
-  try { db.exec('ALTER TABLE backlinks_searches ADD COLUMN links_total INTEGER'); } catch { /* already exists */ }
-  try { db.exec(`ALTER TABLE grid_searches ADD COLUMN status TEXT NOT NULL DEFAULT 'done'`); } catch { /* already exists */ }
-  try { db.exec('ALTER TABLE grid_searches ADD COLUMN task_ids TEXT'); } catch { /* already exists */ }
-  try { db.exec(`ALTER TABLE grid_searches ADD COLUMN queue_mode TEXT NOT NULL DEFAULT 'live'`); } catch { /* already exists */ }
-  try { db.exec('ALTER TABLE reviews_tasks ADD COLUMN meta TEXT'); } catch { /* already exists */ }
-  try { db.exec('ALTER TABLE domain_find_searches ADD COLUMN keyword TEXT'); } catch { /* already exists */ }
-  try { db.exec('ALTER TABLE domain_find_searches ADD COLUMN technology TEXT'); } catch { /* already exists */ }
+  // Migrations — add columns that may not exist in older DBs. Only the expected
+  // "column already exists" error is swallowed; anything else (a real syntax error, a
+  // locked/corrupt DB) rethrows instead of failing silently.
+  addColumnIfMissing(db, 'serp_searches', 'ADD COLUMN target_hits TEXT');
+  addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN links TEXT');
+  addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN links_total INTEGER');
+  addColumnIfMissing(db, 'grid_searches', `ADD COLUMN status TEXT NOT NULL DEFAULT 'done'`);
+  addColumnIfMissing(db, 'grid_searches', 'ADD COLUMN task_ids TEXT');
+  addColumnIfMissing(db, 'grid_searches', `ADD COLUMN queue_mode TEXT NOT NULL DEFAULT 'live'`);
+  addColumnIfMissing(db, 'reviews_tasks', 'ADD COLUMN meta TEXT');
+  addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN keyword TEXT');
+  addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN technology TEXT');
+}
+
+function addColumnIfMissing(db: Database.Database, table: string, alterClause: string): void {
+  try {
+    db.exec(`ALTER TABLE ${table} ${alterClause}`);
+  } catch (err) {
+    if (err instanceof Error && /duplicate column name/i.test(err.message)) return;
+    throw err;
+  }
 }
 
 // --- DataForSEO locations (country/region/city picker) ---
