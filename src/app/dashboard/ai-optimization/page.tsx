@@ -1,7 +1,12 @@
 export const dynamic = 'force-dynamic';
 
-import { getCredentials, getSetting } from '@/lib/db';
+import {
+  getCredentials, getSetting,
+  getAiOptimizationHistory, saveAiOptimizationSearch, getAiOptimizationResults,
+  type AiOptimizationEntry,
+} from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
+import { stableSearchId } from '@/lib/dedupe';
 import SearchForm from '@/components/SearchForm';
 import AiOptimizationTargetingFields from './AiOptimizationTargetingFields';
 
@@ -41,6 +46,7 @@ interface SearchParams {
   location?: string;
   language?: string;
   limit?: string;
+  history_id?: string;
 }
 
 // ---- API ----
@@ -153,6 +159,7 @@ function formatDate(iso?: string) {
 export default async function AiOptimizationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
+  const historyId = params.history_id;
 
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
@@ -168,19 +175,47 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
   let items: MentionItem[] = [];
   let cost: number | undefined;
   let error: string | null = null;
+  let isFromHistory = false;
+  let activeEntry: AiOptimizationEntry | null = null;
 
-  if (targetValue) {
+  if (historyId) {
+    const cached = getAiOptimizationResults<MentionItem>(historyId);
+    if (cached) {
+      items = cached;
+      isFromHistory = true;
+      activeEntry = getAiOptimizationHistory().find((e) => e.id === historyId) ?? null;
+    } else {
+      error = 'This search is no longer available.';
+    }
+  } else if (targetValue) {
     if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const res = await fetchLlmMentions(targetValue, targetType, platform, location, language, limit, creds.login, creds.pass);
-      items = res.items;
-      cost = res.cost;
-      error = res.error ?? null;
+      const dedupeId = stableSearchId(['ai-optimization', targetValue, targetType, platform, location, language, limit]);
+      const cached = getAiOptimizationResults<MentionItem>(dedupeId);
+
+      if (cached) {
+        items = cached;
+        cost = getAiOptimizationHistory().find((e) => e.id === dedupeId)?.cost;
+      } else {
+        const res = await fetchLlmMentions(targetValue, targetType, platform, location, language, limit, creds.login, creds.pass);
+        items = res.items;
+        cost = res.cost;
+        error = res.error ?? null;
+
+        if (!error) {
+          const entry: AiOptimizationEntry = {
+            id: dedupeId, ts: Date.now(), target: targetValue, targetType, platform, location, language, limit, cost,
+          };
+          saveAiOptimizationSearch(entry, items);
+        }
+      }
     }
   }
 
-  const hasQuery = !!targetValue;
+  const history = getAiOptimizationHistory();
+  const displayTarget = activeEntry?.target ?? targetValue;
+  const hasQuery = !!(historyId || targetValue);
   const totalVolume = items.reduce((s, i) => s + (i.ai_search_volume ?? 0), 0);
   const uniqueModels = [...new Set(items.map((i) => i.model_name).filter(Boolean))];
 
@@ -214,7 +249,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
               <input
                 name="target"
                 type="text"
-                defaultValue={targetValue}
+                defaultValue={displayTarget}
                 placeholder={targetType === 'domain' ? 'example.com' : 'plombier paris'}
                 className="w-full h-[42px] px-4 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
@@ -260,6 +295,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
               AI Mentions — {PLATFORM_LABELS[platform] ?? platform}
             </h2>
             <div className="flex items-center gap-3">
+              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">History</span>}
               {cost !== undefined && (
                 <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>
               )}
@@ -364,6 +400,34 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
           <p className="text-slate-400 text-sm">Enter a keyword or domain above to see how AI models mention it.</p>
           <p className="text-slate-300 text-xs mt-1">Powered by DataForSEO LLM Mentions Search API.</p>
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">History</h2>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {history.map((entry) => {
+              const isActive = entry.id === historyId;
+              return (
+                <a key={entry.id} href={`/dashboard/ai-optimization?history_id=${entry.id}#results`}
+                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors ${isActive ? 'bg-blue-50' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.target}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {PLATFORM_LABELS[entry.platform] ?? entry.platform}
+                      {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[11px] text-slate-400">
+                    {new Date(entry.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

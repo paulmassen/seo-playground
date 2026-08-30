@@ -470,6 +470,19 @@ function initSchema(db: Database.Database) {
       seed_summary TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS ai_optimization_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      target TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      location TEXT NOT NULL,
+      language TEXT NOT NULL,
+      limit_count INTEGER NOT NULL,
+      cost REAL,
+      items TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS web_mentions_searches (
       id TEXT PRIMARY KEY,
       ts INTEGER NOT NULL,
@@ -1943,6 +1956,36 @@ export function getFanOutResults<T>(id: string): T[] | null {
 export function getFanOutSeedSummary<T>(id: string): T[] | null {
   const row = getDb().prepare('SELECT seed_summary FROM fan_out_searches WHERE id = ?').get(id) as { seed_summary: string } | undefined;
   if (!row) return null; try { return JSON.parse(row.seed_summary) as T[]; } catch { return null; }
+}
+
+// ─── AI Optimization (LLM Mentions search) ────
+
+export interface AiOptimizationEntry {
+  id: string; ts: number; target: string; targetType: string; platform: string;
+  location: string; language: string; limit: number; cost?: number;
+}
+type AORow = {
+  id: string; ts: number; target: string; target_type: string; platform: string;
+  location: string; language: string; limit_count: number; cost: number | null;
+};
+
+export function getAiOptimizationHistory(): AiOptimizationEntry[] {
+  const rows = getDb().prepare(
+    'SELECT id, ts, target, target_type, platform, location, language, limit_count, cost FROM ai_optimization_searches ORDER BY ts DESC LIMIT 20'
+  ).all() as AORow[];
+  return rows.map((r) => ({
+    id: r.id, ts: r.ts, target: r.target, targetType: r.target_type, platform: r.platform,
+    location: r.location, language: r.language, limit: r.limit_count, cost: r.cost ?? undefined,
+  }));
+}
+export function saveAiOptimizationSearch<T>(entry: AiOptimizationEntry, items: T[]): void {
+  getDb().prepare(
+    'INSERT OR REPLACE INTO ai_optimization_searches (id, ts, target, target_type, platform, location, language, limit_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(entry.id, entry.ts, entry.target, entry.targetType, entry.platform, entry.location, entry.language, entry.limit, entry.cost ?? null, JSON.stringify(items));
+}
+export function getAiOptimizationResults<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT items FROM ai_optimization_searches WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.items) as T[]; } catch { return null; }
 }
 
 // ─── Web Mentions (Content Analysis: search + summary) ────
