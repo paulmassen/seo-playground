@@ -1,6 +1,7 @@
 import { getCredentials, getSetting, getSearchIntentHistory, saveSearchIntentSearch, getSearchIntentResults, type SearchIntentEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -16,17 +17,13 @@ interface IntentItem {
 interface SearchParams { keywords?: string; location?: string; language?: string; history_id?: string; }
 
 async function fetchIntent(keywords: string[], location: string, language: string, login: string, pass: string): Promise<{ items: IntentItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/search_intent/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ keywords, location_name: location, language_name: language }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: IntentItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: IntentItem[] }>(
+    'dataforseo_labs/google/search_intent/live',
+    { keywords, location_name: location, language_name: language },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 const INTENT_CONFIG: Record<string, { label: string; cls: string }> = {

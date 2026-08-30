@@ -5,6 +5,7 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import KeywordIdeasTable from './KeywordIdeasTable';
 
 interface IdeaItem {
@@ -18,17 +19,13 @@ interface IdeaItem {
 interface SearchParams { keyword?: string; location?: string; language?: string; limit?: string; history_id?: string; }
 
 async function fetchIdeas(keyword: string, location: string, language: string, limit: number, login: string, pass: string): Promise<{ items: IdeaItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/keyword_ideas/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ keywords: [keyword], location_name: location, language_name: language, limit, include_serp_info: false, include_clickstream_data: false }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: IdeaItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: IdeaItem[] }>(
+    'dataforseo_labs/google/keyword_ideas/live',
+    { keywords: [keyword], location_name: location, language_name: language, limit, include_serp_info: false, include_clickstream_data: false },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }

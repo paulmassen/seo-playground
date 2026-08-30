@@ -11,6 +11,7 @@ import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import CompetitorsTable from './CompetitorsTable';
 
 // ---- Types ----
@@ -56,35 +57,13 @@ async function fetchCompetitors(
   pass: string,
 ): Promise<{ items: CompetitorItem[]; cost?: number; error?: string }> {
   const clean = target.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/competitors_domain/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      target: clean,
-      location_name: location,
-      language_name: language,
-      limit,
-    }]),
-  });
-
-  if (!res.ok) return { items: [], error: `Error API ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: Array<{ items?: CompetitorItem[] }>;
-    }>;
-  };
-
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], error: `DataForSEO: ${task.status_message}` };
-  }
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: CompetitorItem[] }>(
+    'dataforseo_labs/google/competitors_domain/live',
+    { target: clean, location_name: location, language_name: language, limit },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 // ---- UI helpers ----

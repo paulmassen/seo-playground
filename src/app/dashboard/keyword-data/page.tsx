@@ -2,6 +2,7 @@ import { getCredentials, getKdHistory, saveKdSearch, getKdResults, type KdHistor
 import KeywordDataForm from './KeywordDataForm';
 import KeywordDataTable from './KeywordDataTable';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeo } from '@/lib/dataforseo';
 
 interface KeywordItem {
   keyword?: string;
@@ -56,20 +57,11 @@ function buildRequestBody(params: Record<string, string | undefined>): Record<st
 async function fetchKeywordData(
   se: string, seType: string, body: Record<string, unknown>, login: string, pass: string,
 ): Promise<{ items: KeywordItem[]; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch(`https://api.dataforseo.com/v3/keywords_data/${se}/${seType}/live`, {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-  });
-  if (!res.ok) return { items: [], error: `Error API ${res.status}: ${res.statusText}` };
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: KeywordItem[] }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeo<KeywordItem>(
+    `keywords_data/${se}/${seType}/live`, body, { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result ?? [], cost };
 }
 
 const SE_LABELS: Record<string, string> = { google_ads: 'Google Ads', bing: 'Bing Ads' };

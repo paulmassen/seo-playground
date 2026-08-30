@@ -7,6 +7,7 @@ import {
 } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import HistorySidebar from '@/components/HistorySidebar';
@@ -43,21 +44,13 @@ async function fetchAiKeywordData(
   login: string,
   pass: string,
 ): Promise<{ items: AiKeywordItem[]; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/ai_optimization/ai_keyword_data/keywords_search_volume/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ keywords, location_name: location, language_name: language }]),
-  });
-  if (!res.ok) return { items: [], error: `API error ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: AiKeywordItem[] }> }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: AiKeywordItem[] }>(
+    'ai_optimization/ai_keyword_data/keywords_search_volume/live',
+    { keywords, location_name: location, language_name: language },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 // ---- UI helpers ----

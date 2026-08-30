@@ -7,6 +7,7 @@ import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import RelatedKeywordsTable from './RelatedKeywordsTable';
@@ -45,28 +46,13 @@ async function fetchRelatedKeywords(
   login: string,
   pass: string,
 ): Promise<{ items: RelatedKeywordItem[]; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/related_keywords/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      keyword,
-      location_name: location,
-      language_name: language,
-      depth,
-      limit,
-      include_serp_info: true,
-      include_clickstream_data: false,
-    }]),
-  });
-  if (!res.ok) return { items: [], error: `Error API ${res.status}` };
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: RelatedKeywordItem[] }> }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: RelatedKeywordItem[] }>(
+    'dataforseo_labs/google/related_keywords/live',
+    { keyword, location_name: location, language_name: language, depth, limit, include_serp_info: true, include_clickstream_data: false },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function formatDate(ts: number) {

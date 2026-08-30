@@ -9,6 +9,7 @@ import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { LANGUAGES } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LocationPicker from '@/components/LocationPicker';
 import SearchForm from '@/components/SearchForm';
 import RankedKeywordsTable from './RankedKeywordsTable';
@@ -90,35 +91,14 @@ async function fetchRankedKeywords(
     body.filters = ['ranked_serp_element.serp_item.rank_group', '<=', maxPosition];
   }
 
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-  });
-
-  if (!res.ok) return { items: [], totalCount: 0, error: `Error API ${res.status}: ${res.statusText}` };
-
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: Array<{ total_count?: number; items?: RankedKwItem[] }>;
-    }>;
-  };
-
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], totalCount: 0, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], totalCount: 0, error: `DataForSEO: ${task.status_message}` };
-  }
-
-  const result = task.result?.[0];
+  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: RankedKwItem[] }>(
+    'dataforseo_labs/google/ranked_keywords/live', body, { login, pass },
+  );
+  if (error) return { items: [], totalCount: 0, error };
   return {
     items: result?.items ?? [],
     totalCount: result?.total_count ?? 0,
-    cost: task.cost,
+    cost,
   };
 }
 
