@@ -3,22 +3,19 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import ReferringNetworksTable, { type NetworkItem } from './ReferringNetworksTable';
 
 interface SearchParams { target?: string; history_id?: string; }
 
 async function fetchNetworks(target: string, login: string, pass: string): Promise<{ items: NetworkItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/referring_networks/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target, limit: 1000, order_by: ['referring_domains,desc'] }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: NetworkItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: NetworkItem[] }>(
+    'backlinks/referring_networks/live',
+    { target, limit: 1000, order_by: ['referring_domains,desc'] },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }

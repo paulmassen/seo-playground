@@ -1,5 +1,6 @@
 import { getCredentials, getBlBulkRdHistory, saveBlBulkRd, getBlBulkRdResults, type BlBulkRdEntry } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -18,17 +19,11 @@ interface BulkRdItem {
 interface SearchParams { targets?: string; history_id?: string; }
 
 async function fetchBulkRd(targets: string[], login: string, pass: string): Promise<{ items: BulkRdItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/bulk_referring_domains/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ targets }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: BulkRdItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: BulkRdItem[] }>(
+    'backlinks/bulk_referring_domains/live', { targets }, { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }

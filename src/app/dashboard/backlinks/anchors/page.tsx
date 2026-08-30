@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { getCredentials, getAnchorsHistory, saveAnchorsSearch, getAnchorsResults, getSetting } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SearchForm from '@/components/SearchForm';
@@ -26,25 +27,13 @@ interface SearchParams {
 }
 
 async function fetchAnchors(target: string, limit: number, login: string, pass: string): Promise<{ items: AnchorItem[]; total: number; cost: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/anchors/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target, limit, order_by: ['backlinks,desc'], include_subdomains: true }]),
-  });
-  if (!res.ok) return { items: [], total: 0, cost: 0, error: `Error HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ total_count?: number; items?: AnchorItem[] }> }> };
-  const task = data.tasks?.[0];
-  if (!task) return { items: [], total: 0, cost: 0, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], total: 0, cost: 0, error: `DataForSEO: ${task.status_message} (${task.status_code})` };
-  }
-  const result = task.result?.[0];
-  return {
-    items: result?.items ?? [],
-    total: result?.total_count ?? 0,
-    cost: task.cost ?? 0,
-  };
+  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: AnchorItem[] }>(
+    'backlinks/anchors/live',
+    { target, limit, order_by: ['backlinks,desc'], include_subdomains: true },
+    { login, pass },
+  );
+  if (error) return { items: [], total: 0, cost: 0, error };
+  return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0 };
 }
 
 export default async function AnchorsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {

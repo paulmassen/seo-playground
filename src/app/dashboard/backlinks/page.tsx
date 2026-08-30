@@ -10,6 +10,7 @@ import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import BacklinksTable from './BacklinksTable';
 
 // ---- Types ----
@@ -80,23 +81,14 @@ function cleanTarget(t: string) {
   return t.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
 }
 
-async function fetchSummary(target: string, auth: string): Promise<{ result?: BacklinksSummary; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/summary/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target }]),
-  });
-  if (!res.ok) return { error: `Error API summary ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: BacklinksSummary[] }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { error: `DataForSEO: ${task.status_message}` };
-  return { result: task.result?.[0], cost: task.cost };
+async function fetchSummary(target: string, login: string, pass: string): Promise<{ result?: BacklinksSummary; cost?: number; error?: string }> {
+  return callDataForSeoFirst<BacklinksSummary>('backlinks/summary/live', { target }, { login, pass });
 }
 
 async function fetchLinks(
   target: string,
-  auth: string,
+  login: string,
+  pass: string,
   limit: number,
   orderBy: string,
   dofollow: boolean | null,
@@ -110,18 +102,11 @@ async function fetchLinks(
   if (dofollow !== null) {
     body.filters = ['dofollow', '=', dofollow];
   }
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/backlinks/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-  });
-  if (!res.ok) return { items: [], total: 0, error: `Error API links ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ total_count?: number; items?: BacklinkItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], total: 0, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], total: 0, error: `DataForSEO: ${task.status_message}` };
-  const result = task.result?.[0];
-  return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: BacklinkItem[] }>(
+    'backlinks/backlinks/live', body, { login, pass },
+  );
+  if (error) return { items: [], total: 0, error };
+  return { items: result?.items ?? [], total: result?.total_count ?? 0, cost };
 }
 
 // ---- UI helpers ----
@@ -219,11 +204,9 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
     } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const auth = btoa(`${creds.login}:${creds.pass}`);
-
       const [summaryRes, linksRes] = await Promise.all([
-        fetchSummary(clean, auth),
-        fetchLinks(clean, auth, limit, orderBy, dofollowFilter),
+        fetchSummary(clean, creds.login, creds.pass),
+        fetchLinks(clean, creds.login, creds.pass, limit, orderBy, dofollowFilter),
       ]);
 
       if (summaryRes.error || linksRes.error) {

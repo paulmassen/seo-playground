@@ -3,22 +3,19 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import PageIntersectionTable, { type PageIntItem } from './PageIntersectionTable';
 
 interface SearchParams { targets?: string; history_id?: string; }
 
 async function fetchPageInt(targets: string[], login: string, pass: string): Promise<{ items: PageIntItem[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/page_intersection/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ targets: targets.map((t) => ({ url: t, type: 'url' })), limit: 500, order_by: ['page_from_rank,desc'] }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: PageIntItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: PageIntItem[] }>(
+    'backlinks/page_intersection/live',
+    { targets: targets.map((t) => ({ url: t, type: 'url' })), limit: 500, order_by: ['page_from_rank,desc'] },
+    { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }

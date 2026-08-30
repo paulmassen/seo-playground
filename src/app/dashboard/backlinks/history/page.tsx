@@ -1,5 +1,6 @@
 import { getCredentials, getSetting, getBlHistHistory, saveBlHist, getBlHistResults, type BlHistEntry } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -19,17 +20,11 @@ interface HistoryPoint {
 interface SearchParams { target?: string; history_id?: string; }
 
 async function fetchHistory(target: string, login: string, pass: string): Promise<{ items: HistoryPoint[]; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/history/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target }]),
-  });
-  if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ items?: HistoryPoint[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return { items: task.result?.[0]?.items ?? [], cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: HistoryPoint[] }>(
+    'backlinks/history/live', { target }, { login, pass },
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], cost };
 }
 
 function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }

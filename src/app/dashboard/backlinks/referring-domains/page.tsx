@@ -5,6 +5,7 @@ import ExportCSVButton from '@/components/ExportCSVButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import ReferringDomainsTable, { type RefDomain } from './ReferringDomainsTable';
 
 interface SearchParams {
@@ -14,31 +15,13 @@ interface SearchParams {
 }
 
 async function fetchRefDomains(target: string, limit: number, login: string, pass: string): Promise<{ items: RefDomain[]; total: number; cost: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/backlinks/referring_domains/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      target,
-      limit,
-      order_by: ['domain_from_rank,desc'],
-      filters: ['dofollow', '=', true],
-      include_subdomains: true,
-    }]),
-  });
-  if (!res.ok) return { items: [], total: 0, cost: 0, error: `Error HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ total_count?: number; items?: RefDomain[] }> }> };
-  const task = data.tasks?.[0];
-  if (!task) return { items: [], total: 0, cost: 0, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) {
-    return { items: [], total: 0, cost: 0, error: `DataForSEO: ${task.status_message} (${task.status_code})` };
-  }
-  const result = task.result?.[0];
-  return {
-    items: result?.items ?? [],
-    total: result?.total_count ?? 0,
-    cost: task.cost ?? 0,
-  };
+  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: RefDomain[] }>(
+    'backlinks/referring_domains/live',
+    { target, limit, order_by: ['domain_from_rank,desc'], filters: ['dofollow', '=', true], include_subdomains: true },
+    { login, pass },
+  );
+  if (error) return { items: [], total: 0, cost: 0, error };
+  return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0 };
 }
 
 export default async function RefDomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
