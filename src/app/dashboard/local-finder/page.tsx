@@ -1,6 +1,7 @@
 import {
   getCredentials, getSetting, getLfHistory, saveLfSearch, getLfResults, type LfHistoryEntry,
 } from '@/lib/db';
+import { stableSearchId } from '@/lib/dedupe';
 import LocalFinderForm from './LocalFinderForm';
 import { type LocalPackItem } from './grid-api';
 
@@ -116,11 +117,7 @@ export default async function LocalFinderPage({ searchParams }: { searchParams: 
     if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const lfWindow = Math.floor(Date.now() / 60_000);
-      const lfKey = `${lfWindow}|${params.keyword}|${params.location_coordinate ?? params.location}|${params.language}|${params.device}`;
-      let lfHash = 0x811c9dc5;
-      for (let i = 0; i < lfKey.length; i++) { lfHash ^= lfKey.charCodeAt(i); lfHash = Math.imul(lfHash, 0x01000193) >>> 0; }
-      const lfId = lfHash.toString(16).padStart(8, '0');
+      const lfId = stableSearchId(['local-finder', params.keyword, params.location_coordinate ?? params.location, params.language, params.device]);
 
       const lfExisting = getLfResults<LocalPackItem>(lfId);
       if (lfExisting) {
