@@ -42,6 +42,7 @@ wrangler.toml
 *.db
 *.db-shm
 *.db-wal
+*.backup-*
 
 # vercel
 .vercel
