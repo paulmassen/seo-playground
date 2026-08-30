@@ -99,6 +99,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and go to **Settings** to enter your DataForSEO API credentials.
 
+## Testing
+
+```bash
+npm test
+```
+
+Runs the Vitest suite (dedupe/cache helpers). No DataForSEO credentials or network access needed — it uses a throwaway SQLite file.
+
 ## Configuration
 
 All settings (API credentials, default location, language, coordinates, domain) are stored locally in `seo-playground.db` (SQLite). No `.env` file is needed — configure everything from the Settings page.
@@ -120,7 +128,7 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 
 Full detailed history: [CHANGELOG.md](CHANGELOG.md).
 
-- **2026-08-30** — New Web Mentions page (brand sentiment monitoring via DataForSEO Content Analysis API). New "Trend over time" mode on AI Visibility (month-by-month mentions/volume via `llm_mentions/historical`). App-wide audit: fixed AI Optimization page missing caching/dedupe (was re-billing on every refresh) and `db.ts` migrations swallowing real errors, not just "column already exists".
+- **2026-08-30** — New Web Mentions page (brand sentiment monitoring via DataForSEO Content Analysis API). New "Trend over time" mode on AI Visibility (month-by-month mentions/volume via `llm_mentions/historical`). App-wide audit: added the first automated test suite (`npm test`, Vitest), fixed AI Optimization page missing caching/dedupe (was re-billing on every refresh), and `db.ts` migrations swallowing real errors, not just "column already exists".
 - **2026-08-09** — New Query Fan-Out page (hidden AI sub-queries + their search volume). New AI Visibility page (LLM mention tracking). Sortable tables + "Copy as Markdown" across ~30 pages. Fixed location targeting on Labs pages, Domain Categories names, Bulk Backlinks columns, repeated billing on double-submits app-wide, and blank "Related queries" pills on AI Optimization.
 - **2026-07-25** — Geo-Grid competitive analysis (top competitors, visibility-by-distance) and several Geo-Grid reliability/cost-tracking fixes.
 - **2026-06-01** — Geo-Grid Ranking split out into its own dedicated page.
