@@ -30,8 +30,8 @@ function sortValue(row: Row, key: SortKey): number | string {
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ArrowUpDown className="w-3 h-3 text-slate-300" />;
-  return dir === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />;
+  if (!active) return <ArrowUpDown className="w-3 h-3 text-slate-300 dark:text-slate-600" />;
+  return dir === 'asc' ? <ArrowUp className="w-3 h-3 text-blue-600 dark:text-blue-400" /> : <ArrowDown className="w-3 h-3 text-blue-600 dark:text-blue-400" />;
 }
 
 interface Props {
@@ -65,7 +65,7 @@ export default function RankTrackerTable({ rows, hasCreds, checkAction, removeAc
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : 'text-center'} ${className ?? ''}`}
+      <th className={`px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left' : 'text-center'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'center' ? 'justify-center w-full' : ''}`}>
           {label}
@@ -78,7 +78,7 @@ export default function RankTrackerTable({ rows, hasCreds, checkAction, removeAc
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="border-b border-slate-50">
+        <tr className="border-b border-slate-50 dark:border-slate-800">
           <Header label="Keyword" sortK="keyword" align="left" className="!px-5" />
           <Header label="Pos." sortK="position" align="center" />
           <Header label="Trend" sortK="trend" align="center" />
@@ -87,7 +87,7 @@ export default function RankTrackerTable({ rows, hasCreds, checkAction, removeAc
           <th className="px-3 py-3"></th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-50">
+      <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
         {sorted.map(({ kw, history, latest, previous }) => (
           <KeywordRow
             key={kw.id}
