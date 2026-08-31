@@ -143,38 +143,38 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">SERP Checker</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">SERP Checker</h1>
         <p className="text-sm text-slate-400 mt-1">Analyzes Google results in real time via DataForSEO.</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6">
         <div className="space-y-6">
           {/* Search form */}
-          <SearchForm className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-sm" btnLabel="Analyze" btnClassName="w-full bg-slate-900 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors">
+          <SearchForm className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm" btnLabel="Analyze" btnClassName="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Keyword</label>
                 <input
                   type="text" name="keyword" defaultValue={activeEntry?.keyword ?? keyword}
                   placeholder="e.g. plumber paris" required
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</label>
-                <LocationPicker name="location" defaultValue={activeEntry?.location ?? location} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                <LocationPicker name="location" defaultValue={activeEntry?.location ?? location} className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" />
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Language</label>
                 <select name="language" defaultValue={activeEntry?.language ?? language}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800">
                   {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Device</label>
                 <select name="device" defaultValue={activeEntry?.device ?? device}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800">
                   <option value="desktop">Desktop</option>
                   <option value="mobile">Mobile</option>
                 </select>
@@ -182,7 +182,7 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Number of results</label>
                 <select name="depth" defaultValue={String(activeEntry?.depth ?? depth)}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800">
                   <option value="10">10</option>
                   <option value="20">20</option>
                   <option value="50">50</option>
@@ -194,11 +194,11 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
 
           {/* Target domain hits summary */}
           {hasQuery && !error && targetHits.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex flex-wrap gap-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 self-center">Target domains</span>
+            <div className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-2xl px-5 py-4 flex flex-wrap gap-3">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 self-center">Target domains</span>
               {targetHits.map((h) => (
-                <div key={h.domain} className="flex items-center gap-1.5 bg-white border border-emerald-200 rounded-lg px-3 py-1.5">
-                  <span className="text-xs font-bold text-emerald-700">{h.domain}</span>
+                <div key={h.domain} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-1.5">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">{h.domain}</span>
                   <span className="text-[10px] font-black text-white bg-emerald-500 rounded px-1.5 py-0.5">#{h.position}</span>
                 </div>
               ))}
@@ -206,17 +206,17 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
+            <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>
           )}
 
           {/* Results */}
           {hasQuery && !error && (
-            <div id="results" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div id="results" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Organic results</h2>
                   {isFromHistory && (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">History</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-md">History</span>
                   )}
                 </div>
                 <span className="text-xs font-black text-slate-400">{results.length} result{results.length !== 1 ? 's' : ''}</span>
@@ -225,31 +225,31 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
               {results.length === 0 ? (
                 <div className="px-6 py-12 text-center text-sm text-slate-400">No organic results found.</div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {results.map((item, i) => {
                     const domain = item.domain ?? extractDomain(item.url);
                     const isTarget = targetDomains.some((td) => domain.includes(td) || td.includes(domain));
                     return (
-                      <div key={i} className={`px-6 py-4 hover:bg-slate-50 transition-colors ${isTarget ? 'bg-emerald-50 border-l-4 border-emerald-400' : ''}`}>
+                      <div key={i} className={`px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isTarget ? 'bg-emerald-50 dark:bg-emerald-950 border-l-4 border-emerald-400' : ''}`}>
                         <div className="flex items-start gap-4">
-                          <span className={`mt-0.5 w-7 h-7 shrink-0 rounded-lg text-xs font-black flex items-center justify-center ${isTarget ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <span className={`mt-0.5 w-7 h-7 shrink-0 rounded-lg text-xs font-black flex items-center justify-center ${isTarget ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                             {item.rank_group}
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <a href={item.url} target="_blank" rel="noopener noreferrer"
-                                className="text-sm font-bold text-blue-600 hover:underline leading-snug line-clamp-1">
+                                className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline leading-snug line-clamp-1">
                                 {item.title}
                               </a>
                               {isTarget && (
-                                <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">target</span>
+                                <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900 px-1.5 py-0.5 rounded">target</span>
                               )}
                             </div>
                             <p className="text-[11px] text-slate-400 mt-0.5 mb-1.5 font-mono truncate">
                               {item.breadcrumb ?? domain}
                             </p>
                             {item.description && (
-                              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{item.description}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{item.description}</p>
                             )}
                           </div>
                         </div>
@@ -265,8 +265,8 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
         {/* Right column: target domains + history */}
         <div className="space-y-4">
           {/* Target domains */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Target domains</h2>
             </div>
             <div className="p-4 space-y-2">
@@ -274,9 +274,9 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
                 <input
                   type="text" name="domain"
                   placeholder="example.com"
-                  className="flex-1 min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 min-w-0 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <button type="submit" className="shrink-0 px-3 py-2 bg-slate-900 text-white text-xs font-black rounded-lg hover:bg-blue-600 transition-colors">
+                <button type="submit" className="shrink-0 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs font-black rounded-lg hover:bg-blue-600 transition-colors">
                   +
                 </button>
               </form>
@@ -285,8 +285,8 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
               ) : (
                 <div className="space-y-1 pt-1">
                   {targetDomains.map((domain) => (
-                    <div key={domain} className="flex items-center justify-between gap-2 px-2 py-1.5 bg-slate-50 rounded-lg">
-                      <span className="text-xs font-mono text-slate-700 truncate">{domain}</span>
+                    <div key={domain} className="flex items-center justify-between gap-2 px-2 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                      <span className="text-xs font-mono text-slate-700 dark:text-slate-300 truncate">{domain}</span>
                       <form action={removeDomainAction.bind(null, domain)}>
                         <button type="submit" className="shrink-0 text-slate-300 hover:text-red-500 transition-colors text-xs font-black">✕</button>
                       </form>
@@ -299,25 +299,25 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
 
           {/* History */}
           {history.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">History</h2>
               </div>
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-slate-50 dark:divide-slate-800">
                 {history.map((entry) => {
                   const isActive = entry.id === historyId;
                   return (
                     <a key={entry.id} href={`/dashboard/serp?history_id=${entry.id}#results`}
-                      className={`block px-4 py-3 hover:bg-slate-50 transition-colors ${isActive ? 'bg-blue-50' : ''}`}>
+                      className={`block px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
                       <div className="flex items-center justify-between gap-2">
-                        <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.keyword}</p>
+                        <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.keyword}</p>
                         <span className="shrink-0 text-[10px] text-slate-400">{formatDate(entry.ts)}</span>
                       </div>
                       <p className="text-[10px] text-slate-400 truncate mt-0.5">{entry.location} · {entry.count} results</p>
                       {entry.targetHits && entry.targetHits.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {entry.targetHits.map((h) => (
-                            <span key={h.domain} className="inline-flex items-center gap-1 text-[9px] font-black bg-emerald-50 border border-emerald-200 text-emerald-700 rounded px-1.5 py-0.5">
+                            <span key={h.domain} className="inline-flex items-center gap-1 text-[9px] font-black bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 rounded px-1.5 py-0.5">
                               <span className="truncate max-w-[80px]">{h.domain}</span>
                               <span className="bg-emerald-500 text-white rounded px-1">#{h.position}</span>
                             </span>
