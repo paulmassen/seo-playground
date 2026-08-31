@@ -203,15 +203,15 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">AI Optimization</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">AI Optimization</h1>
         <p className="text-sm text-slate-400 mt-1">Track how AI models mention your keyword or domain via DataForSEO LLM Mentions.</p>
       </div>
 
       {/* Form */}
       <SearchForm
-        className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4"
+        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4"
         btnLabel="Analyze"
-        btnClassName="w-full bg-slate-900 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-violet-600 transition-colors"
+        btnClassName="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-violet-600 transition-colors"
         loadingLabel="Fetching AI mentions…"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -220,7 +220,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
             <div className="shrink-0">
               <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Type</label>
               <select name="target_type" defaultValue={targetType}
-                className="h-[42px] px-3 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
+                className="h-[42px] px-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
                 <option value="keyword">Keyword</option>
                 <option value="domain">Domain</option>
               </select>
@@ -232,7 +232,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
                 type="text"
                 defaultValue={displayTarget}
                 placeholder={targetType === 'domain' ? 'example.com' : 'plombier paris'}
-                className="w-full h-[42px] px-4 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full h-[42px] px-4 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800"
               />
             </div>
           </div>
@@ -247,36 +247,36 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
       </SearchForm>
 
       {error && (
-        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
+        <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>
       )}
 
       {/* Summary stats */}
       {hasQuery && !error && items.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mentions found</p>
-            <p className="text-2xl font-black text-slate-900 mt-1 tabular-nums">{items.length}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{items.length}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total AI volume</p>
-            <p className="text-2xl font-black text-slate-900 mt-1 tabular-nums">{totalVolume.toLocaleString('en-GB')}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{totalVolume.toLocaleString('en-GB')}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Models</p>
-            <p className="text-2xl font-black text-slate-900 mt-1 tabular-nums">{uniqueModels.length}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{uniqueModels.length}</p>
           </div>
         </div>
       )}
 
       {/* Results */}
       {hasQuery && !error && (
-        <div id="results" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div id="results" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
               AI Mentions — {PLATFORM_LABELS[platform] ?? platform}
             </h2>
             <div className="flex items-center gap-3">
-              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">History</span>}
+              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-md">History</span>}
               {cost !== undefined && (
                 <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>
               )}
@@ -289,9 +289,9 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
               No AI mentions found for this target.
             </div>
           ) : (
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {items.map((item, i) => (
-                <div key={i} className="px-6 py-5 hover:bg-slate-50 transition-colors">
+                <div key={i} className="px-6 py-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <ModelBadge model={item.model_name} />
@@ -310,12 +310,12 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
 
                   {/* Question */}
                   {item.question && (
-                    <p className="text-sm font-semibold text-slate-900 mb-2">{item.question}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">{item.question}</p>
                   )}
 
                   {/* Answer */}
                   {item.answer && (
-                    <p className="text-sm text-slate-600 leading-relaxed mb-3">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
                       {truncate(item.answer.replace(/#+\s/g, '').replace(/\*\*/g, ''), 400)}
                     </p>
                   )}
@@ -333,7 +333,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
                               target="_blank"
                               rel="noopener noreferrer"
                               title={s.title ?? s.url}
-                              className="text-[11px] text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md hover:bg-blue-100 transition-colors max-w-[160px] truncate"
+                              className="text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-900 px-2 py-0.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors max-w-[160px] truncate"
                             >
                               {s.domain ?? s.url}
                             </a>
@@ -353,7 +353,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Related queries</p>
                         <div className="flex flex-wrap gap-1">
                           {item.fan_out_queries!.slice(0, 5).map((q, qi) => (
-                            <span key={qi} className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                            <span key={qi} className="text-[11px] text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
                               {q}
                             </span>
                           ))}
@@ -378,25 +378,25 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
 
       {/* Empty state */}
       {!hasQuery && !error && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm px-6 py-16 text-center">
           <p className="text-slate-400 text-sm">Enter a keyword or domain above to see how AI models mention it.</p>
           <p className="text-slate-300 text-xs mt-1">Powered by DataForSEO LLM Mentions Search API.</p>
         </div>
       )}
 
       {history.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">History</h2>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 dark:divide-slate-800">
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
                 <a key={entry.id} href={`/dashboard/ai-optimization?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors ${isActive ? 'bg-blue-50' : ''}`}>
+                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.target}</p>
+                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.target}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       {PLATFORM_LABELS[entry.platform] ?? entry.platform}
                       {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}

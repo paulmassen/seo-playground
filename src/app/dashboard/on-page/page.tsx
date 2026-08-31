@@ -71,7 +71,7 @@ export default function OnPageHub() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">On Page</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">On Page</h1>
         <p className="text-sm text-slate-400 mt-1">On-page analysis tools via the DataForSEO OnPage API.</p>
       </div>
 
@@ -82,12 +82,12 @@ export default function OnPageHub() {
             const Icon = tool.icon;
             return (
               <Link key={tool.href + tool.name} href={tool.href}
-                className="group bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+                className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                 <div className="flex items-start justify-between mb-3">
                   <Icon className="h-5 w-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
                   <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${tool.badgeCls}`}>{tool.badge}</span>
                 </div>
-                <h2 className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors mb-1">{tool.name}</h2>
+                <h2 className="text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-1">{tool.name}</h2>
                 <p className="text-xs text-slate-500 leading-relaxed">{tool.description}</p>
               </Link>
             );
@@ -102,9 +102,9 @@ export default function OnPageHub() {
             const Icon = tab.icon;
             return (
               <Link key={tab.name} href={tab.href}
-                className="group bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+                className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                 <Icon className="h-5 w-5 text-slate-400 group-hover:text-blue-500 transition-colors mb-3" />
-                <h2 className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors mb-1">{tab.name}</h2>
+                <h2 className="text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-1">{tab.name}</h2>
                 <p className="text-xs text-slate-500 leading-relaxed mb-2">{tab.description}</p>
                 <p className="text-[10px] text-slate-300 font-mono">{tab.note}</p>
               </Link>
