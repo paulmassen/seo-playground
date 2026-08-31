@@ -62,7 +62,7 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : 'text-right'} ${className ?? ''}`}
+      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
           {label}
@@ -76,7 +76,7 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50">
+          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <th className="px-5 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 w-10">#</th>
             <Header label="Competitor domain" sortK="domain" align="left" />
             <Header label="Common keywords" sortK="intersections" align="left" />
@@ -85,7 +85,7 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
             <Header label="Total KW" sortK="total_kw" align="right" className="hidden md:table-cell" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50">
+        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
           {sorted.map((item, i) => {
             const intersections = item.intersections ?? 0;
             const barPct = Math.round((intersections / maxIntersections) * 100);
@@ -93,9 +93,9 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
             const totalKw = item.full_domain_metrics?.organic?.count;
 
             return (
-              <tr key={i} className="hover:bg-slate-50 transition-colors">
+              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                 <td className="px-5 py-3 text-center">
-                  <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 text-xs font-black flex items-center justify-center mx-auto">
+                  <span className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-black flex items-center justify-center mx-auto">
                     {i + 1}
                   </span>
                 </td>
@@ -104,26 +104,26 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
                     href={`https://${item.domain}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-mono font-bold text-slate-900 hover:text-blue-600 transition-colors text-sm"
+                    className="font-mono font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-sm"
                   >
                     {item.domain}
                   </a>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-black text-slate-900 tabular-nums w-10 shrink-0">{fmt(intersections)}</span>
-                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[60px]">
+                    <span className="font-black text-slate-900 dark:text-white tabular-nums w-10 shrink-0">{fmt(intersections)}</span>
+                    <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden min-w-[60px]">
                       <div className="h-full bg-blue-400 rounded-full" style={{ width: `${barPct}%` }} />
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-600 tabular-nums">
+                <td className="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-300 tabular-nums">
                   {item.avg_position ? item.avg_position.toFixed(1) : '—'}
                 </td>
                 <td className="px-4 py-3 text-right hidden sm:table-cell">
                   <TrafficBadge value={traffic} />
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
+                <td className="px-4 py-3 text-right font-mono text-slate-500 dark:text-slate-400 tabular-nums hidden md:table-cell">
                   {fmt(totalKw)}
                 </td>
               </tr>

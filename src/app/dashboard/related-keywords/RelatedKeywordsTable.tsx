@@ -77,7 +77,7 @@ export default function RelatedKeywordsTable({ items }: { items: RelatedKeywordI
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
           {label}
@@ -91,7 +91,7 @@ export default function RelatedKeywordsTable({ items }: { items: RelatedKeywordI
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50">
+          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
             <Header label="KD" sortK="kd" align="center" />
             <Header label="Vol." sortK="volume" align="right" />
@@ -101,32 +101,32 @@ export default function RelatedKeywordsTable({ items }: { items: RelatedKeywordI
             <Header label="Related" sortK="related" align="right" className="hidden lg:table-cell" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50">
+        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
           {sorted.map((item, i) => {
             const kd = item.keyword_data;
             return (
-              <tr key={i} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-3 font-medium text-slate-900 max-w-[200px]">
+              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <td className="px-6 py-3 font-medium text-slate-900 dark:text-white max-w-[200px]">
                   <span className="truncate block">{kd?.keyword ?? '—'}</span>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <DifficultyBadge value={item.keyword_difficulty} />
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
+                <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
                   {fmt(kd?.search_volume)}
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">
+                <td className="px-4 py-3 text-right font-mono text-slate-500 dark:text-slate-400 tabular-nums">
                   {kd?.cpc != null ? `$${kd.cpc.toFixed(2)}` : '—'}
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden sm:table-cell">
+                <td className="px-4 py-3 text-right font-mono text-slate-500 dark:text-slate-400 tabular-nums hidden sm:table-cell">
                   {kd?.competition_index ?? '—'}
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
+                <td className="px-4 py-3 text-right font-mono text-slate-500 dark:text-slate-400 tabular-nums hidden md:table-cell">
                   {fmt(item.avg_backlinks_info?.referring_domains)}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums hidden lg:table-cell">
                   {item.related_keywords && item.related_keywords.length > 0 ? (
-                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
                       {item.related_keywords.length}
                     </span>
                   ) : (

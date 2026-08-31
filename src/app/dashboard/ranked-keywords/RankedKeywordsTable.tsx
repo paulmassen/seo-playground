@@ -85,7 +85,7 @@ export default function RankedKeywordsTable({ items }: { items: RankedKwItem[] }
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
           {label}
@@ -99,7 +99,7 @@ export default function RankedKeywordsTable({ items }: { items: RankedKwItem[] }
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50">
+          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Pos." sortK="position" align="center" className="w-12" />
             <Header label="Keyword" sortK="keyword" align="left" />
             <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden lg:table-cell">URL</th>
@@ -109,7 +109,7 @@ export default function RankedKeywordsTable({ items }: { items: RankedKwItem[] }
             <Header label="CPC" sortK="cpc" align="right" className="hidden md:table-cell" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50">
+        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
           {sorted.map((item, i) => {
             const kw = item.keyword_data;
             const serp = item.ranked_serp_element?.serp_item;
@@ -122,13 +122,13 @@ export default function RankedKeywordsTable({ items }: { items: RankedKwItem[] }
             } catch { urlDisplay = url; }
 
             return (
-              <tr key={i} className="hover:bg-slate-50 transition-colors">
+              <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                 <td className="px-4 py-3 text-center">
                   <PositionBadge pos={pos} />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-900">{kw?.keyword ?? '—'}</span>
+                    <span className="font-medium text-slate-900 dark:text-white">{kw?.keyword ?? '—'}</span>
                     {serp?.is_featured_snippet && (
                       <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded shrink-0">featured</span>
                     )}
@@ -142,7 +142,7 @@ export default function RankedKeywordsTable({ items }: { items: RankedKwItem[] }
                     </a>
                   ) : <span className="text-slate-300">—</span>}
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
+                <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
                   {kw?.keyword_info?.search_volume?.toLocaleString('en-GB') ?? '—'}
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -151,7 +151,7 @@ export default function RankedKeywordsTable({ items }: { items: RankedKwItem[] }
                 <td className="px-4 py-3 text-center hidden sm:table-cell">
                   <IntentBadge value={kw?.search_intent_info?.main_intent} />
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden md:table-cell">
+                <td className="px-4 py-3 text-right font-mono text-slate-500 dark:text-slate-400 tabular-nums hidden md:table-cell">
                   {kw?.keyword_info?.cpc != null ? `$${kw.keyword_info.cpc.toFixed(2)}` : '—'}
                 </td>
               </tr>

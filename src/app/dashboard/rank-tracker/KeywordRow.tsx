@@ -256,11 +256,11 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, ch
   return (
     <>
       <tr
-        className="hover:bg-slate-50/60 transition-colors cursor-pointer select-none"
+        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors cursor-pointer select-none"
         onClick={() => setExpanded((v) => !v)}
       >
         <td className="px-5 py-3.5">
-          <div className="font-bold text-slate-800 flex items-center gap-1.5">
+          <div className="font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
             <span
               className="inline-block text-[8px] text-slate-300 transition-transform duration-200"
               style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
@@ -314,7 +314,7 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, ch
       </tr>
 
       {expanded && (
-        <tr className="bg-slate-50/40">
+        <tr className="bg-slate-50/40 dark:bg-slate-800/30">
           <td colSpan={6} className="px-5 pt-1 pb-5">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
               Position history — last 30 days

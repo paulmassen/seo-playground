@@ -86,7 +86,7 @@ export default function IntersectionTable({
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-3 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th className={`px-3 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''}`}>
           {label}
@@ -119,10 +119,10 @@ export default function IntersectionTable({
         <ExportCSVButton data={csvData} filename={`intersection-${target1}-${target2}.csv`} columns={csvColumns} />
       </div>
 
-      <div id="results" className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
+      <div id="results" className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-slate-100">
+            <tr className="border-b border-slate-100 dark:border-slate-800">
               <Header label="Keyword" sortK="keyword" align="left" className="!px-5" />
               <Header label="Vol." sortK="volume" align="right" />
               <Header label="KD" sortK="kd" align="center" />
@@ -130,11 +130,11 @@ export default function IntersectionTable({
               <Header label="D2" sortK="pos2" align="center" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
             {sorted.map((item, i) => (
-              <tr key={i} className="hover:bg-slate-50/50">
-                <td className="px-5 py-3 font-bold text-slate-800">{item.keyword_data.keyword}</td>
-                <td className="px-3 py-3 text-right font-mono text-slate-500">
+              <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                <td className="px-5 py-3 font-bold text-slate-800 dark:text-slate-200">{item.keyword_data.keyword}</td>
+                <td className="px-3 py-3 text-right font-mono text-slate-500 dark:text-slate-400">
                   {(item.keyword_data.keyword_info?.search_volume ?? 0).toLocaleString()}
                 </td>
                 <td className="px-3 py-3 text-center">
