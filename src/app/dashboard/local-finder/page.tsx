@@ -151,20 +151,20 @@ export default async function LocalFinderPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Local Finder</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Local Finder</h1>
         <p className="text-sm text-slate-400 mt-1">Google local pack results for any keyword and location.</p>
       </div>
 
       <LocalFinderForm defaults={formDefaults} />
 
-      {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>}
+      {error && <div className="bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       {hasQuery && !error && (
-        <div id="results" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+        <div id="results" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Results</h2>
-              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">History</span>}
+              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md">History</span>}
             </div>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
@@ -181,25 +181,25 @@ export default async function LocalFinderPage({ searchParams }: { searchParams: 
           {items.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-slate-400">No results found.</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {items.map((item, i) => (
-                <div key={i} className="px-6 py-5 hover:bg-slate-50 transition-colors">
+                <div key={i} className="px-6 py-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-start gap-4">
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <span className="text-xs font-black text-slate-500">{item.rank_group}</span>
+                    <div className="shrink-0 w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <span className="text-xs font-black text-slate-500 dark:text-slate-400">{item.rank_group}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 flex-wrap">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-sm font-bold text-slate-900">{item.title ?? '—'}</h3>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{item.title ?? '—'}</h3>
                             {item.is_paid && <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">Sponsored</span>}
                           </div>
                           {item.rating && <StarRating rating={item.rating} />}
                         </div>
                         {item.phone && <a href={`tel:${item.phone}`} className="shrink-0 text-xs font-mono text-blue-600 hover:text-blue-800 transition-colors">{item.phone}</a>}
                       </div>
-                      {item.description && <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">{item.description}</p>}
+                      {item.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">{item.description}</p>}
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
                         {item.url && (
                           <a href={item.url} target="_blank" rel="noopener noreferrer"
@@ -220,17 +220,17 @@ export default async function LocalFinderPage({ searchParams }: { searchParams: 
       )}
 
       {historyIndex.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">History</h2>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 dark:divide-slate-800">
             {historyIndex.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <div key={entry.id} className={`flex items-center gap-2 px-6 py-3.5 hover:bg-slate-50 transition-colors ${isActive ? 'bg-blue-50' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}>
                   <a href={`/dashboard/local-finder?history_id=${entry.id}#results`} className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.keyword}</p>
+                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.keyword}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                       {entry.location} · {entry.count} result{entry.count !== 1 ? 's' : ''}
                       {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}

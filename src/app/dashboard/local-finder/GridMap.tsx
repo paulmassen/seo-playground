@@ -223,7 +223,7 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
         )}
         <div
           ref={containerRef}
-          className="w-full rounded-xl overflow-hidden border border-slate-200"
+          className="w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800"
           style={{ height: 520 }}
         />
       </div>

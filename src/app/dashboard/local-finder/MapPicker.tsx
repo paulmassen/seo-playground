@@ -205,7 +205,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleGeocode(); } }}
           placeholder="Search a city, address, place…"
-          className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-500 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="button"
@@ -221,7 +221,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       {/* Map */}
       <div
         ref={containerRef}
-        className="w-full rounded-xl overflow-hidden border border-slate-200 transition-all duration-300"
+        className="w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 transition-all duration-300"
         style={{ height: mapHeight }}
       />
       {showGrid && coordinate && gridSize && spacingKm && (

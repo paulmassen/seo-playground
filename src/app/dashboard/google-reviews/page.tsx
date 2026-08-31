@@ -103,15 +103,15 @@ function DistributionChart({ reviews }: { reviews: Review[] }) {
     <div className="space-y-2.5">
       {buckets.map(({ star, count }, i) => (
         <div key={star} className="flex items-center gap-3">
-          <span className="text-xs font-black text-slate-600 w-5 text-right">{star}</span>
+          <span className="text-xs font-black text-slate-600 dark:text-slate-300 w-5 text-right">{star}</span>
           <span className="text-amber-400 text-sm">★</span>
-          <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
+          <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${barColors[i]}`}
               style={{ width: `${(count / maxCount) * 100}%` }}
             />
           </div>
-          <span className="text-xs tabular-nums text-slate-700 font-semibold w-8 text-right">{count}</span>
+          <span className="text-xs tabular-nums text-slate-700 dark:text-slate-300 font-semibold w-8 text-right">{count}</span>
           <span className="text-xs tabular-nums text-slate-400 w-9">
             {reviews.length > 0 ? `${((count / reviews.length) * 100).toFixed(0)}%` : ''}
           </span>
@@ -236,7 +236,7 @@ function RatingGauge({ avg, total }: { avg: number; total: number }) {
         className="absolute left-0 right-0 flex flex-col items-center pointer-events-none"
         style={{ top: '60%', transform: 'translateY(-50%)' }}
       >
-        <span className="text-2xl font-black text-slate-900 leading-none tabular-nums">{avg.toFixed(1)}</span>
+        <span className="text-2xl font-black text-slate-900 dark:text-white leading-none tabular-nums">{avg.toFixed(1)}</span>
         <span className="text-[9px] text-slate-400 mt-1">out of 5</span>
         <span className="text-[9px] text-slate-400">{total} reviews</span>
       </div>
@@ -269,28 +269,28 @@ function GoalCalculator({ reviews }: { reviews: Review[] }) {
   }
 
   if (targetsTenths.length === 0) return (
-    <p className="text-xs text-slate-500">Already displaying 5.0★ — nothing higher to reach.</p>
+    <p className="text-xs text-slate-500 dark:text-slate-400">Already displaying 5.0★ — nothing higher to reach.</p>
   );
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500">
-        Current average: <strong className="text-slate-700">{avg.toFixed(2)}★</strong>{' '}
-        (Google shows <strong className="text-slate-700">{displayed.toFixed(1)}★</strong>) based on{' '}
-        <strong className="text-slate-700">{n}</strong> fetched reviews. Assumes all new reviews are{' '}
-        <strong className="text-slate-700">5★</strong>; counts reach the rating Google would display.
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Current average: <strong className="text-slate-700 dark:text-slate-300">{avg.toFixed(2)}★</strong>{' '}
+        (Google shows <strong className="text-slate-700 dark:text-slate-300">{displayed.toFixed(1)}★</strong>) based on{' '}
+        <strong className="text-slate-700 dark:text-slate-300">{n}</strong> fetched reviews. Assumes all new reviews are{' '}
+        <strong className="text-slate-700 dark:text-slate-300">5★</strong>; counts reach the rating Google would display.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-slate-100">
+      <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
+            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
               <th className="text-left text-[10px] font-black uppercase tracking-widest text-slate-400 px-4 py-2.5">Target rating</th>
               <th className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400 px-4 py-2.5">5★ reviews needed</th>
               <th className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400 px-4 py-2.5 hidden sm:table-cell">Total reviews after</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
             {targetsTenths.map((t) => {
               const target = t / 10;
               // Min true average that still displays as `target` is just above (target − 0.05).
@@ -302,13 +302,13 @@ function GoalCalculator({ reviews }: { reviews: Review[] }) {
               const easy = needed <= 10;
               const medium = needed <= 50;
               return (
-                <tr key={t} className="hover:bg-slate-50 transition-colors">
+                <tr key={t} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <td className="px-4 py-2.5">
-                    <span className="font-black text-slate-800">{target.toFixed(1)}</span>
+                    <span className="font-black text-slate-800 dark:text-slate-200">{target.toFixed(1)}</span>
                     <span className="text-amber-400 ml-1">★</span>
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <span className={`font-black tabular-nums text-base ${easy ? 'text-emerald-600' : medium ? 'text-blue-600' : 'text-slate-700'}`}>
+                    <span className={`font-black tabular-nums text-base ${easy ? 'text-emerald-600 dark:text-emerald-400' : medium ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
                       {needed > 0 ? needed.toLocaleString() : '0'}
                     </span>
                   </td>
@@ -348,15 +348,15 @@ function BusinessInfoCard({ meta }: { meta: BusinessMeta }) {
   if (!hasInfo) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
         <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Business info</h2>
       </div>
       <div className="px-6 py-5 space-y-3">
         {meta.category && (
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 w-32 shrink-0 pt-0.5">Primary category</span>
-            <span className="text-sm font-semibold text-slate-800">{meta.category}</span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{meta.category}</span>
           </div>
         )}
         {meta.additional_categories && meta.additional_categories.length > 0 && (
@@ -364,7 +364,7 @@ function BusinessInfoCard({ meta }: { meta: BusinessMeta }) {
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 w-32 shrink-0 pt-0.5">Also in</span>
             <div className="flex flex-wrap gap-1.5">
               {meta.additional_categories.map((c, i) => (
-                <span key={i} className="text-xs text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg">{c}</span>
+                <span key={i} className="text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg">{c}</span>
               ))}
             </div>
           </div>
@@ -372,19 +372,19 @@ function BusinessInfoCard({ meta }: { meta: BusinessMeta }) {
         {meta.description && (
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 w-32 shrink-0 pt-0.5">Description</span>
-            <p className="text-sm text-slate-600 leading-relaxed">{meta.description}</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{meta.description}</p>
           </div>
         )}
         {meta.address && (
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 w-32 shrink-0 pt-0.5">Address</span>
-            <span className="text-sm text-slate-700">{meta.address}</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">{meta.address}</span>
           </div>
         )}
         {meta.phone && (
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 w-32 shrink-0 pt-0.5">Phone</span>
-            <span className="text-sm text-slate-700">{meta.phone}</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">{meta.phone}</span>
           </div>
         )}
         {(meta.website || meta.url) && (
@@ -396,7 +396,7 @@ function BusinessInfoCard({ meta }: { meta: BusinessMeta }) {
         {meta.place_id && (
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 w-32 shrink-0 pt-0.5">Place ID</span>
-            <span className="text-xs font-mono text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded select-all">{meta.place_id}</span>
+            <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded select-all">{meta.place_id}</span>
           </div>
         )}
       </div>
@@ -466,8 +466,8 @@ function PopularTimesByDaySection({ byDay }: { byDay: Record<string, PopularHour
   if (days.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
         <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Popular times by day</h2>
         <p className="text-[11px] text-slate-400 mt-0.5">Hover a bar to see the hour and busyness level.</p>
       </div>
@@ -504,9 +504,9 @@ function StatusBadge({ status }: { status: ReviewsTask['status'] }) {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-slate-50 rounded-xl border border-slate-100 px-4 py-3">
+    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-      <p className="text-lg font-black text-slate-900">{value}</p>
+      <p className="text-lg font-black text-slate-900 dark:text-white">{value}</p>
       {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
     </div>
   );
@@ -640,11 +640,11 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
         key={t.id}
         href={t.status === 'ready' ? `/dashboard/google-reviews?id=${t.id}` : '#'}
         className={`flex items-start gap-3 px-5 py-3.5 transition-colors ${
-          isActive ? 'bg-blue-50' : t.status === 'ready' ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'
+          isActive ? 'bg-blue-50 dark:bg-blue-950/30' : t.status === 'ready' ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer' : 'cursor-default'
         }`}
       >
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-semibold truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>
+          <p className={`text-sm font-semibold truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>
             {t.business}
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">
@@ -662,12 +662,12 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Google Reviews</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Google Reviews</h1>
         <p className="text-sm text-slate-400 mt-1">Analyse reviews for a business — distribution, monthly trend, and rating goals.</p>
       </div>
 
       {!creds && (
-        <div className="bg-amber-50 border border-amber-100 text-amber-700 text-sm rounded-xl px-4 py-3">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 text-amber-700 dark:text-amber-400 text-sm rounded-xl px-4 py-3">
           DataForSEO credentials missing. Configure them in{' '}
           <a href="/dashboard/settings" className="underline font-semibold">settings</a>.
         </div>
@@ -676,7 +676,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         <div className="flex-1 min-w-0 space-y-6">
       {/* Form */}
-      <form action={submitReviewsTaskAction} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <form action={submitReviewsTaskAction} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Business name</label>
@@ -685,7 +685,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
               name="keyword"
               required
               placeholder="e.g. Joe's Plumbing New York"
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-500 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -694,7 +694,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
               name="location"
               defaultValue={defaultLocation}
               placeholder="e.g. France, Paris"
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-500 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -704,7 +704,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
               name="language"
               defaultValue={defaultLanguage}
               placeholder="e.g. French"
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-500 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -712,7 +712,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
             <select
               name="depth"
               defaultValue="100"
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="50">50 reviews</option>
               <option value="100">100 reviews</option>
@@ -725,7 +725,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
             <select
               name="sort_by"
               defaultValue="newest"
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="newest">Newest</option>
               <option value="relevant">Most relevant</option>
@@ -747,7 +747,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
 
       {/* Pending indicator */}
       {pendingCount > 0 && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-amber-700">
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-amber-700 dark:text-amber-400">
           <svg className="animate-spin w-4 h-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -763,7 +763,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
       {activeTask && activeTask.status === 'ready' && reviews.length > 0 && (
         <div className="space-y-4">
           {/* Summary stats */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <div className="flex items-center gap-6 flex-wrap">
               {avgRating !== null && (
                 <div className="shrink-0">
@@ -795,8 +795,8 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
           {meta && <BusinessInfoCard meta={meta} />}
 
           {/* Distribution */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Rating distribution</h2>
             </div>
             <div className="px-6 py-5">
@@ -805,8 +805,8 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
           </div>
 
           {/* Monthly chart */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Reviews per month</h2>
               <p className="text-[11px] text-slate-400 mt-0.5">Hover a bar to see the exact month and count.</p>
             </div>
@@ -820,8 +820,8 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
 
           {/* Popular times (current/live single snapshot) */}
           {meta?.popular_times && meta.popular_times.length > 0 && !meta.popular_times_by_day && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Popular times</h2>
               </div>
               <div className="px-6 py-5">
@@ -831,8 +831,8 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
           )}
 
           {/* Goal calculator */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Rating goal</h2>
               <p className="text-[11px] text-slate-400 mt-0.5">5★ reviews needed for each 0.1 increment.</p>
             </div>
@@ -842,8 +842,8 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
           </div>
 
           {/* Reviews list */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Reviews</h2>
               <div className="flex items-center gap-4">
                 <span className="text-xs text-slate-400">{reviews.length} fetched</span>
@@ -854,12 +854,12 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
                 />
               </div>
             </div>
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {reviews.slice(0, 100).map((r, i) => (
                 <div key={i} className="px-6 py-4 space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     {r.rating?.value !== undefined && <StarRow value={r.rating.value} />}
-                    <span className="text-xs font-semibold text-slate-700">{r.profile_name ?? 'Anonymous'}</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{r.profile_name ?? 'Anonymous'}</span>
                     {r.local_guide && (
                       <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
                         Local Guide
@@ -873,14 +873,14 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
                     )}
                   </div>
                   {r.review_text && (
-                    <p className="text-sm text-slate-600 leading-relaxed">
+                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                       <TextWithBreaks text={r.review_text} />
                     </p>
                   )}
                   {r.owner_answer && (
-                    <div className="mt-2 ml-4 pl-3 border-l-2 border-blue-100">
+                    <div className="mt-2 ml-4 pl-3 border-l-2 border-blue-100 dark:border-blue-900">
                       <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-0.5">Owner response</p>
-                      <p className="text-xs text-slate-500 leading-relaxed">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                         <TextWithBreaks text={r.owner_answer} />
                       </p>
                     </div>
@@ -898,7 +898,7 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
       )}
 
       {activeTask && activeTask.status === 'pending' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-10 text-center text-sm text-slate-400">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm px-6 py-10 text-center text-sm text-slate-400">
           Task is being processed by DataForSEO. Reload the page in a few seconds.
         </div>
       )}

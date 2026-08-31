@@ -109,9 +109,9 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
     : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4 flex-wrap">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span className="text-xs font-black uppercase tracking-widest text-slate-500">Processing</span>
@@ -131,9 +131,9 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
       <div className="px-6 py-6 space-y-5">
         {/* Search info */}
         <div>
-          <p className="text-sm font-bold text-slate-900">{keyword}</p>
+          <p className="text-sm font-bold text-slate-900 dark:text-white">{keyword}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Target: <span className="font-bold text-slate-600">{target}</span>
+            Target: <span className="font-bold text-slate-600 dark:text-slate-300">{target}</span>
             {' · '}{gridSize}×{gridSize} grid
           </p>
         </div>
@@ -144,7 +144,7 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
             <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Progress</span>
             <span className="text-[11px] font-mono text-slate-500">{ready} / {totalPoints} points ready · {pct}%</span>
           </div>
-          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-500 rounded-full transition-all duration-500"
               style={{ width: `${pct}%` }}
@@ -155,13 +155,13 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
 
         {/* Elapsed / ETA */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-slate-50 rounded-xl px-3 py-2">
+          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl px-3 py-2">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Elapsed</p>
-            <p className="text-sm font-black text-slate-800 tabular-nums mt-0.5">{formatDuration(elapsedMs)}</p>
+            <p className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">{formatDuration(elapsedMs)}</p>
           </div>
-          <div className="bg-slate-50 rounded-xl px-3 py-2">
+          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl px-3 py-2">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Est. remaining</p>
-            <p className="text-sm font-black text-slate-800 tabular-nums mt-0.5">
+            <p className="text-sm font-black text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">
               {etaMs != null ? `~${formatDuration(etaMs)}` : '—'}
             </p>
           </div>
