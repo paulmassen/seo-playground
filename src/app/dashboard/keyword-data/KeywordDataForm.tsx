@@ -82,7 +82,7 @@ export default function KeywordDataForm({ defaults }: Props) {
   }
 
   return (
-    <form method="GET" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+    <form method="GET" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-6">
       {/* SE + SE Type */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -93,7 +93,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             name="se"
             value={se}
             onChange={(e) => handleSeChange(e.target.value as SE)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           >
             {SE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -109,7 +109,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             name="se_type"
             value={seType}
             onChange={(e) => setSeType(e.target.value as SEType)}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           >
             {SE_TYPES[se].map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -129,7 +129,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             defaultValue={defaults.keywords}
             rows={5}
             placeholder={"plumber paris\nelectrician london\nheating engineer manchester"}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-y"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 font-mono resize-y"
           />
         </div>
       )}
@@ -145,7 +145,7 @@ export default function KeywordDataForm({ defaults }: Props) {
               name="target"
               defaultValue={defaults.target}
               placeholder="example.com or https://example.com/page"
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
             />
           </div>
           <div>
@@ -155,7 +155,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             <select
               name="target_type"
               defaultValue={defaults.targetType || 'site'}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
             >
               <option value="site">Site (whole domain)</option>
               <option value="page">Page (exact URL)</option>
@@ -174,7 +174,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             name="location"
             defaultValue={defaults.location || 'France'}
             placeholder="e.g. France, Paris"
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           />
         </div>
         <div>
@@ -186,7 +186,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             name="language"
             defaultValue={defaults.language || 'French'}
             placeholder="e.g. French, English"
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           />
         </div>
       </div>
@@ -199,7 +199,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             type="date"
             name="date_from"
             defaultValue={defaults.dateFrom}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           />
         </div>
         <div>
@@ -208,7 +208,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             type="date"
             name="date_to"
             defaultValue={defaults.dateTo}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           />
         </div>
         <div>
@@ -216,7 +216,7 @@ export default function KeywordDataForm({ defaults }: Props) {
           <select
             name="sort_by"
             defaultValue={defaults.sortBy || 'relevance'}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
           >
             {SORT_BY_OPTIONS[se].map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -233,7 +233,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             <select
               name="device"
               defaultValue={defaults.device || 'all'}
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
             >
               <option value="all">All</option>
               <option value="desktop">Desktop</option>
@@ -254,7 +254,7 @@ export default function KeywordDataForm({ defaults }: Props) {
             defaultChecked={defaults.searchPartners === 'true'}
             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-slate-600 font-medium">Search Partners</span>
+          <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">Search Partners</span>
         </label>
 
         {showIncludeAdult && (
@@ -266,14 +266,14 @@ export default function KeywordDataForm({ defaults }: Props) {
               defaultChecked={defaults.includeAdult === 'true'}
               className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-slate-600 font-medium">Include Adult Keywords</span>
+            <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">Include Adult Keywords</span>
           </label>
         )}
       </div>
 
       <button
         type="submit"
-        className="w-full bg-slate-900 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors"
+        className="w-full bg-slate-900 dark:bg-slate-700 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 transition-colors"
       >
         Search
       </button>

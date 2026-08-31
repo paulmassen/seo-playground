@@ -16,7 +16,7 @@ function DifficultyBar({ value }: { value?: number }) {
   const textColor = value >= 70 ? 'text-red-600' : value >= 40 ? 'text-amber-600' : 'text-emerald-600';
   return (
     <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
       </div>
       <span className={`text-[11px] font-black tabular-nums ${textColor}`}>{value}</span>
@@ -114,7 +114,7 @@ export default function KeywordOverviewTable({ items }: { items: KwOverviewItem[
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
           {label}
@@ -128,7 +128,7 @@ export default function KeywordOverviewTable({ items }: { items: KwOverviewItem[
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50">
+          <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
             <Header label="Vol." sortK="volume" align="right" />
             <Header label="Difficulty KD" sortK="kd" align="left" />
@@ -138,11 +138,11 @@ export default function KeywordOverviewTable({ items }: { items: KwOverviewItem[
             <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Trend</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50">
+        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
           {sorted.map((item, i) => (
-            <tr key={i} className="hover:bg-slate-50 transition-colors">
-              <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">{item.keyword ?? '—'}</td>
-              <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">
+            <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+              <td className="px-6 py-3 font-medium text-slate-900 dark:text-white max-w-xs">{item.keyword ?? '—'}</td>
+              <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
                 {item.keyword_info?.search_volume?.toLocaleString('en-GB') ?? '—'}
               </td>
               <td className="px-4 py-3">

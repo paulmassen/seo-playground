@@ -23,7 +23,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 function CompetitionBadge({ value }: { value?: string | number }) {
   if (value === undefined || value === null) return <span className="text-slate-300">—</span>;
   const label = typeof value === 'string' ? value : value > 0.66 ? 'HIGH' : value > 0.33 ? 'MEDIUM' : 'LOW';
-  const color = label === 'HIGH' ? 'text-red-500 bg-red-50' : label === 'MEDIUM' ? 'text-amber-500 bg-amber-50' : 'text-emerald-600 bg-emerald-50';
+  const color = label === 'HIGH' ? 'text-red-500 bg-red-50 dark:bg-red-950' : label === 'MEDIUM' ? 'text-amber-500 bg-amber-50 dark:bg-amber-950' : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950';
   return <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${color}`}>{label}</span>;
 }
 
@@ -74,7 +74,7 @@ export default function KeywordDataTable({ items }: { items: KeywordItem[] }) {
   function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''}`}>
           {label}
@@ -113,7 +113,7 @@ export default function KeywordDataTable({ items }: { items: KeywordItem[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50">
+            <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
               <Header label="Vol." sortK="volume" align="right" />
               <Header label="Competition" sortK="competition" align="center" />
@@ -124,14 +124,14 @@ export default function KeywordDataTable({ items }: { items: KeywordItem[] }) {
               <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Trend</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
             {sorted.map((item, i) => {
               const monthly = item.monthly_searches?.slice(-12) ?? [];
               const maxVol = Math.max(...monthly.map((m) => m.search_volume ?? 0), 1);
               return (
-                <tr key={i} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-3 font-medium text-slate-900 max-w-xs">{item.keyword ?? '—'}</td>
-                  <td className="px-4 py-3 text-right font-mono text-slate-700 tabular-nums">{item.search_volume?.toLocaleString("en-GB") ?? '—'}</td>
+                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="px-6 py-3 font-medium text-slate-900 dark:text-white max-w-xs">{item.keyword ?? '—'}</td>
+                  <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">{item.search_volume?.toLocaleString("en-GB") ?? '—'}</td>
                   <td className="px-4 py-3 text-center"><CompetitionBadge value={item.competition} /></td>
                   <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{item.competition_index ?? '—'}</td>
                   <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{item.cpc != null ? `$${item.cpc.toFixed(2)}` : '—'}</td>
@@ -142,7 +142,7 @@ export default function KeywordDataTable({ items }: { items: KeywordItem[] }) {
                       <div className="flex items-end gap-0.5 h-7">
                         {monthly.map((m, j) => (
                           <div key={j} title={`${MONTHS[m.month - 1]} ${m.year}: ${m.search_volume?.toLocaleString("en-GB")}`}
-                            className="w-2.5 bg-blue-400 rounded-sm hover:bg-blue-600 transition-colors"
+                            className="w-2.5 bg-blue-400 dark:bg-blue-500 rounded-sm hover:bg-blue-600 transition-colors"
                             style={{ height: `${Math.max(2, Math.round(((m.search_volume ?? 0) / maxVol) * 28))}px` }} />
                         ))}
                       </div>

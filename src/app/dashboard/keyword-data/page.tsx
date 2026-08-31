@@ -150,20 +150,20 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Keyword Data</h1>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Keyword Data</h1>
         <p className="text-sm text-slate-400 mt-1">Search volume, CPC and competition data via DataForSEO.</p>
       </div>
 
       <KeywordDataForm defaults={formDefaults} />
 
-      {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>}
+      {error && <div className="bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       {hasQuery && !error && (
-        <div id="results" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div id="results" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Results</h2>
-              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">History</span>}
+              {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-md">History</span>}
             </div>
             <div className="flex items-center gap-3">
               {cost !== undefined && <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>}
@@ -179,22 +179,22 @@ export default async function KeywordDataPage({ searchParams }: { searchParams: 
       )}
 
       {historyIndex.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Search history</h2>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 dark:divide-slate-800">
             {historyIndex.map((entry) => {
               const isActive = entry.id === historyId;
               return (
                 <a key={entry.id} href={`/dashboard/keyword-data?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors ${isActive ? 'bg-blue-50' : ''}`}>
+                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
                   <div className="shrink-0 flex flex-col items-center gap-1">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{SE_LABELS[entry.se] ?? entry.se}</span>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-300">{TYPE_LABELS[entry.seType] ?? entry.seType}</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{SE_LABELS[entry.se] ?? entry.se}</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 dark:text-slate-600">{TYPE_LABELS[entry.seType] ?? entry.seType}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>{entry.label}</p>
+                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.label}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       {entry.count} result{entry.count !== 1 ? 's' : ''}{entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}
                     </p>
