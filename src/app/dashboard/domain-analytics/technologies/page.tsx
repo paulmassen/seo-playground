@@ -12,6 +12,7 @@ import {
 import SearchForm from '@/components/SearchForm';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import TechFindTable from './TechFindTable';
 
 export const dynamic = 'force-dynamic';
@@ -67,54 +68,32 @@ function cleanTarget(t: string) {
 
 async function fetchDomainTech(
   target: string,
-  auth: string,
+  login: string,
+  pass: string,
 ): Promise<{ result: DomainTechResult | null; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/domain_analytics/technologies/domain_technologies/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ target }]),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) return { result: null, error: `API error ${res.status}` };
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: DomainTechResult[] }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { result: null, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { result: null, error: `DataForSEO: ${task.status_message}` };
-  return { result: task.result?.[0] ?? null, cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<DomainTechResult>(
+    'domain_analytics/technologies/domain_technologies/live', { target }, { login, pass }, 20_000,
+  );
+  if (error) return { result: null, error };
+  return { result: result ?? null, cost };
 }
 
 async function fetchDomainsByTech(opts: {
   keyword?: string;
   technology?: string;
   limit: number;
-  auth: string;
+  login: string;
+  pass: string;
 }): Promise<{ items: FindDomainItem[]; total?: number; cost?: number; error?: string }> {
   const body: Record<string, unknown> = { limit: opts.limit, order_by: ['domain_rank,desc'] };
   if (opts.technology) body.technologies = [opts.technology];
   if (opts.keyword) body.keywords = [opts.keyword];
 
-  const res = await fetch('https://api.dataforseo.com/v3/domain_analytics/technologies/domains_by_technology/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${opts.auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([body]),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) return { items: [], error: `API error ${res.status}` };
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: Array<{ total_count?: number; items?: FindDomainItem[] }>;
-    }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  const result = task.result?.[0];
-  return { items: result?.items ?? [], total: result?.total_count, cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: FindDomainItem[] }>(
+    'domain_analytics/technologies/domains_by_technology/live', body, { login: opts.login, pass: opts.pass }, 20_000,
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], total: result?.total_count, cost };
 }
 
 // ---- UI helpers ----
@@ -209,8 +188,7 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
       } else if (!creds) {
         domainError = 'DataForSEO credentials missing. Configure them in Settings.';
       } else {
-        const auth = btoa(`${creds.login}:${creds.pass}`);
-        const res = await fetchDomainTech(target, auth);
+        const res = await fetchDomainTech(target, creds.login, creds.pass);
         if (res.error) {
           domainError = res.error;
         } else if (res.result) {
@@ -247,8 +225,7 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
       } else if (!creds) {
         findError = 'DataForSEO credentials missing. Configure them in Settings.';
       } else {
-        const auth = btoa(`${creds.login}:${creds.pass}`);
-        const res = await fetchDomainsByTech({ keyword: keyword || undefined, technology: technology || undefined, limit, auth });
+        const res = await fetchDomainsByTech({ keyword: keyword || undefined, technology: technology || undefined, limit, login: creds.login, pass: creds.pass });
         if (res.error) {
           findError = res.error;
         } else {

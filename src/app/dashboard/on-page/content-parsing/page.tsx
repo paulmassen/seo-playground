@@ -1,4 +1,5 @@
 import { getCredentials } from '@/lib/db';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
 
 interface ContentBlock {
@@ -34,18 +35,7 @@ interface ParsedPage {
 interface SearchParams { url?: string }
 
 async function fetchContentParsing(url: string, login: string, pass: string): Promise<{ result?: ParsedPage; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/on_page/content_parsing/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${login}:${pass}`)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ url }]),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!res.ok) return { error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; result?: ParsedPage[] }> };
-  const task = data?.tasks?.[0];
-  if (!task) return { error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { error: `DataForSEO: ${task.status_message}` };
-  return { result: task.result?.[0] };
+  return callDataForSeoFirst<ParsedPage>('on_page/content_parsing/live', { url }, { login, pass }, 30_000);
 }
 
 const BLOCK_STYLES: Record<string, { tag: string; cls: string }> = {

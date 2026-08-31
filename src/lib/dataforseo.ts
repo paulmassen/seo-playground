@@ -33,6 +33,7 @@ export async function callDataForSeo<T>(
   endpoint: string,
   body: Record<string, unknown> | Record<string, unknown>[],
   creds: DfsCredentials,
+  timeoutMs?: number,
 ): Promise<DfsTaskResult<T>> {
   const auth = btoa(`${creds.login}:${creds.pass}`);
 
@@ -42,8 +43,10 @@ export async function callDataForSeo<T>(
       method: 'POST',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(Array.isArray(body) ? body : [body]),
+      signal: timeoutMs != null ? AbortSignal.timeout(timeoutMs) : undefined,
     });
   } catch (err) {
+    if (err instanceof Error && err.name === 'TimeoutError') return { error: `Request timed out after ${timeoutMs}ms.` };
     return { error: err instanceof Error ? `Network error: ${err.message}` : 'Network error.' };
   }
 
@@ -67,7 +70,8 @@ export async function callDataForSeoFirst<T>(
   endpoint: string,
   body: Record<string, unknown> | Record<string, unknown>[],
   creds: DfsCredentials,
+  timeoutMs?: number,
 ): Promise<{ result?: T; cost?: number; error?: string }> {
-  const { result, cost, error } = await callDataForSeo<T>(endpoint, body, creds);
+  const { result, cost, error } = await callDataForSeo<T>(endpoint, body, creds, timeoutMs);
   return { result: result?.[0], cost, error };
 }

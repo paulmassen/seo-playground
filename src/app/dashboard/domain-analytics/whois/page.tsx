@@ -7,6 +7,7 @@ import {
 } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,28 +75,14 @@ function cleanTarget(t: string) {
 
 async function fetchWhois(
   domain: string,
-  auth: string,
+  login: string,
+  pass: string,
 ): Promise<{ result: WhoisResult | null; cost?: number; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/domain_analytics/whois/overview/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ filters: ['domain', '=', domain], limit: 1 }]),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) return { result: null, error: `API error ${res.status}` };
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: Array<{ items?: WhoisResult[] }>;
-    }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { result: null, error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { result: null, error: `DataForSEO: ${task.status_message}` };
-  const item = task.result?.[0]?.items?.[0] ?? null;
-  return { result: item, cost: task.cost };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: WhoisResult[] }>(
+    'domain_analytics/whois/overview/live', { filters: ['domain', '=', domain], limit: 1 }, { login, pass }, 20_000,
+  );
+  if (error) return { result: null, error };
+  return { result: result?.items?.[0] ?? null, cost };
 }
 
 // ---- Price ----
@@ -166,8 +153,7 @@ export default async function WhoisPage({ searchParams }: { searchParams: Promis
     } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const auth = btoa(`${creds.login}:${creds.pass}`);
-      const res = await fetchWhois(domain, auth);
+      const res = await fetchWhois(domain, creds.login, creds.pass);
       if (res.error) {
         error = res.error;
       } else if (res.result) {

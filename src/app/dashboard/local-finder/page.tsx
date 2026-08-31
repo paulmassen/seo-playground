@@ -2,6 +2,7 @@ import {
   getCredentials, getSetting, getLfHistory, saveLfSearch, getLfResults, type LfHistoryEntry,
 } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import LocalFinderForm from './LocalFinderForm';
 import { type LocalPackItem } from './grid-api';
 
@@ -36,28 +37,12 @@ async function fetchLocalFinder(
   if (params.min_rating) body.min_rating = parseFloat(params.min_rating);
   if (params.time_filter) body.time_filter = params.time_filter;
 
-  const auth = btoa(`${login}:${pass}`);
-  let res: Response;
-  try {
-    res = await fetch('https://api.dataforseo.com/v3/serp/google/local_finder/live/advanced', {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([body]),
-      signal: AbortSignal.timeout(30_000),
-    });
-  } catch {
-    return { items: [], error: 'Request timed out or failed. Please try again.' };
-  }
-  if (!res.ok) return { items: [], error: `API error ${res.status}: ${res.statusText}` };
-  const data = await res.json() as {
-    tasks?: Array<{ status_code?: number; status_message?: string; cost?: number; result?: Array<{ check_url?: string; items?: LocalPackItem[] }> }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  const result = task.result?.[0];
+  const { result, cost, error } = await callDataForSeoFirst<{ check_url?: string; items?: LocalPackItem[] }>(
+    'serp/google/local_finder/live/advanced', body, { login, pass }, 30_000,
+  );
+  if (error) return { items: [], error };
   const items = (result?.items ?? []).filter((i) => i.type === 'local_pack');
-  return { items, cost: task.cost, checkUrl: result?.check_url };
+  return { items, cost, checkUrl: result?.check_url };
 }
 
 function StarRating({ rating }: { rating?: Rating }) {

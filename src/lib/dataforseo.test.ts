@@ -70,6 +70,41 @@ describe('callDataForSeo', () => {
     expect(res.error).toBe('Network error: getaddrinfo ENOTFOUND');
   });
 
+  it('returns a clear timeout error instead of throwing when the request exceeds timeoutMs', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => {
+      const err = new Error('The operation was aborted due to timeout');
+      err.name = 'TimeoutError';
+      return Promise.reject(err);
+    }));
+
+    const res = await callDataForSeo('some/endpoint/live', {}, creds, 20_000);
+    expect(res.error).toBe('Request timed out after 20000ms.');
+  });
+
+  it('passes an AbortSignal.timeout(timeoutMs) through to fetch when timeoutMs is given', async () => {
+    let capturedSignal: AbortSignal | undefined;
+    mockFetchOnce((...args: unknown[]) => {
+      const init = args[1] as RequestInit;
+      capturedSignal = init.signal ?? undefined;
+      return new Response(JSON.stringify({ tasks: [{ status_code: 20000, result: [] }] }), { status: 200 });
+    });
+
+    await callDataForSeo('some/endpoint/live', {}, creds, 5_000);
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('does not set a signal at all when timeoutMs is omitted', async () => {
+    let capturedSignal: AbortSignal | null | undefined = 'unset' as unknown as undefined;
+    mockFetchOnce((...args: unknown[]) => {
+      const init = args[1] as RequestInit;
+      capturedSignal = init.signal;
+      return new Response(JSON.stringify({ tasks: [{ status_code: 20000, result: [] }] }), { status: 200 });
+    });
+
+    await callDataForSeo('some/endpoint/live', {}, creds);
+    expect(capturedSignal).toBeUndefined();
+  });
+
   it('returns an error instead of throwing when the response body is not valid JSON', async () => {
     mockFetchOnce(() => new Response('<html>not json</html>', { status: 200 }));
 

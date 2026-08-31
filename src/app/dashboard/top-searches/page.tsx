@@ -9,6 +9,7 @@ import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { callDataForSeoFirst } from '@/lib/dataforseo';
 import TopSearchesTable from './TopSearchesTable';
 
 interface MonthlySearch {
@@ -55,36 +56,13 @@ async function fetchTopSearches(
   login: string,
   pass: string,
 ): Promise<{ items: TopSearchItem[]; totalCount?: number; cost?: number; error?: string }> {
-  const auth = btoa(`${login}:${pass}`);
-  const res = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/top_searches/live', {
-    method: 'POST',
-    headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      location_name: location,
-      language_name: language,
-      limit,
-      ignore_synonyms: ignoreSynonyms,
-      include_serp_info: false,
-    }]),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!res.ok) return { items: [], error: `API error ${res.status}` };
-  const data = await res.json() as {
-    tasks?: Array<{
-      status_code?: number;
-      status_message?: string;
-      cost?: number;
-      result?: Array<{ items?: TopSearchItem[]; total_count?: number }>;
-    }>;
-  };
-  const task = data?.tasks?.[0];
-  if (!task) return { items: [], error: 'Empty API response.' };
-  if (task.status_code && task.status_code !== 20000) return { items: [], error: `DataForSEO: ${task.status_message}` };
-  return {
-    items: task.result?.[0]?.items ?? [],
-    totalCount: task.result?.[0]?.total_count,
-    cost: task.cost,
-  };
+  const { result, cost, error } = await callDataForSeoFirst<{ items?: TopSearchItem[]; total_count?: number }>(
+    'dataforseo_labs/google/top_searches/live',
+    { location_name: location, language_name: language, limit, ignore_synonyms: ignoreSynonyms, include_serp_info: false },
+    { login, pass }, 30_000,
+  );
+  if (error) return { items: [], error };
+  return { items: result?.items ?? [], totalCount: result?.total_count, cost };
 }
 
 function DifficultyBadge({ value }: { value?: number }) {
