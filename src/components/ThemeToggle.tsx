@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
 // Subscribe to changes on the <html> class attribute
@@ -13,8 +13,24 @@ function subscribe(cb: () => void) {
 const isDarkSnapshot = () => document.documentElement.classList.contains('dark');
 const isDarkServerSnapshot = () => false;
 
+// Same rule as the inline script in the root layout
+function wantsDark() {
+  try {
+    const t = localStorage.getItem('theme');
+    return t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  } catch {
+    return false;
+  }
+}
+
 export default function ThemeToggle() {
   const isDark = useSyncExternalStore(subscribe, isDarkSnapshot, isDarkServerSnapshot);
+
+  // If hydration fails, React re-renders the whole document and resets the
+  // <html> class, dropping the `dark` the inline script added. Put it back.
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('dark', wantsDark());
+  }, []);
 
   function toggle() {
     const next = !isDark;

@@ -15,7 +15,7 @@ function DRBadge({ value }: { value?: number }) {
 
 function formatSeenDate(s?: string) {
   if (!s) return '—';
-  return new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 function sortValue(item: BacklinkItem, key: SortKey): number | string {

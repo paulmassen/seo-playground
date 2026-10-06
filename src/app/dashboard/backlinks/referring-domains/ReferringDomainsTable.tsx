@@ -95,7 +95,7 @@ export default function ReferringDomainsTable({ items }: { items: RefDomain[] })
               </div>
             </td>
             <td className="px-3 py-3 text-center"><DRBadge rank={item.domain_from_rank} /></td>
-            <td className="px-3 py-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">{item.backlinks.toLocaleString()}</td>
+            <td className="px-3 py-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">{item.backlinks.toLocaleString('en-GB')}</td>
             <td className="px-3 py-3 text-right font-mono text-slate-400">{item.broken_backlinks > 0 ? item.broken_backlinks : '—'}</td>
             <td className="px-3 py-3 text-slate-400">{item.first_seen?.split('T')[0] ?? '—'}</td>
           </tr>

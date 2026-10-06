@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { TrackedKeyword, RankCheck } from '@/lib/db';
 import PendingButton from '@/components/PendingButton';
 
@@ -250,9 +250,13 @@ function formatDay(date: string) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
-function formatDate(ts: number) {
-  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+// The server's timezone is not the browser's, so the first render pins UTC on
+// both sides and the local time is swapped in once hydration is done.
+function formatDate(ts: number, timeZone?: string) {
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone });
 }
+
+const subscribeNever = () => () => {};
 
 interface Props {
   kw: TrackedKeyword;
@@ -267,6 +271,7 @@ interface Props {
 
 export default function KeywordRow({ kw, history, latest, previous, hasCreds, pending, checkAction, removeAction }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const hydrated = useSyncExternalStore(subscribeNever, () => true, () => false);
   const currPos = latest?.position ?? null;
   const prevPos = previous?.position ?? null;
   // The latest check can miss a domain that ranked days earlier; keep that position in view.
@@ -314,7 +319,7 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, pe
           </div>
         </td>
         <td className="px-3 py-3.5 text-slate-400 text-[10px] whitespace-nowrap">
-          {latest ? formatDate(latest.checkedAt) : '—'}
+          {latest ? formatDate(latest.checkedAt, hydrated ? undefined : 'UTC') : '—'}
         </td>
         <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
           <div className="flex gap-1.5">
