@@ -20,6 +20,11 @@ type GitHubRelease = {
 export async function GET() {
   const current = normalizeVersion(process.env.APP_VERSION ?? process.env.NEXT_PUBLIC_APP_VERSION);
 
+  // Platforms that ship their own updates (e.g. the Cloudron package) turn the in-app notice off.
+  if (process.env.UPDATE_CHECK_DISABLED?.trim().toLowerCase() === 'true') {
+    return NextResponse.json({ current, latest: null, hasUpdate: false });
+  }
+
   try {
     const res = await fetch(
       LATEST_RELEASE_URL,

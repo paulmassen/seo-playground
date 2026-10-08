@@ -1,0 +1,47 @@
+# Cloudron package. The regular Dockerfile (used by docker-compose and the GHCR release image) is unchanged.
+# Build with: cloudron builder build   (see cloudron/README.md)
+
+# ── Stage 1: build the Next.js standalone bundle ─────────────────────────────
+FROM cloudron/node-base:24-20260920@sha256:d984683ec59bf2379130bf41cf3c2b6bc0453f327297d7183525cb05424e7b34 AS builder
+WORKDIR /build
+
+# better-sqlite3 ships prebuilt binaries; the toolchain is only a fallback if none matches.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential python3 \
+ && rm -rf /var/cache/apt /var/lib/apt/lists
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+COPY . .
+RUN npm run build
+
+# ── Stage 2: runtime ─────────────────────────────────────────────────────────
+FROM cloudron/node-base:24-20260920@sha256:d984683ec59bf2379130bf41cf3c2b6bc0453f327297d7183525cb05424e7b34
+
+ARG APP_VERSION=dev
+ENV NODE_ENV=production \
+    APP_VERSION=$APP_VERSION \
+    PORT=8000 \
+    HOSTNAME=0.0.0.0 \
+    DB_PATH=/app/data/seo-playground.db \
+    UPDATE_CHECK_DISABLED=true
+
+WORKDIR /app/code
+
+COPY --from=builder /build/.next/standalone ./
+COPY --from=builder /build/.next/static ./.next/static
+COPY --from=builder /build/public ./public
+# DataForSEO locations/categories CSVs, read from ./data and seeded into the database on first run.
+COPY --from=builder /build/data ./data
+COPY --from=builder /build/scripts/geo-grid-worker.mjs ./scripts/geo-grid-worker.mjs
+COPY cloudron/launcher.mjs cloudron/start.sh ./
+
+# The code directory is read-only at runtime: Next.js' fetch/image cache goes to /run.
+RUN rm -rf /app/code/.next/cache && ln -s /run/next-cache /app/code/.next/cache \
+ && chmod +x /app/code/start.sh
+
+EXPOSE 8000
+CMD ["/app/code/start.sh"]
