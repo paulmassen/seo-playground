@@ -1,0 +1,50 @@
+name: Publish Cloudron image
+
+# Builds the Cloudron package image (Dockerfile.cloudron) and pushes it next to the regular image,
+# as ghcr.io/<repo>:cloudron-<version>. CloudronVersions.json points at that tag.
+# Independent from "Publish stable release": it never touches the :latest / :x.y.z tags.
+on:
+  push:
+    branches: [cloudron-package]
+    paths:
+      - Dockerfile.cloudron
+      - CloudronManifest.json
+      - cloudron/**
+      - .github/workflows/publish-cloudron.yml
+    tags: ['cloudron-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read package version
+        id: version
+        run: echo "version=$(jq -r .version CloudronManifest.json)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.cloudron
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cloudron-${{ steps.version.outputs.version }}
+          build-args: APP_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -23,11 +23,11 @@
   "packageUrl": "https://github.com/paulmassen/seo-playground",
   "packagerName": "Paul Massendari",
   "packagerUrl": "https://github.com/paulmassen",
-  "iconUrl": "https://raw.githubusercontent.com/paulmassen/seo-playground/main/cloudron/icon.png",
+  "iconUrl": "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/cloudron/icon.png",
   "tags": ["seo", "analytics", "dataforseo", "marketing"],
   "mediaLinks": [
-    "https://raw.githubusercontent.com/paulmassen/seo-playground/main/public/hero.png",
-    "https://raw.githubusercontent.com/paulmassen/seo-playground/main/public/screenshot-rank-tracker.png",
-    "https://raw.githubusercontent.com/paulmassen/seo-playground/main/public/screenshot-local-finder.png"
+    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/hero.png",
+    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-rank-tracker.png",
+    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-local-finder.png"
   ]
 }
