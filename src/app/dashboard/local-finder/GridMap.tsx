@@ -167,6 +167,8 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
         crossOrigin: true,
+        // See MapPicker: keep the Referer that OSM's tile usage policy asks for behind strict proxies.
+        referrerPolicy: 'strict-origin-when-cross-origin',
       }).addTo(map);
       markerLayerRef.current = L.layerGroup().addTo(map);
       setMapReady(true);

@@ -93,6 +93,9 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
+        // OSM's tile policy requires a Referer. Some reverse proxies (Cloudron) send `Referrer-Policy: same-origin`,
+        // which strips it and gets the tiles blocked; a per-tile policy overrides the page's.
+        referrerPolicy: 'strict-origin-when-cross-origin',
       }).addTo(map);
 
       if (coordinate) {
@@ -209,7 +212,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       .replace(/\s*(#|\b(?:suite|ste\.?|unit|apt\.?|bldg|building|floor|fl\.?)\b)\s*[\w-]+/gi, '')
       .replace(/\s+,/g, ',').replace(/,\s*,/g, ',').trim();
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleaned)}&format=json&limit=1`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' }, referrerPolicy: 'strict-origin-when-cross-origin' });
     const results: NominatimResult[] = await res.json();
     if (!results.length) return false;
     await placeMarker(parseFloat(results[0].lat), parseFloat(results[0].lon));

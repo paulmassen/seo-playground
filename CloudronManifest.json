@@ -3,7 +3,7 @@
   "title": "SEO Playground",
   "tagline": "Self-hosted SEO dashboard powered by DataForSEO",
   "description": "file://cloudron/DESCRIPTION.md",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "upstreamVersion": "0.4.0",
   "changelog": "file://cloudron/CHANGELOG",
   "postInstallMessage": "file://cloudron/POSTINSTALL.md",
