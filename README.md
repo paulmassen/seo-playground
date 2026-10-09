@@ -2,7 +2,7 @@
 
 ![SEO Playground — the free, open-source, self-hosted SEO & Local SEO dashboard](public/readme/hero.png)
 
-## ✨ Update — Unreleased
+## ✨ Update — v0.5.0
 
 SEO Playground is actively evolving. Here are the latest substantial additions:
 
@@ -86,31 +86,74 @@ https://github.com/user-attachments/assets/fb506723-0996-4704-a6a5-b12b1115b805
 
 ## Requirements
 
-- Node.js 18+
-- Or Docker with Docker Compose
+- Docker with Docker Compose
+- Or Node.js 18+
 - A DataForSEO account (API key). Don't have one yet? [Sign up through my affiliate link](https://try.dataforseo.com/nrjev32kinaz): it supports SEO Playground at no extra cost to you (I may earn a commission).
 
 ## Getting Started
 
-### Option 1 — Docker from source
+### Option 1 — Docker with the published image (recommended)
 
-The easiest way to run the production app. One command builds the image (when needed), starts the dashboard, and starts the Geo-grid worker.
+The simplest install: no clone and no build. One file runs the released image (built for `amd64` and `arm64`) and starts both the dashboard and the Geo-grid worker.
 
 ```bash
-docker compose up -d --build
+mkdir seo-playground && cd seo-playground
+curl -fsSLO https://github.com/paulmassen/seo-playground/releases/latest/download/docker-compose.production.yml
+docker compose -f docker-compose.production.yml up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000), then enter your DataForSEO credentials in **Settings**. The database and the worker secret are persisted locally in `./data/`.
+Open [http://localhost:3000](http://localhost:3000), then enter your DataForSEO credentials in **Settings**. Your data lives in the `seo-playground-data` Docker volume, which is kept across restarts and updates.
 
-Useful commands:
+The downloaded file is pinned to the exact release it was published with, so the app never changes version behind your back. Do not use the floating `latest` image tag for a long-running install.
+
+Optional settings (port, network access, login) go in a `.env` file next to it. [`.env.example`](.env.example) lists them all, for example:
+
+```bash
+SEO_PLAYGROUND_PORT=8080
+AUTH_ENABLED=true
+```
+
+Run `docker compose -f docker-compose.production.yml up -d` again to apply them. Useful commands:
 
 ```bash
 # Follow the dashboard and worker logs
-docker compose logs -f
+docker compose -f docker-compose.production.yml logs -f
 
-# Stop the services without deleting the database
-docker compose down
+# Stop the services without deleting your data
+docker compose -f docker-compose.production.yml down
 ```
+
+**Network access:** both Compose files publish the dashboard on `127.0.0.1` only. By default SEO Playground has no login, and anyone who can reach it can spend your DataForSEO credit. To reach it from another machine, either turn on the built-in [login](#login-optional) (`AUTH_ENABLED=true`, optional and off by default) or put a reverse proxy with authentication in front of it (Coolify, Caddy, Traefik…). On a trusted private network only, you can listen on every interface with `SEO_PLAYGROUND_BIND=0.0.0.0`.
+
+**Coolify, Yunohost and other hosts:** deploy the same Compose file, or use the image `ghcr.io/paulmassen/seo-playground` with an exact version tag (for example `0.5.0`). **Cloudron:** a community app package is available, see [cloudron/README.md](cloudron/README.md).
+
+### Updating a release installation
+
+The dashboard checks GitHub Releases twice a day and shows a notice when a newer stable release is available. It never updates itself.
+
+1. Read the release notes linked from the notice, and back up the `seo-playground-data` volume.
+2. From your install folder, download the new Compose file, then pull the image and restart:
+
+   ```bash
+   curl -fsSLO https://github.com/paulmassen/seo-playground/releases/latest/download/docker-compose.production.yml
+   docker compose -f docker-compose.production.yml pull
+   docker compose -f docker-compose.production.yml up -d
+   ```
+
+3. Confirm the dashboard loads and the Geo-grid worker is healthy with `docker compose -f docker-compose.production.yml logs -f`.
+
+If your `.env` sets `SEO_PLAYGROUND_VERSION`, it overrides the downloaded file: change it to the new version too, or remove it. On Coolify, change the image tag to the announced version and redeploy.
+
+### Option 2 — Docker from source
+
+To run the current `main` branch or your own changes. The image is built on your machine.
+
+```bash
+git clone https://github.com/paulmassen/seo-playground.git && cd seo-playground
+docker compose up -d --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). The database and the worker secret are persisted in `./data/`. To update, run `git pull`, then `docker compose up -d --build` again.
 
 **Linux:** the container runs as uid/gid `1000` by default so it can write to `./data`. If your user has a different uid (check with `id -u`), start it with:
 
@@ -118,47 +161,7 @@ docker compose down
 HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up -d --build
 ```
 
-**Network access:** both Compose files publish the dashboard on `127.0.0.1` only. By default SEO Playground has no login, and anyone who can reach it can spend your DataForSEO credit. To reach it from another machine, either turn on the built-in [login](#login-optional) (`AUTH_ENABLED=true`, optional and off by default) or put a reverse proxy with authentication in front of it (Coolify, Caddy, Traefik…). On a trusted private network only, you can listen on every interface with `SEO_PLAYGROUND_BIND=0.0.0.0`.
-
-### Production release installation
-
-Use the published image for Coolify, Yunohost packaging, or any long-running self-hosted deployment. Copy `.env.example` to `.env`, keep `SEO_PLAYGROUND_VERSION` pinned to an exact version, then start the production Compose file:
-
-```bash
-docker compose -f docker-compose.production.yml up -d
-```
-
-The app checks GitHub Releases twice daily and shows a notice when a newer stable release is available. It never updates itself. Read the release notes, update `SEO_PLAYGROUND_VERSION` in `.env`, then run the commands below. Your named `seo-playground-data` volume is preserved.
-
-```bash
-docker compose -f docker-compose.production.yml pull
-docker compose -f docker-compose.production.yml up -d
-```
-
-Back up the entire `seo-playground-data` volume before an update that includes database changes. Do not use the floating `latest` image tag for a production installation.
-
-### Updating a release installation
-
-1. Read the release notes shown in the dashboard and make a backup of `seo-playground-data`.
-2. Change `SEO_PLAYGROUND_VERSION` in `.env` to the exact announced version, for example `0.5.0`.
-3. Run `docker compose -f docker-compose.production.yml pull`, then `docker compose -f docker-compose.production.yml up -d`.
-4. Confirm the dashboard loads and the Geo-grid worker is healthy with `docker compose -f docker-compose.production.yml logs -f`.
-
-Coolify users can use the same image name and exact tag, then redeploy from its interface. The image is built for both `amd64` and `arm64` hosts.
-
-## Publishing a stable release
-
-Stable releases are published from versioned tags, not from `main`. Update `package.json` and `CHANGELOG.md`, verify the application locally, then create and push a matching tag:
-
-```bash
-RELEASE_TAG=vX.Y.Z npm run check:release   # also requires a "## [X.Y.Z]" section in CHANGELOG.md
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-The `Publish stable release` workflow verifies that the tag matches `package.json`, runs lint/tests/build, publishes the `amd64` and `arm64` images to GHCR, generates a provenance attestation, then creates the GitHub Release using that version's CHANGELOG.md section as its notes. Mark the GHCR package public once in GitHub package settings so self-hosted users can pull it anonymously.
-
-### Option 2 — Node.js (production mode)
+### Option 3 — Node.js (production mode)
 
 For a local server without Docker. This single command compiles the application, then starts the dashboard and worker together.
 
@@ -171,7 +174,7 @@ After a code update, run `npm run launch` again. If the app is already built, `n
 
 Node launches (`dev`, `start`, `launch`) listen on `127.0.0.1` by default. To deliberately expose the server, export `SEO_PLAYGROUND_BIND=0.0.0.0` before launching, and enable login or an authenticated reverse proxy first. `HOSTNAME` does not override this safety default.
 
-### Option 3 — Node.js (dev mode)
+### Option 4 — Node.js (dev mode)
 
 Convenient for development but noticeably slower — Next.js recompiles on every request and skips all optimizations. Not recommended for daily use.
 
@@ -189,6 +192,18 @@ npm test
 ```
 
 Runs the Vitest suite (dedupe/cache helpers). No DataForSEO credentials or network access needed — it uses a throwaway SQLite file.
+
+## Publishing a stable release
+
+Stable releases are published from versioned tags, not from `main`. Set the new version in `package.json`, `CHANGELOG.md` and the `SEO_PLAYGROUND_VERSION` default of `docker-compose.production.yml`, verify the application locally, then create and push a matching tag:
+
+```bash
+RELEASE_TAG=vX.Y.Z npm run check:release   # checks package.json, the Compose default and a "## [X.Y.Z]" CHANGELOG section
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The `Publish stable release` workflow verifies that the tag matches `package.json`, runs lint/tests/build, publishes the `amd64` and `arm64` images to GHCR, generates a provenance attestation, then creates the GitHub Release using that version's CHANGELOG.md section as its notes, with `docker-compose.production.yml` attached for the install and update commands above. Mark the GHCR package public once in GitHub package settings so self-hosted users can pull it anonymously.
 
 ## Configuration
 
