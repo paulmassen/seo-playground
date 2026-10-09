@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSiteAuditHistory, getSiteAuditTask, upsertSiteAuditTask,
   saveSiteAuditResult, getSiteAuditSummary, getSiteAuditPages,
@@ -360,7 +361,7 @@ function IssueRow({ label, count, sev }: { label: string; count: number; sev: Se
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function SiteAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SiteAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const brand = getBrandSettings();
@@ -970,3 +971,5 @@ function StatusBadge({ status }: { status: SiteAuditEntry['status'] }) {
   };
   return <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${map[status]}`}>{labels[status]}</span>;
 }
+
+export default withProjectScope(SiteAuditPage);

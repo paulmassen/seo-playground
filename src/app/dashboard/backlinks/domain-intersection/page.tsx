@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getBlDomIntHistory, saveBlDomInt, getBlDomIntResults, type BlDomIntEntry } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
@@ -44,7 +45,7 @@ async function fetchDomInt(target1: string, target2: string, login: string, pass
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultDomain = getSetting('default_domain') ?? '';
@@ -171,3 +172,5 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
     </div>
   );
 }
+
+export default withProjectScope(DomainIntersectionPage);

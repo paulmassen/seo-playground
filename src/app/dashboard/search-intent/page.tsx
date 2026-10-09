@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getSearchIntentHistory, saveSearchIntentSearch, getSearchIntentResults, type SearchIntentEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
@@ -35,7 +36,7 @@ const INTENT_CONFIG: Record<string, { label: string; cls: string }> = {
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function SearchIntentPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SearchIntentPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -181,3 +182,5 @@ export default async function SearchIntentPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(SearchIntentPage);

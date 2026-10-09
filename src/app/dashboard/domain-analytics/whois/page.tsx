@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getDomainWhoisHistory,
@@ -121,7 +122,7 @@ function daysUntil(dateStr?: string) {
 
 // ---- Page ----
 
-export default async function WhoisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function WhoisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -393,3 +394,5 @@ export default async function WhoisPage({ searchParams }: { searchParams: Promis
     </div>
   );
 }
+
+export default withProjectScope(WhoisPage);

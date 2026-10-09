@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -517,7 +518,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function GoogleReviewsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function GoogleReviewsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = getSetting('default_location') ?? 'France';
@@ -953,3 +954,5 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
     </div>
   );
 }
+
+export default withProjectScope(GoogleReviewsPage);

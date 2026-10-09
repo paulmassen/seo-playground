@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getRankedKwHistory,
@@ -111,7 +112,7 @@ function formatDate(ts: number) {
 
 // ---- Page ----
 
-export default async function RankedKeywordsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function RankedKeywordsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -355,3 +356,5 @@ export default async function RankedKeywordsPage({ searchParams }: { searchParam
     </div>
   );
 }
+
+export default withProjectScope(RankedKeywordsPage);

@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getDomainTechHistory,
@@ -141,7 +142,7 @@ function entryLabel(e: DomainFindEntry) {
 
 // ---- Page ----
 
-export default async function TechnologiesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function TechnologiesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
 
@@ -560,3 +561,5 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(TechnologiesPage);

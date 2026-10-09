@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getOnpageTasks, upsertOnpageTask, getOnpageResult, saveOnpageResult, type OnpageTask } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
@@ -159,7 +160,7 @@ function statusBadge(status: OnpageTask['status']) {
   return <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${map[status]}`}>{labels[status]}</span>;
 }
 
-export default async function MicrodataPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function MicrodataPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
 
@@ -346,3 +347,5 @@ export default async function MicrodataPage({ searchParams }: { searchParams: Pr
     </div>
   );
 }
+
+export default withProjectScope(MicrodataPage);

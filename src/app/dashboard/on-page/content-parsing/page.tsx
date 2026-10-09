@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials } from '@/lib/db';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
@@ -65,7 +66,7 @@ function scoreLabel(score?: number) {
   return { label: 'Poor', cls: 'text-red-500' };
 }
 
-export default async function ContentParsingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function ContentParsingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const rawUrl = params.url?.trim() ?? '';
@@ -208,3 +209,5 @@ export default async function ContentParsingPage({ searchParams }: { searchParam
     </div>
   );
 }
+
+export default withProjectScope(ContentParsingPage);

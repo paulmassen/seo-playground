@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getTrafficEstimationHistory, saveTrafficEstimationSearch, getTrafficEstimationResults, type TrafficEstimationEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
@@ -25,7 +26,7 @@ async function fetchTraffic(targets: string[], location: string, language: strin
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function TrafficEstimationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function TrafficEstimationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -152,3 +153,5 @@ export default async function TrafficEstimationPage({ searchParams }: { searchPa
     </div>
   );
 }
+
+export default withProjectScope(TrafficEstimationPage);

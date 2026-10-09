@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getBacklinksHistory,
@@ -156,7 +157,7 @@ function formatDate(ts: number) {
 
 // ---- Page ----
 
-export default async function BacklinksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function BacklinksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -487,3 +488,5 @@ export default async function BacklinksPage({ searchParams }: { searchParams: Pr
     </div>
   );
 }
+
+export default withProjectScope(BacklinksPage);

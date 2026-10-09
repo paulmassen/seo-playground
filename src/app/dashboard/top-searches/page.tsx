@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting,
   getTopSearchesHistory, saveTopSearches, getTopSearchesResults,
@@ -76,7 +77,7 @@ function formatDate(ts: number) {
 
 const COST_PER_1000 = 0.05;
 
-export default async function TopSearchesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function TopSearchesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -294,3 +295,5 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
     </div>
   );
 }
+
+export default withProjectScope(TopSearchesPage);

@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getCompetitorsHistory,
@@ -75,7 +76,7 @@ function formatDate(ts: number) {
 
 // ---- Page ----
 
-export default async function CompetitorsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function CompetitorsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -280,3 +281,5 @@ export default async function CompetitorsPage({ searchParams }: { searchParams: 
     </div>
   );
 }
+
+export default withProjectScope(CompetitorsPage);

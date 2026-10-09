@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getSetting,
@@ -270,7 +271,7 @@ function MonthlyTrendChart({ title, items, metric }: { title: string; items: His
 
 // ---- Page ----
 
-export default async function AiVisibilityPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function AiVisibilityPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -660,3 +661,5 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(AiVisibilityPage);

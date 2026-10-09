@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -74,7 +75,7 @@ function StatChip({ label, value }: { label: string; value: string }) {
 
 // ---- Page ----
 
-export default async function LlmResponsesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function LlmResponsesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -245,3 +246,5 @@ export default async function LlmResponsesPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(LlmResponsesPage);

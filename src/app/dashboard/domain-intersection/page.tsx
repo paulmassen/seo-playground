@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -38,7 +39,7 @@ async function fetchIntersection(target1: string, target2: string, location: str
   return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0, error };
 }
 
-export default async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getDomainIntersectionHistory();
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -176,3 +177,5 @@ export default async function DomainIntersectionPage({ searchParams }: { searchP
     </div>
   );
 }
+
+export default withProjectScope(DomainIntersectionPage);

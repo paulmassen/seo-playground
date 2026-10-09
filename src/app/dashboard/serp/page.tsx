@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getTargetDomains, getSerpHistory, saveSerpSearch, getSerpResults, type SerpHistoryEntry, type TargetHit } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
 import LocationPicker from '@/components/LocationPicker';
@@ -51,7 +52,7 @@ function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short' });
 }
 
-export default async function SerpPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SerpPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const targetDomains = getTargetDomains();
   const history = getSerpHistory();
@@ -343,3 +344,5 @@ export default async function SerpPage({ searchParams }: { searchParams: Promise
     </div>
   );
 }
+
+export default withProjectScope(SerpPage);

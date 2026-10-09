@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -60,7 +61,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default async function PromptTrackerPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function PromptTrackerPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const brand = getBrandSettings();
@@ -292,3 +293,5 @@ export default async function PromptTrackerPage({ searchParams }: { searchParams
     </div>
   );
 }
+
+export default withProjectScope(PromptTrackerPage);

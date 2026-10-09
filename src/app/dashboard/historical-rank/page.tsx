@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getHistRankHistory, saveHistRankSearch, getHistRankResults, getSetting } from '@/lib/db';
@@ -81,7 +82,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
   );
 }
 
-export default async function HistoricalRankPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function HistoricalRankPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getHistRankHistory();
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -269,3 +270,5 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
     </div>
   );
 }
+
+export default withProjectScope(HistoricalRankPage);

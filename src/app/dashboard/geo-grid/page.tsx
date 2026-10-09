@@ -1,7 +1,8 @@
+import { withProjectScope } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import { getBrandSettings } from '@/lib/brand-server';
 import {
-  getActiveProject, getCredentials, getSetting, getGridHistory, getGridEntry, saveGridSearch,
+  getCurrentProject, getCredentials, getSetting, getGridHistory, getGridEntry, saveGridSearch,
   saveGridSearchPending, getGridResults, getGridSeriesHistory, getGridSchedule, gridSeriesId, type GridSearchEntry, type GridPoint, type GridQueueMode,
 } from '@/lib/db';
 import LocalFinderForm from '../local-finder/LocalFinderForm';
@@ -45,7 +46,7 @@ function gridRerunUrl(entry: { keyword: string; center: string; grid_size: numbe
   return `${basePath}?${p.toString()}`;
 }
 
-export default async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const gridHistoryId = params.grid_history_id;
@@ -304,7 +305,7 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
             {gridPending && gridEntry && (
               <GridPending
                 searchId={gridPending.id}
-                projectId={getActiveProject().id}
+                projectId={getCurrentProject().id}
                 totalPoints={gridPending.totalPoints}
                 queueMode={gridPending.queueMode}
                 keyword={gridEntry.keyword}
@@ -340,3 +341,5 @@ export default async function GeoGridPage({ searchParams }: { searchParams: Prom
     </div>
   );
 }
+
+export default withProjectScope(GeoGridPage);

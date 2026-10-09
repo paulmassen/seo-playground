@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getAnchorsHistory, saveAnchorsSearch, getAnchorsResults, getSetting } from '@/lib/db';
@@ -36,7 +37,7 @@ async function fetchAnchors(target: string, limit: number, login: string, pass: 
   return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0 };
 }
 
-export default async function AnchorsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function AnchorsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getAnchorsHistory();
   const defaultDomain = getSetting('default_domain') ?? '';
@@ -181,3 +182,5 @@ export default async function AnchorsPage({ searchParams }: { searchParams: Prom
     </div>
   );
 }
+
+export default withProjectScope(AnchorsPage);

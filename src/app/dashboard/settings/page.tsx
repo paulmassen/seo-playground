@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getSetting } from '@/lib/db';
@@ -16,7 +17,7 @@ interface DFUserResponse {
 
 const inputCls = 'w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-600 transition-all font-medium';
 
-export default async function SettingsPage() {
+async function SettingsPage() {
   const creds = getCredentials();
   // Raw values: blank fields stay blank so the defaults remain visible as placeholders.
   const brandName = getSetting('brand_name') ?? '';
@@ -145,3 +146,5 @@ export default async function SettingsPage() {
     </div>
   );
 }
+
+export default withProjectScope(SettingsPage);

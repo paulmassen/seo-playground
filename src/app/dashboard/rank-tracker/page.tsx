@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -24,7 +25,7 @@ const inputCls = 'w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-s
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
 
   const creds = getCredentials();
@@ -290,3 +291,5 @@ export default async function RankTrackerPage({ searchParams }: { searchParams: 
     </div>
   );
 }
+
+export default withProjectScope(RankTrackerPage);
