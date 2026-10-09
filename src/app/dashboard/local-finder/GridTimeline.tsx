@@ -24,7 +24,9 @@ type Props = {
 
 function metricDelta(current: number | null, previous: number | null, inverse = false) {
   if (current === null || previous === null) return null;
-  const value = inverse ? previous - current : current - previous;
+  const raw = inverse ? previous - current : current - previous;
+  // Round to 1 decimal to avoid floating-point artifacts (e.g. 9.3 - 9.5 = -0.19999999999999929).
+  const value = Math.round(raw * 10) / 10;
   if (value === 0) return 'No change';
   return `${value > 0 ? '+' : ''}${value}`;
 }
