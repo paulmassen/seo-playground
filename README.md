@@ -169,6 +169,8 @@ npm run launch
 
 After a code update, run `npm run launch` again. If the app is already built, `npm start` starts both processes without rebuilding.
 
+Node launches (`dev`, `start`, `launch`) listen on `127.0.0.1` by default. To deliberately expose the server, export `SEO_PLAYGROUND_BIND=0.0.0.0` before launching, and enable login or an authenticated reverse proxy first. `HOSTNAME` does not override this safety default.
+
 ### Option 3 — Node.js (dev mode)
 
 Convenient for development but noticeably slower — Next.js recompiles on every request and skips all optimizations. Not recommended for daily use.
