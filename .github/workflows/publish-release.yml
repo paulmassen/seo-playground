@@ -5,7 +5,8 @@ on:
     tags: ['v*.*.*']
 
 permissions:
-  contents: read
+  # write: the last step creates the GitHub Release that the in-app update notice reads.
+  contents: write
   packages: write
   attestations: write
   id-token: write
