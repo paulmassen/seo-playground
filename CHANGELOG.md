@@ -7,7 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] — 2026-10-09
+
 ### Added
+- **Cloudron package** — SEO Playground can be installed as a Cloudron community app (`CloudronManifest.json`, `Dockerfile.cloudron`, `cloudron/`). Cloudron's login sits in front of the app and Cloudron delivers updates; set `UPDATE_CHECK_DISABLED=true` to turn off the in-app update notice on any platform that ships its own updates.
 - **Optional email + password login** — set `AUTH_ENABLED=true` to protect the dashboard and every `/api` route (Better Auth, SQLite). The first visit creates the only account at `/setup`, then registration closes. Accounts live in a separate `seo-playground.db.auth` file; the Geo-grid worker's `/api/cron` endpoint keeps its own secret. Off by default, so existing installs are unchanged. See README → Login.
 - **Geo-grid business search** — the map search now looks businesses up on Google Maps (about $0.002 per search, biased to the area shown on the map and to the form's language). Picking a listing centers the grid on it and sets the target to that exact listing (its CID). Plain addresses still fall back to OpenStreetMap, ignoring suite/unit numbers.
 - **Geo-grid: delete a monitor** — a Delete button on each monitor removes all of its snapshots and its schedule.
@@ -18,12 +23,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Rank Tracker top 10** — every check now saves the first page of organic results at no extra cost. Expanding a keyword lists the top 10 for any of the last 30 checks, with moves versus the previous check, new entries and the domains that left the top 10. Checks recorded before this release have no top 10.
 
 ### Fixed
+- **Project isolation** — a search, check or settings change now always saves to the project it started in, even if the selected project changes (for example from another tab) while DataForSEO is still answering. A request still running when its project is deleted fails with "Project not found." instead of recreating the deleted project's database.
+- **Maps behind strict proxies** — OpenStreetMap tiles and address search now always send a Referer, as OSM's usage policy requires, so maps no longer get blocked behind proxies that send `Referrer-Policy: same-origin` (such as Cloudron's).
 - **Geo-grid target matching** — a picked Google listing matches on its CID only; a domain target matches whatever the protocol or `www.` (`https://example.com` no longer misses `www.example.com`), and a path in the target must appear in the listing URL.
 - **Geo-grid PDF** — the competitive landscape table only lists the rows that fit above the footer, so a long competitor list no longer runs off the page. Logos in PDF headers keep their proportions instead of being stretched.
 - **Rank Tracker** — "Add & Check" is now "Add": keywords appear in the list immediately instead of after every check had finished. Run the check afterwards with Queue or ↻. In dark mode the Queue and Add buttons no longer show a light glow while pending.
 - **Site Audit** — the Pages table shows the word count again, and the Keyword Density, Duplicate Tags and Non-indexable tabs no longer fail with `Invalid Field` errors (`order_by`, `type`, `filters`). Non-indexable pages now come from DataForSEO's dedicated endpoint and list the reason each page is excluded.
 
 ### Changed
+- **Node launches listen on `127.0.0.1` by default** — `npm run dev`, `npm start` and `npm run launch` no longer listen on every interface. Export `SEO_PLAYGROUND_BIND=0.0.0.0` before launching to expose the server deliberately, after enabling login or an authenticated reverse proxy. `HOSTNAME` no longer overrides this. Docker images are unchanged.
 - **Security updates** — Next.js 15.5.27 (fixes middleware bypass, Server Actions and denial-of-service advisories) and jsPDF 4.2.1 (fixes PDF injection and path traversal). A new test renders the shared PDF helpers with the installed jsPDF.
 - **Prompt Tracker PDFs** — the overview export now lists only the latest result of each prompt, as a card with a cited / not cited / error marker and the date of the check. The single-prompt export shows the latest result, a colour-coded weekly calendar of mentions and one marked card per check. Long prompts no longer run off the page, and "·" no longer prints as "?" in PDFs.
 - **Cheaper Rank Tracker checks** — a check now stops crawling at the results page where the domain is found (`stop_crawl_on_match`), so it is billed for those pages instead of the full depth. The recorded cost is the amount DataForSEO reports once the task completes.

@@ -12,7 +12,7 @@ services:
     restart: "no"
 
   app:
-    image: "${SEO_PLAYGROUND_IMAGE:-ghcr.io/paulmassen/seo-playground}:${SEO_PLAYGROUND_VERSION:-0.4.0}"
+    image: "${SEO_PLAYGROUND_IMAGE:-ghcr.io/paulmassen/seo-playground}:${SEO_PLAYGROUND_VERSION:-0.5.0}"
     # Loopback only by default: the dashboard has no login unless AUTH_ENABLED=true, and it spends DataForSEO credit.
     # Put a reverse proxy with authentication in front, or set SEO_PLAYGROUND_BIND=0.0.0.0.
     ports:
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: "${SEO_PLAYGROUND_IMAGE:-ghcr.io/paulmassen/seo-playground}:${SEO_PLAYGROUND_VERSION:-0.4.0}"
+    image: "${SEO_PLAYGROUND_IMAGE:-ghcr.io/paulmassen/seo-playground}:${SEO_PLAYGROUND_VERSION:-0.5.0}"
     command: ["node", "scripts/geo-grid-worker.mjs"]
     volumes:
       - seo-playground-data:/data:ro
