@@ -2,9 +2,12 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { reconcileGridPoints } from './grid-target';
 import type { RankTopResult } from './rank-serp';
 
+// Operation-local identity, never the mutable UI selection after an await.
+const projectScope = new AsyncLocalStorage<string>();
 const dataDbs = new Map<string, Database.Database>();
 let controlDb: Database.Database | null = null;
 
@@ -149,6 +152,36 @@ export function getActiveProject(): Project {
   return projectFromRow(fallback);
 }
 
+/** The global UI selection is intentionally separate from this operation's project. */
+export function getCurrentProject(): Project {
+  const projectId = projectScope.getStore();
+  if (projectId === undefined) return getActiveProject();
+  const row = getControlDb().prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as ProjectRow | undefined;
+  if (!row) throw new Error('Project not found.');
+  return projectFromRow(row);
+}
+
+/** Explicit scope for an operation; deleted projects never fall back to the UI selection. */
+export function runInProjectScope<T>(projectId: string, operation: () => T): T {
+  if (!projectExists(projectId)) throw new Error('Project not found.');
+  return projectScope.run(projectId, operation);
+}
+
+/** Capture synchronously, before authentication/searchParams/network awaits. Nested calls reuse the scope. */
+export function runWithCurrentProject<T>(operation: () => T): T {
+  return runInProjectScope(getCurrentProject().id, operation);
+}
+
+/**
+ * Wrap each server page, not its layout: React renders child components separately.
+ * This covers the function's async work, not deferred child Server Components.
+ * Server actions must remain exported async functions and call runWithCurrentProject inside.
+ * This is identity routing, not authorization or per-user project selection.
+ */
+export function withProjectScope<Args extends unknown[], Result>(operation: (...args: Args) => Promise<Result>) {
+  return async (...args: Args): Promise<Result> => runWithCurrentProject(() => operation(...args));
+}
+
 export function createProject(input: Pick<Project, 'name' | 'domain' | 'defaultLocation' | 'defaultLanguage' | 'defaultCoordinates' | 'rankTrackerDepth'>): Project {
   const name = input.name.trim();
   const domain = normalizeDomain(input.domain);
@@ -222,6 +255,8 @@ export function deleteProject(id: string): void {
 }
 
 function getDbForProject(projectId: string): Database.Database {
+  // Check even cached handles: deletion by another process must not resurrect a data file.
+  if (!projectExists(projectId)) throw new Error('Project not found.');
   const existing = dataDbs.get(projectId);
   if (existing) return existing;
   const db = new Database(dataDbPath(projectId));
@@ -235,7 +270,7 @@ function getDbForProject(projectId: string): Database.Database {
 }
 
 function getDb(): Database.Database {
-  return getDbForProject(getActiveProject().id);
+  return getDbForProject(getCurrentProject().id);
 }
 
 function initSchema(db: Database.Database) {
@@ -977,7 +1012,7 @@ export function searchLocations(query: string, limit = 20): LocationOption[] {
 
 export function getSetting(key: string): string | null {
   if (key in PROJECT_SETTING_COLUMNS) {
-    const project = getActiveProject();
+    const project = getCurrentProject();
     const column = PROJECT_SETTING_COLUMNS[key as keyof typeof PROJECT_SETTING_COLUMNS];
     return projectFromRow(getControlDb().prepare('SELECT * FROM projects WHERE id = ?').get(project.id) as ProjectRow)[column === 'default_location' ? 'defaultLocation' : column === 'default_language' ? 'defaultLanguage' : column === 'default_coordinates' ? 'defaultCoordinates' : column === 'rank_tracker_depth' ? 'rankTrackerDepth' : 'domain'];
   }
@@ -987,7 +1022,7 @@ export function getSetting(key: string): string | null {
 
 export function setSetting(key: string, value: string): void {
   if (key in PROJECT_SETTING_COLUMNS) {
-    const project = getActiveProject();
+    const project = getCurrentProject();
     const current = project;
     updateProject(project.id, {
       name: current.name,
@@ -1033,7 +1068,7 @@ export function clearCredentials(): void {
 
 export function getTargetDomains(): string[] {
   const rows = getDb().prepare('SELECT domain FROM target_domains ORDER BY created_at DESC').all() as { domain: string }[];
-  const projectDomain = getActiveProject().domain;
+  const projectDomain = getCurrentProject().domain;
   return [...new Set([projectDomain, ...rows.map((r) => r.domain)])];
 }
 
@@ -1937,7 +1972,7 @@ export function getGridSeriesHistory(seriesId: string): GridSearchEntry[] {
 }
 
 export function getGridEntry(id: string): (GridSearchEntry & { task_ids?: GridTaskPoint[] }) | null {
-  return getGridEntryForProject(getActiveProject().id, id);
+  return getGridEntryForProject(getCurrentProject().id, id);
 }
 
 export function getGridEntryForProject(projectId: string, id: string): (GridSearchEntry & { task_ids?: GridTaskPoint[] }) | null {
