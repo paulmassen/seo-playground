@@ -17,6 +17,14 @@ if (tag !== expected) {
   process.exit(1);
 }
 
+// The Compose file is attached to the release and is what `releases/latest/download` installs.
+const compose = readFileSync(new URL('../docker-compose.production.yml', import.meta.url), 'utf8');
+const pinned = [...compose.matchAll(/\$\{SEO_PLAYGROUND_VERSION:-([^}]+)\}/g)].map((m) => m[1]);
+if (!pinned.length || pinned.some((version) => version !== packageJson.version)) {
+  console.error(`docker-compose.production.yml must default SEO_PLAYGROUND_VERSION to ${packageJson.version} (found: ${pinned.join(', ') || 'none'}).`);
+  process.exit(1);
+}
+
 if (!extractReleaseNotes(changelog, tag)) {
   console.error(`CHANGELOG.md has no non-empty "## [${packageJson.version}]" section; it becomes the GitHub Release notes.`);
   process.exit(1);

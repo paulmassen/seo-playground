@@ -68,6 +68,9 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+        # The attached Compose file pins this exact image, so the README's
+        # releases/latest/download URL always installs the newest stable release.
         run: |
           gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || \
             gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release upload "${{ github.ref_name }}" docker-compose.production.yml --clobber
