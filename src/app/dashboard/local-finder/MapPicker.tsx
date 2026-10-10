@@ -234,7 +234,11 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
           location_coordinate: `${center.lat.toFixed(6)},${center.lng.toFixed(6)},${mapRef.current.getZoom()}`,
         });
         if (language) params.set('language', language);
-        const res = await fetch(`/api/business-search?${params}`);
+        const res = await fetch('/api/business-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(params)),
+        });
         const data = await res.json() as { results?: BusinessResult[] };
         found = data.results ?? [];
       } catch {

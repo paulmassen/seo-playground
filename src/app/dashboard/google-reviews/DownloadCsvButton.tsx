@@ -1,6 +1,7 @@
 'use client';
 
 import { Download } from 'lucide-react';
+import { csvRows } from '@/lib/csv';
 
 interface CsvReview {
   rating?: { value?: number };
@@ -12,11 +13,6 @@ interface CsvReview {
   reviews_count?: number;
   owner_answer?: string;
   owner_time_ago?: string;
-}
-
-function esc(v: unknown): string {
-  const s = v === undefined || v === null ? '' : String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 const stripBreaks = (t?: string) => (t ?? '').replace(/<br\s*\/?>/gi, '\n');
@@ -33,10 +29,10 @@ export default function DownloadCsvButton({ reviews, filename }: { reviews: CsvR
       stripBreaks(r.review_text),
       stripBreaks(r.owner_answer),
       r.owner_time_ago ?? '',
-    ].map(esc).join(','));
+    ]);
 
     // Prepend BOM so Excel reads UTF-8 (accents) correctly.
-    const csv = '﻿' + [headers.join(','), ...rows].join('\r\n');
+    const csv = '﻿' + csvRows([headers, ...rows], '\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

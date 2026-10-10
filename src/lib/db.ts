@@ -840,6 +840,14 @@ function initSchema(db: Database.Database) {
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_rank_checks_kw ON rank_checks(keyword_id, checked_at DESC)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_rank_tasks_status ON rank_tasks(status, created_at ASC)`);
+  // Before 0.6.0 two overlapping runs could leave two pending tasks for one keyword, which would
+  // make the unique index below fail and the project unopenable. Keep the oldest, fail the others.
+  db.prepare(`UPDATE rank_tasks
+    SET status = 'failed', completed_at = ?, error_message = 'Duplicate pending check for this keyword.'
+    WHERE status IN ('posting', 'pending') AND rowid NOT IN (
+      SELECT MIN(rowid) FROM rank_tasks WHERE status IN ('posting', 'pending') GROUP BY keyword_id
+    )`).run(Date.now());
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_rank_tasks_active_keyword ON rank_tasks(keyword_id) WHERE status IN ('posting', 'pending')`);
 
   // Migrations — add columns that may not exist in older DBs. Only the expected
   // "column already exists" error is swallowed; anything else (a real syntax error, a
@@ -1479,13 +1487,51 @@ export interface PendingRankTask {
   cost: number | null;
 }
 
+export interface RankTaskReservation {
+  reservationId: string;
+  keywordId: number;
+}
+
 function pendingRankTasksFromDb(db: Database.Database): PendingRankTask[] {
   const rows = db.prepare(`SELECT rank_tasks.task_id, rank_tasks.keyword_id, tracked_keywords.domain, rank_tasks.cost
     FROM rank_tasks JOIN tracked_keywords ON tracked_keywords.id = rank_tasks.keyword_id
-    WHERE rank_tasks.status = 'pending' ORDER BY rank_tasks.created_at ASC LIMIT 500`).all() as Array<{
+    WHERE rank_tasks.status = 'pending' ORDER BY rank_tasks.created_at ASC`).all() as Array<{
       task_id: string; keyword_id: number; domain: string; cost: number | null;
     }>;
   return rows.map((row) => ({ taskId: row.task_id, keywordId: row.keyword_id, domain: row.domain, cost: row.cost }));
+}
+
+function reserveRankTasksToDb(db: Database.Database, keywordIds: number[]): RankTaskReservation[] {
+  const now = Date.now();
+  const reservations: RankTaskReservation[] = [];
+  const stmt = db.prepare(`INSERT OR IGNORE INTO rank_tasks
+    (task_id, keyword_id, status, cost, created_at, completed_at, error_message)
+    VALUES (?, ?, 'posting', NULL, ?, NULL, NULL)`);
+  db.transaction(() => {
+    for (const keywordId of keywordIds) {
+      const reservationId = `posting:${keywordId}:${randomUUID()}`;
+      const result = stmt.run(reservationId, keywordId, now);
+      if (result.changes > 0) reservations.push({ reservationId, keywordId });
+    }
+  })();
+  return reservations;
+}
+
+export function reserveRankTasksForProject(projectId: string, keywordIds: number[]): RankTaskReservation[] {
+  return reserveRankTasksToDb(getDbForProject(projectId), keywordIds);
+}
+
+export function confirmRankTaskReservationForProject(projectId: string, reservationId: string, taskId: string, cost: number | null): boolean {
+  const result = getDbForProject(projectId).prepare(`UPDATE rank_tasks
+    SET task_id = ?, status = 'pending', cost = ?, error_message = NULL
+    WHERE task_id = ? AND status = 'posting'`).run(taskId, cost, reservationId);
+  return result.changes > 0;
+}
+
+export function failRankTaskReservationForProject(projectId: string, reservationId: string, errorMessage: string): void {
+  getDbForProject(projectId).prepare(`UPDATE rank_tasks
+    SET status = 'failed', completed_at = ?, error_message = ?
+    WHERE task_id = ? AND status = 'posting'`).run(Date.now(), errorMessage.slice(0, 500), reservationId);
 }
 
 /** Stores the task_post cost, the price of the full depth; completing the task replaces it with the amount billed. */

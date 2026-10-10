@@ -39,7 +39,7 @@ let passInProgress = false;
  * all due schedules before posting them to DataForSEO, so overlapping cron calls
  * cannot produce duplicate Geo-grid or Rank Tracker runs.
  */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   if (!getCronSecret()) {
     return NextResponse.json({ error: 'The Geo-grid worker secret is not configured.' }, { status: 503 });
   }

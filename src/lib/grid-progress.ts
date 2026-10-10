@@ -5,13 +5,16 @@ import {
 } from '@/lib/db';
 
 interface DFSTaskGetResponse {
+  status_code?: number;
+  status_message?: string;
   tasks?: Array<{
     status_code?: number;
+    status_message?: string;
     result?: Array<{ items?: Array<{
       type: string; rank_group: number; title?: string; domain?: string; url?: string; cid?: string;
       rating?: { value?: number; votes_count?: number };
     }> }>;
-  }>;
+  }> | null;
 }
 
 const inFlightCollections = new Map<string, Promise<{ status: 'done' | 'pending'; ready: number; total: number }>>();
@@ -48,9 +51,11 @@ async function collectGridProgressOnce(
       });
       if (!response.ok) return { taskPoint, ready: false, items: [] };
       const data = await response.json() as DFSTaskGetResponse;
+      if (data.status_code && data.status_code !== 20000) return { taskPoint, ready: false, items: [] };
       const task = data.tasks?.[0];
       if (!task || stillProcessing.has(task.status_code ?? 0)) return { taskPoint, ready: false, items: [] };
-      const items = task.status_code === 20000 ? (task.result?.[0]?.items ?? []).filter((item) => item.type === 'local_pack') : [];
+      if (task.status_code !== 20000) return { taskPoint, ready: false, items: [] };
+      const items = (task.result?.[0]?.items ?? []).filter((item) => item.type === 'local_pack');
       return { taskPoint, ready: true, items };
     } catch {
       return { taskPoint, ready: false, items: [] };

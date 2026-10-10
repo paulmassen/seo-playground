@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // name (like Semrush's Map Rank Tracker) instead of geocoding an address.
 // Uses DataForSEO's Google Maps SERP (about $0.002 per search).
 //
-// Query parameters:
+// POST JSON body:
 //   q                    business name (required)
 //   location_coordinate  "lat,lng" or "lat,lng,zoom" — usually the current map view (preferred)
 //   location_code        DataForSEO location code, used when no coordinate is given
@@ -37,17 +37,22 @@ function parseMapsCoordinate(raw: string | null): string | null {
   return `${latN.toFixed(7)},${lngN.toFixed(7)},${zoomN}z`;
 }
 
-export async function GET(request: NextRequest) {
-  const query = request.nextUrl.searchParams.get('q')?.trim();
+export async function POST(request: NextRequest) {
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ results: [], error: 'Invalid JSON body.' }, { status: 400 });
+  }
+  const query = typeof body.q === 'string' ? body.q.trim() : '';
   if (!query) return NextResponse.json({ results: [] });
 
-  const params = request.nextUrl.searchParams;
-  const coordinate = parseMapsCoordinate(params.get('location_coordinate'));
-  const locationCode = Number(params.get('location_code'));
+  const coordinate = parseMapsCoordinate(typeof body.location_coordinate === 'string' ? body.location_coordinate : null);
+  const locationCode = Number(body.location_code);
   if (!coordinate && !(Number.isInteger(locationCode) && locationCode > 0)) {
     return NextResponse.json({ results: [], error: 'A map location (location_coordinate or location_code) is required.' }, { status: 400 });
   }
-  const requestedLanguage = params.get('language')?.trim();
+  const requestedLanguage = typeof body.language === 'string' ? body.language.trim() : undefined;
   const language = LANGUAGES.find((item) => item.value.toLowerCase() === requestedLanguage?.toLowerCase())?.value ?? 'English';
   const credentials = getCredentials();
   if (!credentials) return NextResponse.json({ results: [], error: 'DataForSEO credentials are not configured.' }, { status: 503 });

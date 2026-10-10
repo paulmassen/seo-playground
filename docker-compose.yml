@@ -6,7 +6,8 @@ services:
     command: >
       sh -c 'if [ ! -s /data/.geo-grid-worker-secret ]; then
       umask 077 && head -c 48 /dev/urandom | base64 > /data/.geo-grid-worker-secret &&
-      chmod 644 /data/.geo-grid-worker-secret; fi'
+      chown ${HOST_UID:-1000}:${HOST_GID:-1000} /data/.geo-grid-worker-secret &&
+      chmod 600 /data/.geo-grid-worker-secret; fi'
     restart: "no"
 
   app:

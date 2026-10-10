@@ -1,6 +1,7 @@
 'use client';
 
 import { Download } from 'lucide-react';
+import { csvRows } from '@/lib/csv';
 
 interface Column {
   key: string;
@@ -17,17 +18,11 @@ export default function ExportCSVButton({
   columns: Column[];
 }) {
   const handleExport = () => {
-    const escape = (val: unknown) => {
-      const s = String(val ?? '');
-      return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? `"${s.replace(/"/g, '""')}"`
-        : s;
-    };
     const rows = [
-      columns.map((c) => escape(c.label)).join(','),
-      ...data.map((row) => columns.map((c) => escape(row[c.key])).join(',')),
+      columns.map((c) => c.label),
+      ...data.map((row) => columns.map((c) => row[c.key])),
     ];
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvRows(rows)], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -26,6 +26,7 @@ async function run() {
     }
 
     const response = await fetch(endpoint, {
+      method: 'POST',
       headers: { Authorization: `Bearer ${secret}` },
       // A pass polls every project's pending tasks one after another, so it can take minutes.
       // Aborting early only hides its result: the server keeps working either way.
