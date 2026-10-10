@@ -6,6 +6,7 @@ import { footerPalette, footerSegments, headerPolygon, type BrandHeaderStyle, ty
 /** Standard PDF fonts only cover WinAnsi, so anything else is replaced before drawing. */
 export function pdfSafeText(value: string): string {
   return value
+    .replace(/\s?★/g, ' stars')
     .replace(/[·•]/g, '|')
     .replace(/[–—]/g, '-')
     .normalize('NFKD')

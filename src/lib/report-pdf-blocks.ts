@@ -205,3 +205,258 @@ export function drawCalendar(ctx: BlockContext, calendar: PdfCalendar, startY: n
   }
   return y;
 }
+
+// ─── Tables, charts and bullet paragraphs ────────────────────────────────────
+
+/** A plain string, or a cell with a coloured background chip / text colour. */
+export type PdfCell = string | { text: string; fill?: Rgb; color?: Rgb; bold?: boolean };
+
+export type PdfTable = {
+  /** `width` is relative (defaults to 1); columns share the content width. */
+  columns: Array<{ label: string; width?: number; align?: 'left' | 'right' | 'center' }>;
+  rows: Array<{ cells: PdfCell[]; highlight?: boolean }>;
+  /** Small print under the table. */
+  note?: string;
+};
+
+export type PdfLineChart = {
+  kind: 'line';
+  labels: string[];
+  series: Array<{ name: string; values: Array<number | null>; color: Rgb; emphasis?: boolean }>;
+  height?: number;
+};
+
+export type PdfBarChart = {
+  kind: 'bar';
+  bars: Array<{ label: string; value: number | null; display: string; color?: Rgb; emphasis?: boolean }>;
+};
+
+export type PdfChart = PdfLineChart | PdfBarChart;
+
+const HEADER_BG: Rgb = [241, 245, 249];
+const HIGHLIGHT_BG: Rgb = [239, 246, 255];
+const RULE: Rgb = [226, 232, 240];
+
+/** Truncates to the width with an ellipsis, measured in the current font. */
+function fitText(pdf: jsPDF, value: string, width: number): string {
+  const text = pdfSafeText(value);
+  if (pdf.getTextWidth(text) <= width) return text;
+  let end = text.length;
+  while (end > 0 && pdf.getTextWidth(`${text.slice(0, end)}...`) > width) end--;
+  return end > 0 ? `${text.slice(0, end)}...` : '';
+}
+
+/** Multi-column table; the header row repeats after a page break and the highlighted row is tinted. */
+export function drawTable(ctx: BlockContext, table: PdfTable, startY: number): number {
+  const { pdf, margin, contentWidth } = ctx;
+  const weights = table.columns.map((c) => c.width ?? 1);
+  const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+  const widths = weights.map((w) => (w / totalWeight) * contentWidth);
+  const xs = widths.map((_, i) => margin + widths.slice(0, i).reduce((a, b) => a + b, 0));
+  const rowHeight = 6.2;
+  const pad = 1.6;
+  let y = startY;
+
+  // Header labels wrap onto two lines at word boundaries; a word too long for its column
+  // shrinks the font (down to 4.2 pt) instead of being cut in the middle.
+  pdf.setFont('helvetica', 'bold');
+  const headers = table.columns.map((column, i) => {
+    const label = pdfSafeText(column.label.toUpperCase());
+    const available = widths[i] - pad * 2;
+    let size = 5.8;
+    pdf.setFontSize(size);
+    while (size > 4.2 && label.split(/\s+/).some((word) => pdf.getTextWidth(word) > available)) {
+      size -= 0.2;
+      pdf.setFontSize(size);
+    }
+    const lines = pdf.splitTextToSize(label, available) as string[];
+    return { size, lines: lines.length > 2 ? [lines[0], fitText(pdf, lines.slice(1).join(' '), available)] : lines };
+  });
+  const headerHeight = Math.max(...headers.map((h) => h.lines.length)) > 1 ? 9 : 6.5;
+
+  const drawHeader = () => {
+    setFill(pdf, HEADER_BG);
+    pdf.rect(margin, y, contentWidth, headerHeight, 'F');
+    pdf.setFont('helvetica', 'bold');
+    setText(pdf, MUTED);
+    table.columns.forEach((column, i) => {
+      const align = column.align ?? 'left';
+      const x = align === 'right' ? xs[i] + widths[i] - pad : align === 'center' ? xs[i] + widths[i] / 2 : xs[i] + pad;
+      const { lines, size } = headers[i];
+      pdf.setFontSize(size);
+      const top = y + headerHeight / 2 - (lines.length - 1) * 1.25 + 1.2;
+      lines.forEach((line, n) => pdf.text(line, x, top + n * 2.5, { align }));
+    });
+    y += headerHeight;
+  };
+
+  if (y + headerHeight + rowHeight > ctx.bottom) y = ctx.newPage();
+  drawHeader();
+
+  for (const row of table.rows) {
+    if (y + rowHeight > ctx.bottom) { y = ctx.newPage(); drawHeader(); }
+    if (row.highlight) { setFill(pdf, HIGHLIGHT_BG); pdf.rect(margin, y, contentWidth, rowHeight, 'F'); }
+    pdf.setDrawColor(RULE[0], RULE[1], RULE[2]);
+    pdf.setLineWidth(0.15);
+    pdf.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
+    row.cells.forEach((cell, i) => {
+      const column = table.columns[i];
+      if (!column) return;
+      const spec = typeof cell === 'string' ? { text: cell } : cell;
+      const align = column.align ?? 'left';
+      pdf.setFont('helvetica', spec.bold || row.highlight ? 'bold' : 'normal');
+      pdf.setFontSize(6.8);
+      if (spec.fill) {
+        const chipWidth = Math.min(widths[i] - pad * 2, Math.max(7, pdf.getTextWidth(pdfSafeText(spec.text)) + 3));
+        const chipX = align === 'right' ? xs[i] + widths[i] - pad - chipWidth : align === 'center' ? xs[i] + (widths[i] - chipWidth) / 2 : xs[i] + pad;
+        setFill(pdf, spec.fill);
+        pdf.roundedRect(chipX, y + 1.1, chipWidth, rowHeight - 2.2, 1, 1, 'F');
+        setText(pdf, spec.color ?? [255, 255, 255]);
+        pdf.text(fitText(pdf, spec.text, chipWidth - 1), chipX + chipWidth / 2, y + 4.2, { align: 'center' });
+        return;
+      }
+      setText(pdf, spec.color ?? INK);
+      const text = fitText(pdf, spec.text, widths[i] - pad * 2);
+      const x = align === 'right' ? xs[i] + widths[i] - pad : align === 'center' ? xs[i] + widths[i] / 2 : xs[i] + pad;
+      pdf.text(text, x, y + 4.2, { align });
+    });
+    y += rowHeight;
+  }
+
+  if (table.note) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6.3);
+    setText(pdf, MUTED);
+    const lines = pdf.splitTextToSize(pdfSafeText(table.note), contentWidth) as string[];
+    if (y + 2 + lines.length * 3 > ctx.bottom) y = ctx.newPage();
+    lines.forEach((line, i) => pdf.text(line, margin, y + 3.5 + i * 3));
+    y += 2 + lines.length * 3;
+  }
+  return y + 1;
+}
+
+/** Bulleted sentences, wrapped to the content width. */
+export function drawParagraphs(ctx: BlockContext, paragraphs: string[], startY: number): number {
+  const { pdf, margin, contentWidth } = ctx;
+  let y = startY;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  for (const paragraph of paragraphs) {
+    const lines = pdf.splitTextToSize(pdfSafeText(paragraph), contentWidth - 5) as string[];
+    const height = lines.length * 3.9 + 1.4;
+    if (y + height > ctx.bottom) y = ctx.newPage();
+    setFill(pdf, MUTED);
+    pdf.circle(margin + 1.2, y + 1.9, 0.55, 'F');
+    setText(pdf, INK);
+    lines.forEach((line, i) => pdf.text(line, margin + 4.5, y + 2.9 + i * 3.9));
+    y += height;
+  }
+  return y;
+}
+
+/** Rounds a maximum up to a readable axis bound (1, 2, 5 × 10^n). */
+export function niceMax(value: number): number {
+  if (value <= 0) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  for (const step of [1, 2, 2.5, 5, 10]) if (step * magnitude >= value) return step * magnitude;
+  return 10 * magnitude;
+}
+
+function drawLegend(ctx: BlockContext, items: Array<{ name: string; color: Rgb; emphasis?: boolean }>, startY: number): number {
+  const { pdf, margin, contentWidth } = ctx;
+  let x = margin;
+  let y = startY;
+  pdf.setFontSize(6.5);
+  for (const item of items) {
+    pdf.setFont('helvetica', item.emphasis ? 'bold' : 'normal');
+    const label = fitText(pdf, item.name, 60);
+    const width = 5 + pdf.getTextWidth(label) + 5;
+    if (x + width > margin + contentWidth) { x = margin; y += 4; }
+    setFill(pdf, item.color);
+    pdf.roundedRect(x, y - 2.2, 3, 2.6, 0.5, 0.5, 'F');
+    setText(pdf, item.emphasis ? INK : MUTED);
+    pdf.text(label, x + 4.2, y);
+    x += width;
+  }
+  return y + 3;
+}
+
+export function drawLineChart(ctx: BlockContext, chart: PdfLineChart, startY: number): number {
+  const { pdf, margin, contentWidth } = ctx;
+  const height = chart.height ?? 62;
+  const legendRows = Math.ceil(chart.series.length / 5);
+  let y = startY;
+  if (y + height + 6 + legendRows * 4 > ctx.bottom) y = ctx.newPage();
+
+  const axisWidth = 9;
+  const left = margin + axisWidth;
+  const width = contentWidth - axisWidth;
+  const plotTop = y + 2;
+  const plotHeight = height - 9;
+  const values = chart.series.flatMap((s) => s.values).filter((v): v is number => v !== null);
+  const max = niceMax(Math.max(1, ...values));
+  const n = Math.max(1, chart.labels.length);
+  const xAt = (i: number) => (n === 1 ? left + width / 2 : left + (i / (n - 1)) * width);
+  const yAt = (v: number) => plotTop + plotHeight - (v / max) * plotHeight;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(6);
+  for (let t = 0; t <= 4; t++) {
+    const value = (max / 4) * t;
+    const gy = yAt(value);
+    pdf.setDrawColor(RULE[0], RULE[1], RULE[2]);
+    pdf.setLineWidth(0.15);
+    pdf.line(left, gy, left + width, gy);
+    setText(pdf, MUTED);
+    pdf.text(Number.isInteger(value) ? String(value) : value.toFixed(1), left - 1.5, gy + 1, { align: 'right' });
+  }
+  const every = Math.max(1, Math.ceil(n / 14));
+  chart.labels.forEach((label, i) => {
+    if (i % every !== 0 && i !== n - 1) return;
+    pdf.text(pdfSafeText(label), xAt(i), plotTop + plotHeight + 4, { align: 'center' });
+  });
+
+  // Muted series first so the emphasised one is drawn on top.
+  const ordered = [...chart.series].sort((a, b) => Number(Boolean(a.emphasis)) - Number(Boolean(b.emphasis)));
+  for (const series of ordered) {
+    pdf.setDrawColor(series.color[0], series.color[1], series.color[2]);
+    pdf.setLineWidth(series.emphasis ? 0.9 : 0.4);
+    let previous: { x: number; y: number } | null = null;
+    series.values.forEach((value, i) => {
+      if (value === null) { previous = null; return; }
+      const point = { x: xAt(i), y: yAt(value) };
+      if (previous) pdf.line(previous.x, previous.y, point.x, point.y);
+      if (series.emphasis) { setFill(pdf, series.color); pdf.circle(point.x, point.y, 0.7, 'F'); }
+      previous = point;
+    });
+  }
+  return drawLegend(ctx, chart.series, y + height + 1) + 1;
+}
+
+export function drawBarChart(ctx: BlockContext, chart: PdfBarChart, startY: number): number {
+  const { pdf, margin, contentWidth } = ctx;
+  const labelWidth = Math.min(70, contentWidth * 0.3);
+  const valueWidth = 16;
+  const barArea = contentWidth - labelWidth - valueWidth;
+  const barHeight = 4.4;
+  const gap = 1.8;
+  const max = Math.max(0, ...chart.bars.map((b) => b.value ?? 0)) || 1;
+  let y = startY;
+  for (const bar of chart.bars) {
+    if (y + barHeight + gap > ctx.bottom) y = ctx.newPage();
+    pdf.setFont('helvetica', bar.emphasis ? 'bold' : 'normal');
+    pdf.setFontSize(7);
+    setText(pdf, INK);
+    pdf.text(fitText(pdf, bar.label, labelWidth - 3), margin, y + 3.3);
+    setFill(pdf, HEADER_BG);
+    pdf.roundedRect(margin + labelWidth, y, barArea, barHeight, 1, 1, 'F');
+    if (bar.value !== null && bar.value > 0) {
+      setFill(pdf, bar.color ?? [100, 116, 139]);
+      pdf.roundedRect(margin + labelWidth, y, Math.max(1.5, (bar.value / max) * barArea), barHeight, 1, 1, 'F');
+    }
+    setText(pdf, bar.value === null ? MUTED : INK);
+    pdf.text(pdfSafeText(bar.display), margin + contentWidth, y + 3.3, { align: 'right' });
+    y += barHeight + gap;
+  }
+  return y;
+}

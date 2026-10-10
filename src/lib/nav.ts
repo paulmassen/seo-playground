@@ -4,7 +4,7 @@ import {
   TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
   Gauge, Lightbulb, BrainCircuit, Star, Flame, Cpu, ShieldCheck, Grid3X3,
   Sparkles, Target, Layers, Network, LineChart, Tag, ScanText,
-  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet, CalendarCheck, Unlink,
+  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet, CalendarCheck, Unlink, Trophy,
 } from 'lucide-react';
 
 // Single source of truth for the tool list: the Sidebar and the Dashboard home both render from it.
@@ -115,6 +115,7 @@ export const NAV_SECTIONS: NavSection[] = [
     color: 'yellow',
     items: [
       { name: 'Google Reviews', href: '/dashboard/google-reviews', icon: Star, desc: 'Google reviews and rating goals' },
+      { name: 'Review Velocity', href: '/dashboard/review-velocity', icon: Trophy, desc: 'Rank local competitors on review pace and replies' },
       { name: 'Web Mentions', href: '/dashboard/web-mentions', icon: Megaphone, desc: 'Brand mentions and sentiment across the web' },
     ],
   },

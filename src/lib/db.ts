@@ -273,6 +273,14 @@ function getDb(): Database.Database {
   return getDbForProject(getCurrentProject().id);
 }
 
+/**
+ * Data store for feature modules that keep their own tables (e.g. review-velocity-db.ts).
+ * With an explicit ID (cron, workers) the project must still exist; without one it uses the operation's scope.
+ */
+export function getProjectDataDb(projectId?: string): Database.Database {
+  return projectId ? getDbForProject(projectId) : getDb();
+}
+
 function initSchema(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -3090,6 +3098,8 @@ export const SPEND_SOURCES: Array<{ table: string; tool: string; href: string | 
   { table: 'bl_bulk_backlinks', tool: 'Bulk Backlinks', href: '/dashboard/backlinks/bulk-backlinks' },
   { table: 'bl_bulk_ref_domains', tool: 'Bulk Ref. Domains', href: '/dashboard/backlinks/bulk-referring-domains' },
   { table: 'bl_broken', tool: 'Broken Backlinks', href: '/dashboard/backlinks/broken' },
+  { table: 'rv_tasks', tool: 'Review Velocity', href: '/dashboard/review-velocity', tsColumn: 'created_at' },
+  { table: 'rv_discoveries', tool: 'Review Velocity', href: '/dashboard/review-velocity' },
   { table: 'serp_searches', tool: 'SERP Checker', href: '/dashboard/serp' },
   { table: 'lf_searches', tool: 'Local Finder', href: '/dashboard/local-finder' },
   { table: 'grid_searches', tool: 'Geo-Grid Ranking', href: '/dashboard/geo-grid' },
