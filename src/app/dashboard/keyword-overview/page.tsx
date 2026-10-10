@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -87,7 +88,7 @@ function formatDate(ts: number) {
 
 // ---- Page ----
 
-export default async function KeywordOverviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function KeywordOverviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -194,7 +195,7 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
               name="keywords"
               defaultValue={activeEntry ? '' : rawKeywords}
               rows={5}
-              placeholder={"plombier paris\ndébouchage évier\nrobineterie fuite"}
+              placeholder={"plumber paris\nsink unclogging\nplumbing leak"}
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 font-mono resize-y"
             />
           </div>
@@ -283,3 +284,5 @@ export default async function KeywordOverviewPage({ searchParams }: { searchPara
     </div>
   );
 }
+
+export default withProjectScope(KeywordOverviewPage);

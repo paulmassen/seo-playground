@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -6,11 +7,14 @@ import {
   type ReviewsTask,
 } from '@/lib/db';
 import { submitReviewsTaskAction } from './actions';
+import { getBrandSettings } from '@/lib/brand-server';
 import PendingButton from '@/components/PendingButton';
 import HistorySidebar from '@/components/HistorySidebar';
 import LocationPicker from '@/components/LocationPicker';
 import DownloadCsvButton from './DownloadCsvButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import ExportExcelButton from '@/components/ExportExcelButton';
+import ReportPdfExportButton from '@/components/ReportPdfExportButton';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -514,11 +518,14 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function GoogleReviewsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function GoogleReviewsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = getSetting('default_location') ?? 'France';
   const defaultLanguage = getSetting('default_language') ?? 'French';
+  const brand = getBrandSettings();
+  const brandName = brand.name;
+  const brandLogoUrl = brand.logo ?? undefined;
 
   // Auto-poll: check tasks_ready on every load and fetch ready tasks
   if (creds) {
@@ -630,6 +637,17 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
     { key: 'review', label: 'Review' },
     { key: 'owner_response', label: 'Owner response' },
   ];
+  const reviewsExcelData = reviews.map((r) => ({
+    date: r.timestamp ?? r.time_ago ?? '', rating: r.rating?.value ?? '', author: r.profile_name ?? '',
+    local_guide: r.local_guide ? 'Yes' : 'No', author_review_count: r.reviews_count ?? '',
+    review: (r.review_text ?? '').replace(/<br\s*\/?>/gi, '\n'),
+    owner_response: (r.owner_answer ?? '').replace(/<br\s*\/?>/gi, '\n'), owner_reply_date: r.owner_time_ago ?? '',
+  }));
+  const reviewFileStem = (activeTask?.business || 'reviews').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+  const distributionRows = [5, 4, 3, 2, 1].map((stars) => {
+    const count = ratings.filter((value) => value >= stars - 0.5 && value < stars + 0.5).length;
+    return [`${stars} stars`, `${count} (${ratings.length ? Math.round((count / ratings.length) * 100) : 0}%)`] as [string, string];
+  });
 
   const pendingCount = tasks.filter((t) => t.status === 'pending').length;
 
@@ -762,6 +780,31 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
       {/* Results */}
       {activeTask && activeTask.status === 'ready' && reviews.length > 0 && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4 border-y border-slate-100 dark:border-slate-800 py-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Export reputation report</p>
+            <div className="flex items-center gap-3">
+              <ReportPdfExportButton brandName={brandName} brandLogoUrl={brandLogoUrl} brandColor={brand.color} brandFooter={brand.footer} brandStyle={brand} filename={`${reviewFileStem}-reputation-report.pdf`}
+                title="Google reviews report" subject={meta?.title || activeTask.business} generatedAt={activeTask.ts}
+                metrics={[
+                  { label: 'Average rating', value: avgRating?.toFixed(2) ?? '—', detail: 'out of 5 stars' },
+                  { label: 'Reviews analysed', value: String(reviews.length), detail: meta?.total_count ? `${meta.total_count} available` : undefined },
+                  { label: 'Positive reviews', value: positivePct !== null ? `${positivePct}%` : '—', detail: '4 stars and above' },
+                  { label: 'Owner replies', value: ownerReplyPct !== null ? `${ownerReplyPct}%` : '—', detail: `${ownerRepliedCount} replies` },
+                ]}
+                sections={[
+                  { title: 'Rating distribution', rows: distributionRows },
+                  { title: 'Business details', rows: [[ 'Category', meta?.category ?? '—' ], [ 'Address', meta?.address ?? '—' ], [ 'Website', meta?.website ?? '—' ]].filter((row) => row[1] !== '—') as Array<[string, string]> },
+                ]} />
+              <ExportExcelButton filename={`${reviewFileStem}-reviews.xls`} sheets={[{
+                name: 'Reviews', columns: [
+                  { key: 'date', label: 'Date' }, { key: 'rating', label: 'Rating' }, { key: 'author', label: 'Author' },
+                  { key: 'local_guide', label: 'Local guide' }, { key: 'author_review_count', label: 'Author review count' },
+                  { key: 'review', label: 'Review' }, { key: 'owner_response', label: 'Owner response' }, { key: 'owner_reply_date', label: 'Owner reply date' },
+                ], data: reviewsExcelData,
+              }]} />
+              <DownloadCsvButton reviews={reviews} filename={`${reviewFileStem}-reviews.csv`} />
+            </div>
+          </div>
           {/* Summary stats */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <div className="flex items-center gap-6 flex-wrap">
@@ -911,3 +954,5 @@ export default async function GoogleReviewsPage({ searchParams }: { searchParams
     </div>
   );
 }
+
+export default withProjectScope(GoogleReviewsPage);

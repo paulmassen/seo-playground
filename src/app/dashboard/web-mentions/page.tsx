@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -160,7 +161,7 @@ function truncate(text: string, max: number) {
 
 // ---- Page ----
 
-export default async function WebMentionsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function WebMentionsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -389,3 +390,5 @@ export default async function WebMentionsPage({ searchParams }: { searchParams: 
     </div>
   );
 }
+
+export default withProjectScope(WebMentionsPage);

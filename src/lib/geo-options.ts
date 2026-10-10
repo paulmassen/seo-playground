@@ -105,7 +105,19 @@ export const LABS_LOCATIONS = [
 ];
 
 /**
- * The global `default_location` setting stores a full "City,Region,Country" string (needed for
+ * LLM Mentions returns country-level aggregated metrics keyed by DataForSEO's numeric
+ * location code (for example, 2124 for Canada). Resolve it before presenting a result
+ * or exporting it, while keeping unknown values intact for forwards compatibility.
+ */
+export function labsLocationLabel(value: string | number): string {
+  const code = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(code)
+    ? LABS_LOCATIONS.find((location) => location.code === code)?.name ?? String(value)
+    : String(value);
+}
+
+/**
+ * A project's `default_location` setting stores a full "City,Region,Country" string (needed for
  * SERP-based tools like Local Finder). Labs/AI Optimization endpoints only accept a bare country
  * name, so pull the country segment out of that string — checked from the end, since country is
  * always last — and fall back if none of the segments match a supported Labs country.

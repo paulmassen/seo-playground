@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getBlHistHistory, saveBlHist, getBlHistResults, type BlHistEntry } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
@@ -63,7 +64,7 @@ function SparkChart({ points, key1, key2, color1, color2 }: {
   );
 }
 
-export default async function BacklinksHistoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function BacklinksHistoryPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultDomain = getSetting('default_domain') ?? '';
@@ -219,3 +220,5 @@ export default async function BacklinksHistoryPage({ searchParams }: { searchPar
     </div>
   );
 }
+
+export default withProjectScope(BacklinksHistoryPage);

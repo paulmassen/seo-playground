@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getBlRefNetHistory, saveBlRefNet, getBlRefNetResults, type BlRefNetEntry } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -20,7 +21,7 @@ async function fetchNetworks(target: string, login: string, pass: string): Promi
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function ReferringNetworksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function ReferringNetworksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultDomain = getSetting('default_domain') ?? '';
@@ -134,3 +135,5 @@ export default async function ReferringNetworksPage({ searchParams }: { searchPa
     </div>
   );
 }
+
+export default withProjectScope(ReferringNetworksPage);

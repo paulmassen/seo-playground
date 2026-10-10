@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting,
   getRelatedKwHistory, saveRelatedKwSearch, getRelatedKwResults,
@@ -59,7 +60,7 @@ function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default async function RelatedKeywordsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function RelatedKeywordsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -155,7 +156,7 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
             <input
               type="text" name="keyword"
               defaultValue={displayKeyword}
-              placeholder="e.g. plombier"
+              placeholder="e.g. plumber"
               required
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
@@ -257,3 +258,5 @@ export default async function RelatedKeywordsPage({ searchParams }: { searchPara
     </div>
   );
 }
+
+export default withProjectScope(RelatedKeywordsPage);

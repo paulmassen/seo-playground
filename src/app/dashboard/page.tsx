@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials } from '@/lib/db';
@@ -22,7 +23,7 @@ const colorMap: Record<NavColor, { badge: string; icon: string; hover: string }>
   indigo:  { badge: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400', icon: 'text-indigo-400', hover: 'hover:border-indigo-200 dark:hover:border-indigo-800' },
 };
 
-export default async function DashboardPage() {
+async function DashboardPage() {
   const creds = getCredentials();
 
   if (!creds) {
@@ -94,3 +95,5 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
+export default withProjectScope(DashboardPage);

@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting,
   getTopSearchesHistory, saveTopSearches, getTopSearchesResults,
@@ -65,45 +66,6 @@ async function fetchTopSearches(
   return { items: result?.items ?? [], totalCount: result?.total_count, cost };
 }
 
-function DifficultyBadge({ value }: { value?: number }) {
-  if (value === undefined || value === null) return <span className="text-slate-300 text-xs">—</span>;
-  const color = value >= 70 ? 'bg-red-100 text-red-700'
-    : value >= 50 ? 'bg-orange-100 text-orange-700'
-    : value >= 30 ? 'bg-amber-100 text-amber-700'
-    : 'bg-emerald-100 text-emerald-700';
-  return <span className={`inline-flex items-center justify-center w-9 h-5 rounded text-[10px] font-black ${color}`}>{value}</span>;
-}
-
-function IntentBadge({ intent }: { intent?: string }) {
-  if (!intent) return <span className="text-slate-300 text-xs">—</span>;
-  const map: Record<string, string> = {
-    informational: 'bg-blue-50 text-blue-600',
-    navigational: 'bg-purple-50 text-purple-600',
-    commercial: 'bg-amber-50 text-amber-700',
-    transactional: 'bg-emerald-50 text-emerald-700',
-  };
-  const cls = map[intent] ?? 'bg-slate-100 text-slate-500';
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wide ${cls}`}>{intent.slice(0, 5)}</span>;
-}
-
-function TrendSparkline({ monthly }: { monthly?: MonthlySearch[] }) {
-  if (!monthly || monthly.length === 0) return <span className="text-slate-300 text-xs">—</span>;
-  const sorted = [...monthly].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
-  const values = sorted.map((m) => m.search_volume);
-  const max = Math.max(...values, 1);
-  const w = 60, h = 20;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - (v / max) * h;
-    return `${x},${y}`;
-  }).join(' ');
-  return (
-    <svg width={w} height={h} className="inline-block align-middle">
-      <polyline points={pts} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function fmt(n?: number) {
   if (n === undefined || n === null) return '—';
   return n.toLocaleString('en-GB');
@@ -115,7 +77,7 @@ function formatDate(ts: number) {
 
 const COST_PER_1000 = 0.05;
 
-export default async function TopSearchesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function TopSearchesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -333,3 +295,5 @@ export default async function TopSearchesPage({ searchParams }: { searchParams: 
     </div>
   );
 }
+
+export default withProjectScope(TopSearchesPage);

@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getBlBulkBlHistory, saveBlBulkBl, getBlBulkBlResults, type BlBulkBlEntry } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
@@ -23,7 +24,7 @@ async function fetchBulkBacklinks(targets: string[], login: string, pass: string
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function BulkBacklinksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function BulkBacklinksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const rawTargets = params.targets?.trim() ?? '';
@@ -132,3 +133,5 @@ export default async function BulkBacklinksPage({ searchParams }: { searchParams
     </div>
   );
 }
+
+export default withProjectScope(BulkBacklinksPage);

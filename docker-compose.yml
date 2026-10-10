@@ -1,15 +1,52 @@
 services:
+  init:
+    image: busybox:1.36
+    volumes:
+      - ./data:/data
+    command: >
+      sh -c 'if [ ! -s /data/.geo-grid-worker-secret ]; then
+      umask 077 && head -c 48 /dev/urandom | base64 > /data/.geo-grid-worker-secret &&
+      chmod 644 /data/.geo-grid-worker-secret; fi'
+    restart: "no"
+
   app:
     build: .
     # Run as the host user so the ./data bind mount (owned by that user) stays writable on native
     # Linux, where uids aren't remapped. Defaults to 1000, the first user on most distros; override
     # with HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up. No effect on Docker Desktop.
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    # Loopback only by default: the dashboard has no login unless AUTH_ENABLED=true, and it spends DataForSEO credit.
     ports:
-      - "3000:3000"
+      - "${SEO_PLAYGROUND_BIND:-127.0.0.1}:3000:3000"
     volumes:
       # SQLite database — persisted in ./data/ next to this file
       - ./data:/data
     environment:
       DB_PATH: /data/seo-playground.db
+      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_SECRET_FILE: /data/.geo-grid-worker-secret
+      AUTH_ENABLED: ${AUTH_ENABLED:-}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build: .
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    command: ["node", "scripts/geo-grid-worker.mjs"]
+    volumes:
+      - ./data:/data:ro
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_SECRET_FILE: /data/.geo-grid-worker-secret
+      GEO_GRID_WORKER_URL: http://app:3000
+      GEO_GRID_WORKER_INTERVAL_MS: ${GEO_GRID_WORKER_INTERVAL_MS:-60000}
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      app:
+        condition: service_started
     restart: unless-stopped

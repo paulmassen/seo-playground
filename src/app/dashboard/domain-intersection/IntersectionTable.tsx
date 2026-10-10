@@ -135,7 +135,7 @@ export default function IntersectionTable({
               <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                 <td className="px-5 py-3 font-bold text-slate-800 dark:text-slate-200">{item.keyword_data.keyword}</td>
                 <td className="px-3 py-3 text-right font-mono text-slate-500 dark:text-slate-400">
-                  {(item.keyword_data.keyword_info?.search_volume ?? 0).toLocaleString()}
+                  {(item.keyword_data.keyword_info?.search_volume ?? 0).toLocaleString('en-GB')}
                 </td>
                 <td className="px-3 py-3 text-center">
                   <KdBadge kd={item.keyword_data.keyword_properties?.keyword_difficulty} />

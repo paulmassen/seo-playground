@@ -17,9 +17,9 @@ interface AuditPage {
     internal_links_count?: number;
     external_links_count?: number;
     images_count?: number;
+    content?: { plain_text_word_count?: number };
   };
   page_timing?: { duration_time?: number; waiting_time?: number };
-  content?: { plain_text_word_count?: number };
   checks?: Record<string, boolean | undefined>;
 }
 
@@ -107,7 +107,7 @@ function sortValue(page: AuditPage, key: SortKey): number | string {
       return errors * 1000 + warnings;
     }
     case 'load': return page.page_timing?.duration_time ?? -1;
-    case 'words': return page.content?.plain_text_word_count ?? -1;
+    case 'words': return page.meta?.content?.plain_text_word_count ?? -1;
   }
 }
 
@@ -202,7 +202,7 @@ export default function SiteAuditPagesTable({ pages }: { pages: AuditPage[] }) {
                   {formatMs(page.page_timing?.duration_time)}
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-slate-500 tabular-nums hidden xl:table-cell text-xs">
-                  {fmt(page.content?.plain_text_word_count)}
+                  {fmt(page.meta?.content?.plain_text_word_count)}
                 </td>
               </tr>
             );

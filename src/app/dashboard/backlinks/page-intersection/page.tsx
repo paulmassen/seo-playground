@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getBlPageIntHistory, saveBlPageInt, getBlPageIntResults, type BlPageIntEntry } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -35,7 +36,7 @@ async function fetchPageInt(targets: string[], login: string, pass: string): Pro
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function BacklinksPageIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function BacklinksPageIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const rawTargets = params.targets?.trim() ?? '';
@@ -155,3 +156,5 @@ export default async function BacklinksPageIntersectionPage({ searchParams }: { 
     </div>
   );
 }
+
+export default withProjectScope(BacklinksPageIntersectionPage);

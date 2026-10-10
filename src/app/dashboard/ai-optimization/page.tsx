@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -137,7 +138,7 @@ function formatDate(iso?: string) {
 
 // ---- Page ----
 
-export default async function AiOptimizationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function AiOptimizationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -231,7 +232,7 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
                 name="target"
                 type="text"
                 defaultValue={displayTarget}
-                placeholder={targetType === 'domain' ? 'example.com' : 'plombier paris'}
+                placeholder={targetType === 'domain' ? 'example.com' : 'plumber paris'}
                 className="w-full h-[42px] px-4 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800"
               />
             </div>
@@ -414,3 +415,5 @@ export default async function AiOptimizationPage({ searchParams }: { searchParam
     </div>
   );
 }
+
+export default withProjectScope(AiOptimizationPage);

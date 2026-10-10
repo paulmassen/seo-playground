@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getBlBulkRdHistory, saveBlBulkRd, getBlBulkRdResults, type BlBulkRdEntry } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
@@ -26,10 +27,9 @@ async function fetchBulkRd(targets: string[], login: string, pass: string): Prom
   return { items: result?.items ?? [], cost };
 }
 
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function BulkRefDomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function BulkRefDomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const rawTargets = params.targets?.trim() ?? '';
@@ -140,3 +140,5 @@ export default async function BulkRefDomainsPage({ searchParams }: { searchParam
     </div>
   );
 }
+
+export default withProjectScope(BulkRefDomainsPage);

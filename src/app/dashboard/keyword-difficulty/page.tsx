@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting,
   getKwDifficultyHistory, saveKwDifficultySearch, getKwDifficultyResults,
@@ -55,7 +56,7 @@ function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default async function KeywordDifficultyPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function KeywordDifficultyPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -202,3 +203,5 @@ export default async function KeywordDifficultyPage({ searchParams }: { searchPa
     </div>
   );
 }
+
+export default withProjectScope(KeywordDifficultyPage);

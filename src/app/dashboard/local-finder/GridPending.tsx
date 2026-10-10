@@ -6,6 +6,7 @@ import type { GridQueueMode } from '@/lib/db';
 
 interface Props {
   searchId: string;
+  projectId: string;
   totalPoints: number;
   queueMode: GridQueueMode;
   keyword: string;
@@ -42,7 +43,7 @@ function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
-export default function GridPending({ searchId, totalPoints, queueMode, keyword, target, gridSize, startedAt }: Props) {
+export default function GridPending({ searchId, projectId, totalPoints, queueMode, keyword, target, gridSize, startedAt }: Props) {
   const router = useRouter();
   const [ready, setReady] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -65,7 +66,7 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
     setChecking(true);
     setError(null);
     try {
-      const res = await fetch(`/api/grid-check/${searchId}`);
+      const res = await fetch(`/api/grid-check/${encodeURIComponent(searchId)}?project=${encodeURIComponent(projectId)}`);
       const data = await res.json() as { status: string; ready?: number; total?: number; error?: string };
       setLastChecked(new Date());
       if (data.status === 'done') {
@@ -84,7 +85,7 @@ export default function GridPending({ searchId, totalPoints, queueMode, keyword,
       checkingRef.current = false;
       setChecking(false);
     }
-  }, [searchId, router]);
+  }, [searchId, projectId, router]);
 
   const interval = POLL_INTERVAL[queueMode];
 

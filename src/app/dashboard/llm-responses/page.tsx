@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import {
@@ -5,42 +6,13 @@ import {
   getLlmResponseHistory, saveLlmResponseSearch, getLlmResponseResult,
   type LlmResponseEntry,
 } from '@/lib/db';
-import { PLATFORM_LABELS, MODELS_BY_PLATFORM, isValidPlatform, type LlmPlatform } from '@/lib/llm-options';
+import { PLATFORM_LABELS, DEFAULT_MODEL_BY_PLATFORM, isValidPlatform, type LlmPlatform } from '@/lib/llm-options';
 import { stableSearchId } from '@/lib/dedupe';
-import { callDataForSeoFirst } from '@/lib/dataforseo';
+import { fetchLlmResponse, type LlmResponseResult, type ResponseItem } from '@/lib/llm-responses';
+import { extractAnswerText } from '@/lib/prompt-mentions';
+import MarkdownAnswer from '@/components/MarkdownAnswer';
 import LlmResponseForm from './LlmResponseForm';
 import HistorySidebar from '@/components/HistorySidebar';
-
-// ---- Types ----
-
-interface Annotation {
-  title?: string;
-  url?: string;
-}
-
-interface ResponseSection {
-  type?: string;
-  text?: string;
-  annotations?: Annotation[];
-}
-
-interface ResponseItem {
-  type?: string;
-  sections?: ResponseSection[];
-}
-
-interface LlmResponseResult {
-  platform?: string;
-  model_name?: string;
-  input_tokens?: number;
-  output_tokens?: number;
-  reasoning_tokens?: number;
-  web_search?: boolean;
-  money_spent?: number;
-  datetime?: string;
-  items?: ResponseItem[];
-  fan_out_queries?: Array<{ keyword?: string }> | null;
-}
 
 interface SearchParams {
   platform?: string;
@@ -50,26 +22,6 @@ interface SearchParams {
   web_search?: string;
   country_code?: string;
   history_id?: string;
-}
-
-// ---- API ----
-
-async function fetchLlmResponse(
-  platform: LlmPlatform,
-  prompt: string,
-  model: string,
-  webSearch: boolean,
-  countryCode: string,
-  systemMessage: string,
-  login: string,
-  pass: string,
-): Promise<{ result?: LlmResponseResult; cost?: number; error?: string }> {
-  const body: Record<string, unknown> = { user_prompt: prompt, model_name: model };
-  if (platform !== 'perplexity') body.web_search = webSearch;
-  if (systemMessage) body.system_message = systemMessage;
-  if (countryCode && (webSearch || platform === 'perplexity')) body.web_search_country_iso_code = countryCode.toUpperCase();
-
-  return callDataForSeoFirst<LlmResponseResult>(`ai_optimization/${platform}/llm_responses/live`, body, { login, pass });
 }
 
 // ---- UI helpers ----
@@ -84,17 +36,11 @@ function ResponseText({ items }: { items?: ResponseItem[] }) {
 
   const allAnnotations = messageItems.flatMap((it) => it.sections ?? []).flatMap((s) => s.annotations ?? []);
 
+  const answerMarkdown = extractAnswerText(messageItems);
+
   return (
     <div className="space-y-4">
-      {messageItems.map((item, i) => (
-        <div key={i} className="space-y-2">
-          {(item.sections ?? []).map((section, si) => (
-            <p key={si} className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-              {section.text}
-            </p>
-          ))}
-        </div>
-      ))}
+      <MarkdownAnswer>{answerMarkdown}</MarkdownAnswer>
       {allAnnotations.length > 0 && (
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Sources</p>
@@ -129,13 +75,13 @@ function StatChip({ label, value }: { label: string; value: string }) {
 
 // ---- Page ----
 
-export default async function LlmResponsesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function LlmResponsesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
 
   const platform: LlmPlatform = isValidPlatform(params.platform ?? '') ? (params.platform as LlmPlatform) : 'chat_gpt';
-  const model = (params.model ?? MODELS_BY_PLATFORM[platform][0]).trim();
+  const model = (params.model ?? DEFAULT_MODEL_BY_PLATFORM[platform]).trim();
   const prompt = (params.user_prompt ?? '').trim();
   const systemMessage = (params.system_message ?? '').trim();
   const webSearch = params.web_search === 'on';
@@ -171,7 +117,7 @@ export default async function LlmResponsesPage({ searchParams }: { searchParams:
     } else if (!creds) {
       error = 'DataForSEO credentials missing. Configure them in Settings.';
     } else {
-      const res = await fetchLlmResponse(platform, prompt, model, webSearch, countryCode, systemMessage, creds.login, creds.pass);
+      const res = await fetchLlmResponse(platform, prompt, model, webSearch, countryCode, systemMessage, creds);
       result = res.result ?? null;
       cost = res.cost;
       error = res.error ?? null;
@@ -300,3 +246,5 @@ export default async function LlmResponsesPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(LlmResponsesPage);

@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getInstantPageHistory, saveInstantPageResult, getInstantPageResult, type InstantPageEntry } from '@/lib/db';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import { redirect } from 'next/navigation';
@@ -231,7 +232,7 @@ function CheckBadge({ severity, label }: { severity: CheckSeverity; label: strin
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function InstantPagesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function InstantPagesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
 
@@ -553,3 +554,5 @@ export default async function InstantPagesPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(InstantPagesPage);

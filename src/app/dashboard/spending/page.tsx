@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
@@ -91,7 +92,7 @@ function SpendChart({ buckets, unit }: { buckets: SpendBucket[]; unit: 'day' | '
   );
 }
 
-export default async function SpendingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SpendingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const firstTs = getFirstSpendTs();
   const range = resolveSpendRange(params, new Date(), firstTs);
@@ -295,3 +296,5 @@ export default async function SpendingPage({ searchParams }: { searchParams: Pro
     </div>
   );
 }
+
+export default withProjectScope(SpendingPage);

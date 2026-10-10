@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting, getLfHistory, saveLfSearch, getLfResults, type LfHistoryEntry,
 } from '@/lib/db';
@@ -70,7 +71,7 @@ function lfRerunUrl(entry: LfHistoryEntry) {
   return `/dashboard/local-finder?${p.toString()}`;
 }
 
-export default async function LocalFinderPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function LocalFinderPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -249,3 +250,5 @@ export default async function LocalFinderPage({ searchParams }: { searchParams: 
     </div>
   );
 }
+
+export default withProjectScope(LocalFinderPage);

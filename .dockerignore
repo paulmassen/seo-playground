@@ -8,3 +8,6 @@ node_modules
 .wrangler
 data/*
 !data/*.csv
+*.db.*
+*.db-*
+.dev.vars

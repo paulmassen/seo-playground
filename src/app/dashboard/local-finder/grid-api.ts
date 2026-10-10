@@ -1,4 +1,5 @@
 import type { GridPoint, GridLocalItem, GridTaskPoint } from '@/lib/db';
+import { matchesGridTarget } from '@/lib/grid-target';
 
 export interface LocalPackItem {
   type: string;
@@ -103,17 +104,13 @@ export async function fetchGridSearch(
   const [centerLat, centerLng] = parts;
   const coords = generateGridCoords(centerLat, centerLng, gridSize, spacingKm);
   const auth = btoa(`${login}:${pass}`);
-  const targetLower = target.toLowerCase();
 
   const pointResults = await mapWithConcurrency(
     coords, 6,
     async ({ row, col, lat, lng }) => {
       const { items: rawItems, cost } = await fetchOneGridPoint(keyword, lat, lng, language, auth);
 
-      const isTarget = (item: LocalPackItem) =>
-        (item.title ?? '').toLowerCase().includes(targetLower) ||
-        (item.domain ?? '').toLowerCase().includes(targetLower) ||
-        (item.url ?? '').toLowerCase().includes(targetLower);
+      const isTarget = (item: LocalPackItem) => matchesGridTarget(target, item);
 
       const match = rawItems.find(isTarget);
       const items: GridLocalItem[] = rawItems.slice(0, 20).map((item) => ({
@@ -163,16 +160,22 @@ export async function postGridTasksQueue(
       depth: 20,
       priority,
     }));
-    const res = await fetch('https://api.dataforseo.com/v3/serp/google/local_finder/task_post', {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return { taskPoints: [], cost: 0, error: `API error ${res.status}` };
-    const data = await res.json() as {
-      tasks?: Array<{ id?: string; status_code?: number; cost?: number }>;
-    };
-    if (!data.tasks) return { taskPoints: [], cost: 0, error: 'Empty response from DataForSEO.' };
+    // On failure, still return the chunks already posted: those tasks are billed, and
+    // callers keep them as a partial run rather than losing them or posting them twice.
+    let data: { tasks?: Array<{ id?: string; status_code?: number; cost?: number }> };
+    try {
+      const res = await fetch('https://api.dataforseo.com/v3/serp/google/local_finder/task_post', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!res.ok) return { taskPoints: allTaskPoints, cost: totalCost, error: `API error ${res.status}` };
+      data = await res.json();
+    } catch (error) {
+      return { taskPoints: allTaskPoints, cost: totalCost, error: error instanceof Error ? error.message : 'Could not reach DataForSEO.' };
+    }
+    if (!data.tasks) return { taskPoints: allTaskPoints, cost: totalCost, error: 'Empty response from DataForSEO.' };
     data.tasks.forEach((task, j) => {
       const coord = chunk[j];
       if (task.id) {

@@ -91,8 +91,8 @@ export default function AnchorsTable({ items }: { items: AnchorItem[] }) {
                   <div className="h-full bg-blue-400 rounded-full" style={{ width: `${pct}%` }} />
                 </div>
               </td>
-              <td className="px-3 py-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">{item.backlinks.toLocaleString()}</td>
-              <td className="px-3 py-3 text-right font-mono text-slate-500 dark:text-slate-400">{item.referring_domains.toLocaleString()}</td>
+              <td className="px-3 py-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">{item.backlinks.toLocaleString('en-GB')}</td>
+              <td className="px-3 py-3 text-right font-mono text-slate-500 dark:text-slate-400">{item.referring_domains.toLocaleString('en-GB')}</td>
               <td className="px-3 py-3">
                 <div className="flex items-center gap-1">
                   <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400">{dfPct}% do</span>

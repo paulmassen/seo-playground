@@ -1,8 +1,11 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getSetting } from '@/lib/db';
+import { getBrandSettings } from '@/lib/brand-server';
+import { DEFAULT_BRAND_COLOR, normalizeHexColor } from '@/lib/brand';
 import { updateSettings, deleteCredentials } from './actions';
-import LocationPicker from '@/components/LocationPicker';
+import BrandIdentityFields from './BrandIdentityFields';
 
 interface DFUserResponse {
   tasks?: Array<{
@@ -14,12 +17,15 @@ interface DFUserResponse {
 
 const inputCls = 'w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-slate-900 dark:text-white placeholder-slate-300 dark:placeholder-slate-600 transition-all font-medium';
 
-export default async function SettingsPage() {
+async function SettingsPage() {
   const creds = getCredentials();
-  const defaultLocation = getSetting('default_location') ?? '';
-  const defaultCoordinates = getSetting('default_coordinates') ?? '';
-  const defaultLanguage = getSetting('default_language') ?? '';
-  const defaultDomain = getSetting('default_domain') ?? '';
+  // Raw values: blank fields stay blank so the defaults remain visible as placeholders.
+  const brandName = getSetting('brand_name') ?? '';
+  const brandFooter = getSetting('brand_footer') ?? '';
+  const brandColor = normalizeHexColor(getSetting('brand_color')) ?? DEFAULT_BRAND_COLOR;
+  const resolvedBrand = getBrandSettings();
+  const brandLogo = resolvedBrand.logo;
+  const brandStyle = resolvedBrand;
 
   let balance = 0;
   let status = 'NOT CONNECTED';
@@ -80,6 +86,16 @@ export default async function SettingsPage() {
             {/* API Credentials */}
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">API Credentials</p>
+              {!creds && (
+                <aside className="mb-6 border-l-2 border-blue-500 bg-blue-50/70 px-4 py-3.5 dark:border-blue-400 dark:bg-blue-950/25">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">New to DataForSEO?</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    <a href="https://try.dataforseo.com/nrjev32kinaz" target="_blank" rel="noreferrer" className="font-bold text-blue-700 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-100">Create an account through this link ↗</a>
+                    {' '}to support the continued development of SEO Playground, at no extra cost to you.
+                  </p>
+                  <p className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">Affiliate link — I may earn a commission if you become a customer.</p>
+                </aside>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">API Username</label>
@@ -88,36 +104,24 @@ export default async function SettingsPage() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">API Password</label>
                   <input name="password" type="password" className={inputCls} />
+                  {creds && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 ml-1">Password saved. Leave blank to keep it unchanged.</p>}
                 </div>
               </div>
             </div>
 
             <div className="border-t border-slate-200 dark:border-slate-700" />
 
-            {/* Search Defaults */}
+            {/* White-label report identity */}
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Search Defaults</p>
-              <p className="text-xs text-slate-400 mb-4">Pre-filled values across all search forms.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Location</label>
-                  <LocationPicker name="default_location" defaultValue={defaultLocation} placeholder="e.g. France, Paris" className={inputCls} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Language</label>
-                  <input name="default_language" type="text" defaultValue={defaultLanguage} placeholder="e.g. French" className={inputCls} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Coordinates</label>
-                  <input name="default_coordinates" type="text" defaultValue={defaultCoordinates} placeholder="e.g. 45.7640,4.8357" className={inputCls} />
-                  <p className="text-[10px] text-slate-400 ml-1">lat,lng — used for Maps &amp; Local Finder</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Default Domain</label>
-                  <input name="default_domain" type="text" defaultValue={defaultDomain} placeholder="e.g. example.com" className={inputCls} />
-                  <p className="text-[10px] text-slate-400 ml-1">Used in Rank Tracker &amp; domain-based tools</p>
-                </div>
-              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">White-label reports</p>
+              <p className="text-xs text-slate-400 mb-6">Applied to every PDF you export. Leave the name blank to use SEO Playground.</p>
+              <BrandIdentityFields
+                initialName={brandName}
+                initialColor={brandColor}
+                initialFooter={brandFooter}
+                initialStyle={brandStyle}
+                currentLogo={brandLogo}
+              />
             </div>
 
             <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-700 shadow-xl shadow-blue-200 dark:shadow-none transition-all active:scale-[0.98]">
@@ -142,3 +146,5 @@ export default async function SettingsPage() {
     </div>
   );
 }
+
+export default withProjectScope(SettingsPage);

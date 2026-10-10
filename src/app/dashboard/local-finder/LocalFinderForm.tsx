@@ -2,6 +2,7 @@
 
 import { useState, lazy, Suspense } from 'react';
 import { LANGUAGES } from '@/lib/geo-options';
+import { formatBusinessTarget } from '@/lib/grid-target';
 
 const MapPicker = lazy(() => import('./MapPicker'));
 
@@ -86,6 +87,8 @@ export default function LocalFinderForm({ defaults }: Props) {
   const [gridSize, setGridSize] = useState(parseInt(defaults.gridSize ?? '5', 10));
   const [spacingKm, setSpacingKm] = useState(parseFloat(defaults.spacingKm ?? '1'));
   const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'live');
+  const [language, setLanguage] = useState(defaults.language || 'English');
+  const [gridTarget, setGridTarget] = useState(defaults.gridTarget ?? '');
 
   const osOptions =
     device === 'mobile'
@@ -99,7 +102,7 @@ export default function LocalFinderForm({ defaults }: Props) {
       {/* Keyword */}
       <div>
         <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-          Keyword <span className="text-red-400">*</span>
+          Keyword to monitor <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
@@ -118,7 +121,8 @@ export default function LocalFinderForm({ defaults }: Props) {
         </label>
         <select
           name="language"
-          defaultValue={defaults.language || 'English'}
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
           className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
         >
           {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
@@ -129,7 +133,7 @@ export default function LocalFinderForm({ defaults }: Props) {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="block text-xs font-black uppercase tracking-widest text-slate-400">
-            {isGrid ? 'Grid center (map)' : 'Location (map)'} <span className="text-red-400">*</span>
+            {isGrid ? 'Location to monitor (map)' : 'Location (map)'} <span className="text-red-400">*</span>
           </label>
           {coordinate && (
             <button
@@ -149,6 +153,8 @@ export default function LocalFinderForm({ defaults }: Props) {
               showGrid={isGrid && !!coordinate}
               gridSize={isGrid ? gridSize : undefined}
               spacingKm={isGrid ? spacingKm : undefined}
+              language={language}
+              onBusinessSelect={isGrid ? (business) => setGridTarget(formatBusinessTarget(business.title, business.cid)) : undefined}
             />
           </Suspense>
           <input
@@ -173,17 +179,18 @@ export default function LocalFinderForm({ defaults }: Props) {
           {/* Target business */}
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-              Target business <span className="text-red-400">*</span>
+              Target domain or business <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
               name="grid_target"
-              defaultValue={defaults.gridTarget}
-              placeholder="e.g. Best Plumbing or bestplumbing.com"
+              value={gridTarget}
+              onChange={(e) => setGridTarget(e.target.value)}
+              placeholder="Pick a Google listing above, or enter a domain / business name"
               required
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
             />
-            <p className="text-[11px] text-slate-400 mt-1">Name or domain — partial match, case-insensitive.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Picking a listing from the map search matches that exact Google listing. A domain matches with or without https:// and www; a name matches partially.</p>
           </div>
 
           {/* Grid size + spacing */}
@@ -354,7 +361,7 @@ export default function LocalFinderForm({ defaults }: Props) {
             </svg>
             {isGrid ? 'Running grid…' : 'Searching…'}
           </span>
-        ) : (isGrid ? 'Run geo-grid' : 'Search')}
+        ) : (isGrid ? 'Create monitor & run' : 'Search')}
       </button>
     </form>
   );

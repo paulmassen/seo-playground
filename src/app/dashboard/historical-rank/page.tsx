@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getHistRankHistory, saveHistRankSearch, getHistRankResults, getSetting } from '@/lib/db';
@@ -6,6 +7,9 @@ import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields'
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
+import RankDistributionChart from './RankDistributionChart';
+
+const HISTORICAL_RANK_START = '2020-10-01';
 
 interface HistRankItem {
   se_type?: string;
@@ -35,13 +39,15 @@ interface SearchParams {
   target?: string;
   location?: string;
   language?: string;
+  date_from?: string;
+  date_to?: string;
   history_id?: string;
 }
 
-async function fetchHistRank(target: string, location: string, language: string, login: string, pass: string): Promise<{ items: HistRankItem[]; cost: number; error?: string }> {
+async function fetchHistRank(target: string, location: string, language: string, dateFrom: string, dateTo: string, login: string, pass: string): Promise<{ items: HistRankItem[]; cost: number; error?: string }> {
   const { result, cost, error } = await callDataForSeoFirst<{ items?: HistRankItem[] }>(
     'dataforseo_labs/google/historical_rank_overview/live',
-    { target, location_name: location, language_name: language },
+    { target, location_name: location, language_name: language, date_from: dateFrom, date_to: dateTo, correlate: true },
     { login, pass },
   );
   if (error) return { items: [], cost: 0, error };
@@ -50,6 +56,18 @@ async function fetchHistRank(target: string, location: string, language: string,
 
 function formatMonth(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeDate(value: string | undefined, fallback: string, max: string) {
+  const date = value?.trim();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return fallback;
+  if (date < HISTORICAL_RANK_START) return HISTORICAL_RANK_START;
+  if (date > max) return max;
+  return date;
 }
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -64,7 +82,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
   );
 }
 
-export default async function HistoricalRankPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function HistoricalRankPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getHistRankHistory();
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -73,31 +91,37 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
 
   const params = await searchParams;
   const historyId = params.history_id;
-  const target = params.target?.trim() ?? '';
-  const location = params.location ?? defaultLocation;
-  const language = params.language ?? defaultLanguage;
+  const selectedHistory = historyId ? history.find((entry) => entry.id === historyId) : undefined;
+  const maxDate = todayIso();
+  const dateFrom = selectedHistory?.dateFrom ?? normalizeDate(params.date_from, HISTORICAL_RANK_START, maxDate);
+  const dateTo = selectedHistory?.dateTo ?? normalizeDate(params.date_to, maxDate, maxDate);
+  const target = params.target?.trim() || selectedHistory?.target || '';
+  const location = params.location ?? selectedHistory?.location ?? defaultLocation;
+  const language = params.language ?? selectedHistory?.language ?? defaultLanguage;
 
   let items: HistRankItem[] = [];
   let error = '';
   let cost = 0;
 
-  if (historyId) {
+  if (dateFrom > dateTo) {
+    error = 'Choose a start date on or before the end date.';
+  } else if (historyId) {
     items = getHistRankResults<HistRankItem>(historyId) ?? [];
   } else if (target && creds) {
     try {
-      const dedupeId = stableSearchId(['historical-rank', target, location, language]);
+      const dedupeId = stableSearchId(['historical-rank', target, location, language, dateFrom, dateTo]);
       const cachedItems = getHistRankResults<HistRankItem>(dedupeId);
       if (cachedItems) {
         items = cachedItems;
         cost = history.find((h) => h.id === dedupeId)?.cost ?? 0;
       } else {
-        const result = await fetchHistRank(target, location, language, creds.login, creds.pass);
+        const result = await fetchHistRank(target, location, language, dateFrom, dateTo, creds.login, creds.pass);
         if (result.error) {
           error = result.error;
         } else {
           items = result.items;
           cost = result.cost;
-          saveHistRankSearch({ id: dedupeId, ts: Date.now(), target, location, language, cost }, items);
+          saveHistRankSearch({ id: dedupeId, ts: Date.now(), target, location, language, dateFrom, dateTo, cost }, items);
         }
       }
     } catch (e) {
@@ -105,7 +129,7 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
     }
   }
 
-  // Sort ascending (oldest → newest) for sparkline; descending for table
+  // Sort ascending (oldest → newest) for the time-series visuals; descending for the table.
   const sorted = [...items].sort((a, b) => (a.year - b.year) || (a.month - b.month));
   const maxCount = Math.max(...sorted.map((i) => i.metrics.organic?.count ?? 0), 1);
 
@@ -125,7 +149,7 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
     <div className="space-y-6 pb-12">
       <div>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Historical Rank Overview</h1>
-        <p className="text-slate-500 text-sm mt-1 font-medium">Monthly keyword count evolution for a domain</p>
+        <p className="text-slate-500 text-sm mt-1 font-medium dark:text-slate-400">Monthly keyword count and SERP-position mix for a domain</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -143,7 +167,18 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
                 wrapperClassName="space-y-1.5"
                 labelClassName="text-[10px] font-black text-slate-400 uppercase tracking-widest"
               />
+              <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">From</label>
+                  <input name="date_from" type="date" defaultValue={dateFrom} min={HISTORICAL_RANK_START} max={maxDate} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-sm font-medium text-slate-900 transition-all dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">To</label>
+                  <input name="date_to" type="date" defaultValue={dateTo} min={HISTORICAL_RANK_START} max={maxDate} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-sm font-medium text-slate-900 transition-all dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                </div>
+              </div>
             </div>
+            <p className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">Historical Rank data is available from October 2020. The full period is selected by default.</p>
             {!creds && <p className="text-xs text-amber-600 font-medium">Configure API credentials in Settings first.</p>}
           </SearchForm>
 
@@ -159,14 +194,8 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
                 </p>
                 <div className="flex items-end gap-6">
                   <svg width={W} height={H} className="overflow-visible">
-                    <defs>
-                      <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
                     {sparkData.length > 1 && (
-                      <path d={sparkPath + ` L ${((sparkData.length - 1) * xStep).toFixed(1)} ${H} L 0 ${H} Z`} fill="url(#sparkGrad)" />
+                      <path d={sparkPath + ` L ${((sparkData.length - 1) * xStep).toFixed(1)} ${H} L 0 ${H} Z`} fill="#3b82f6" fillOpacity="0.12" />
                     )}
                     {sparkData.length > 1 && <path d={sparkPath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
                   </svg>
@@ -176,6 +205,8 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
                   </div>
                 </div>
               </div>
+
+              <RankDistributionChart points={sorted} />
 
               {/* Monthly table */}
               <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
@@ -227,7 +258,7 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
                   <a key={h.id} href={`?history_id=${h.id}`} className="block rounded-xl px-3 py-2.5 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
                     <div className="font-bold text-xs text-slate-800">{h.target}</div>
                     <div className="text-[10px] text-slate-400 mt-0.5">
-                      {h.location} · {new Date(h.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {h.location} · {h.dateFrom && h.dateTo ? `${h.dateFrom} → ${h.dateTo}` : new Date(h.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </div>
                   </a>
                 ))}
@@ -239,3 +270,5 @@ export default async function HistoricalRankPage({ searchParams }: { searchParam
     </div>
   );
 }
+
+export default withProjectScope(HistoricalRankPage);

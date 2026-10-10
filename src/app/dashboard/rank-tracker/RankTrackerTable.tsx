@@ -37,11 +37,12 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 interface Props {
   rows: Row[];
   hasCreds: boolean;
+  pendingKeywordIds: number[];
   checkAction: (fd: FormData) => Promise<void>;
   removeAction: (fd: FormData) => Promise<void>;
 }
 
-export default function RankTrackerTable({ rows, hasCreds, checkAction, removeAction }: Props) {
+export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, checkAction, removeAction }: Props) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -96,6 +97,7 @@ export default function RankTrackerTable({ rows, hasCreds, checkAction, removeAc
             latest={latest}
             previous={previous}
             hasCreds={hasCreds}
+            pending={pendingKeywordIds.includes(kw.id)}
             checkAction={checkAction}
             removeAction={removeAction}
           />

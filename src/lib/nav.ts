@@ -4,7 +4,7 @@ import {
   TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
   Gauge, Lightbulb, BrainCircuit, Star, Flame, Cpu, ShieldCheck, Grid3X3,
   Sparkles, Target, Layers, Network, LineChart, Tag, ScanText,
-  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet,
+  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet, CalendarCheck,
 } from 'lucide-react';
 
 // Single source of truth for the tool list: the Sidebar and the Dashboard home both render from it.
@@ -105,6 +105,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { name: 'AI Prompt Test', href: '/dashboard/llm-responses', icon: Bot, desc: 'See what ChatGPT, Claude, Gemini answer' },
       { name: 'AI Keyword Data', href: '/dashboard/ai-keyword-data', icon: Radar, desc: 'Keyword volume in AI tools' },
       { name: 'Query Fan-Out', href: '/dashboard/query-fan-out', icon: Waypoints, desc: 'Hidden sub-queries behind AI answers' },
+      { name: 'Prompt Tracker', href: '/dashboard/prompt-tracker', icon: CalendarCheck, desc: 'Re-run prompts and track brand mentions over time' },
     ],
   },
   {
@@ -130,5 +131,5 @@ export const NAV_SECTIONS: NavSection[] = [
 // Pinned at the bottom of the sidebar, outside the filter
 export const NAV_FOOTER: NavItem[] = [
   { name: 'Spending', href: '/dashboard/spending', icon: Wallet, desc: 'What your DataForSEO calls cost, by tool' },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings, desc: 'Credentials and search defaults' },
+  { name: 'Settings', href: '/dashboard/settings', icon: Settings, desc: 'Credentials and report identity' },
 ];

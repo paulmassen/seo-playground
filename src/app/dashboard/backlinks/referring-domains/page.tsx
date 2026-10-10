@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import { getCredentials, getRefDomainsHistory, saveRefDomainsSearch, getRefDomainsResults, getSetting } from '@/lib/db';
@@ -24,7 +25,7 @@ async function fetchRefDomains(target: string, limit: number, login: string, pas
   return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0 };
 }
 
-export default async function RefDomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function RefDomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const history = getRefDomainsHistory();
   const defaultDomain = getSetting('default_domain') ?? '';
@@ -170,3 +171,5 @@ export default async function RefDomainsPage({ searchParams }: { searchParams: P
     </div>
   );
 }
+
+export default withProjectScope(RefDomainsPage);

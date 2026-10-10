@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getSubdomainsHistory, saveSubdomainsSearch, getSubdomainsResults, type SubdomainsEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
@@ -31,10 +32,9 @@ async function fetchSubdomains(target: string, location: string, language: strin
   return { items: result?.items ?? [], cost };
 }
 
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function SubdomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SubdomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -164,3 +164,5 @@ export default async function SubdomainsPage({ searchParams }: { searchParams: P
     </div>
   );
 }
+
+export default withProjectScope(SubdomainsPage);

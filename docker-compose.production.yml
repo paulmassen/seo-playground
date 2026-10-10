@@ -1,0 +1,52 @@
+# Production install: runs a published, immutable image instead of building from source.
+# Set SEO_PLAYGROUND_VERSION in .env to choose the exact release to run.
+services:
+  init:
+    image: busybox:1.36
+    volumes:
+      - seo-playground-data:/data
+    command: >
+      sh -c 'if [ ! -s /data/.geo-grid-worker-secret ]; then
+      umask 077 && head -c 48 /dev/urandom | base64 > /data/.geo-grid-worker-secret;
+      fi && chown -R 1001:1001 /data && chmod 600 /data/.geo-grid-worker-secret'
+    restart: "no"
+
+  app:
+    image: "${SEO_PLAYGROUND_IMAGE:-ghcr.io/paulmassen/seo-playground}:${SEO_PLAYGROUND_VERSION:-0.5.0}"
+    # Loopback only by default: the dashboard has no login unless AUTH_ENABLED=true, and it spends DataForSEO credit.
+    # Put a reverse proxy with authentication in front, or set SEO_PLAYGROUND_BIND=0.0.0.0.
+    ports:
+      - "${SEO_PLAYGROUND_BIND:-127.0.0.1}:${SEO_PLAYGROUND_PORT:-3000}:3000"
+    volumes:
+      - seo-playground-data:/data
+    environment:
+      DB_PATH: /data/seo-playground.db
+      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_SECRET_FILE: /data/.geo-grid-worker-secret
+      AUTH_ENABLED: ${AUTH_ENABLED:-}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    image: "${SEO_PLAYGROUND_IMAGE:-ghcr.io/paulmassen/seo-playground}:${SEO_PLAYGROUND_VERSION:-0.5.0}"
+    command: ["node", "scripts/geo-grid-worker.mjs"]
+    volumes:
+      - seo-playground-data:/data:ro
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_SECRET_FILE: /data/.geo-grid-worker-secret
+      GEO_GRID_WORKER_URL: http://app:3000
+      GEO_GRID_WORKER_INTERVAL_MS: ${GEO_GRID_WORKER_INTERVAL_MS:-60000}
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      app:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  seo-playground-data:

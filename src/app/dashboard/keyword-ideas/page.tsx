@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getKeywordIdeasHistory, saveKeywordIdeasSearch, getKeywordIdeasResults, type KeywordIdeasEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
@@ -30,7 +31,7 @@ async function fetchIdeas(keyword: string, location: string, language: string, l
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function KeywordIdeasPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function KeywordIdeasPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -96,7 +97,7 @@ export default async function KeywordIdeasPage({ searchParams }: { searchParams:
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Seed keyword</label>
-            <input type="text" name="keyword" defaultValue={displayKeyword} placeholder="plombier" required
+            <input type="text" name="keyword" defaultValue={displayKeyword} placeholder="plumber" required
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800" />
           </div>
           <LabsLocationLanguageFields
@@ -162,3 +163,5 @@ export default async function KeywordIdeasPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(KeywordIdeasPage);

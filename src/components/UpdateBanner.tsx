@@ -1,52 +1,82 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { ArrowUpRight, PackageCheck, X } from 'lucide-react';
 
-const DISMISS_KEY = 'update-banner-dismissed';
+type UpdateCheck = {
+  current: string | null;
+  latest: string | null;
+  hasUpdate: boolean;
+  release: {
+    version: string;
+    url: string;
+    notes: string;
+    publishedAt: string | null;
+  } | null;
+};
 
 export default function UpdateBanner() {
-  const [show, setShow] = useState(false);
+  const [update, setUpdate] = useState<UpdateCheck | null>(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem(DISMISS_KEY)) return;
-
     fetch('/api/update-check')
       .then((r) => r.json())
-      .then((data: { hasUpdate: boolean }) => {
-        if (data.hasUpdate) setShow(true);
+      .then((data: UpdateCheck) => {
+        if (!data.hasUpdate || !data.latest || localStorage.getItem(`release-dismissed:${data.latest}`)) return;
+        setUpdate(data);
       })
       .catch(() => {});
   }, []);
 
-  if (!show) return null;
+  if (!update?.release || !update.latest) return null;
+  const release = update.release;
+  const latest = update.latest;
 
   function dismiss() {
-    sessionStorage.setItem(DISMISS_KEY, '1');
-    setShow(false);
+    localStorage.setItem(`release-dismissed:${latest}`, '1');
+    setUpdate(null);
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 px-8 py-2 bg-indigo-600 text-white text-sm">
-      <span>
-        A new version is available —{' '}
-        <a
-          href="https://github.com/paulmassen/seo-playground"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 font-semibold hover:opacity-80"
-        >
-          git pull
-        </a>{' '}
-        to update.
-      </span>
+    <aside
+      aria-label="Application update available"
+      className="flex items-start justify-between gap-4 border-b border-blue-500/20 bg-slate-950 px-5 py-2.5 text-slate-100 dark:border-slate-700 dark:bg-slate-900 sm:px-8"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-blue-500/15 text-blue-300 ring-1 ring-inset ring-blue-400/20">
+          <PackageCheck size={14} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 text-sm leading-5">
+          <span className="font-bold text-white">Version {release.version} is available.</span>{' '}
+          <span className="text-slate-400">You’re running {update.current ?? 'an unversioned build'}.</span>
+          {release.notes && <span className="hidden text-slate-400 lg:inline"> — {release.notes}</span>}
+          <span className="ml-2 inline-flex items-center gap-1 whitespace-nowrap">
+            <a
+              href={release.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-blue-300 underline decoration-blue-300/40 underline-offset-4 transition-colors hover:text-blue-200 hover:decoration-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              Release notes <ArrowUpRight className="inline-block -mt-0.5" size={13} aria-hidden="true" />
+            </a>
+            <a
+              href="https://github.com/paulmassen/seo-playground#updating-a-release-installation"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-300 underline decoration-slate-500 underline-offset-4 transition-colors hover:text-white hover:decoration-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              Update guide
+            </a>
+          </span>
+        </div>
+      </div>
       <button
         onClick={dismiss}
-        aria-label="Dismiss"
-        className="shrink-0 hover:opacity-70 transition-opacity"
+        aria-label={`Dismiss version ${release.version} update notification`}
+        className="mt-0.5 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
       >
         <X size={16} />
       </button>
-    </div>
+    </aside>
   );
 }

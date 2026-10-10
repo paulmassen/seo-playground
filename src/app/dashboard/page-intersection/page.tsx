@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getPageIntersectionHistory, savePageIntersectionSearch, getPageIntersectionResults, type PageIntersectionEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
@@ -29,7 +30,7 @@ async function fetchIntersection(pages: string[], location: string, language: st
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function PageIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function PageIntersectionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -170,3 +171,5 @@ export default async function PageIntersectionPage({ searchParams }: { searchPar
     </div>
   );
 }
+
+export default withProjectScope(PageIntersectionPage);

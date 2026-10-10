@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getTrafficEstimationHistory, saveTrafficEstimationSearch, getTrafficEstimationResults, type TrafficEstimationEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
@@ -23,23 +24,9 @@ async function fetchTraffic(targets: string[], location: string, language: strin
   return { items: result?.items ?? [], cost };
 }
 
-function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-function TrafficBar({ value, max }: { value?: number; max: number }) {
-  if (!value || max === 0) return <span className="text-slate-300 text-xs">0</span>;
-  const pct = Math.round((value / max) * 100);
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-20 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 tabular-nums">{fmt(value)}</span>
-    </div>
-  );
-}
-
-export default async function TrafficEstimationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function TrafficEstimationPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -84,7 +71,6 @@ export default async function TrafficEstimationPage({ searchParams }: { searchPa
   const displayLanguage = activeEntry?.language ?? language;
 
   const sorted = [...items].sort((a, b) => (b.metrics?.organic?.etv ?? 0) - (a.metrics?.organic?.etv ?? 0));
-  const maxEtv = Math.max(...sorted.map((i) => i.metrics?.organic?.etv ?? 0), 1);
 
   const csvData = sorted.map((item) => {
     const org = item.metrics?.organic;
@@ -167,3 +153,5 @@ export default async function TrafficEstimationPage({ searchParams }: { searchPa
     </div>
   );
 }
+
+export default withProjectScope(TrafficEstimationPage);

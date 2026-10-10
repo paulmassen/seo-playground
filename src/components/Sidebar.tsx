@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Search, X } from 'lucide-react';
 import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NAV_SECTIONS as sections, NAV_FOOTER as footerItems, type NavItem } from '@/lib/nav';
+import type { Project } from '@/lib/db';
+import ProjectSwitcher from './ProjectSwitcher';
 
 // The single most specific item for this path, so /dashboard/on-page/content-parsing
 // highlights Content Parsing only, not On Page as well.
@@ -44,7 +46,7 @@ function saveCollapsed(keys: Set<string>) {
   document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${encodeURIComponent([...keys].join(','))}; path=/; max-age=31536000; samesite=lax`;
 }
 
-export default function Sidebar({ initialCollapsed = [] }: { initialCollapsed?: string[] }) {
+export default function Sidebar({ initialCollapsed = [], projects, activeProject }: { initialCollapsed?: string[]; projects: Project[]; activeProject: Project }) {
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -114,6 +116,8 @@ export default function Sidebar({ initialCollapsed = [] }: { initialCollapsed?: 
           <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">SEO Playground</span>
         </Link>
       </div>
+
+      <ProjectSwitcher projects={projects} activeProject={activeProject} />
 
       {/* Filter */}
       <div className="px-3 pt-3 shrink-0">

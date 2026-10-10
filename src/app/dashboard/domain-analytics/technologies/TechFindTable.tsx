@@ -27,7 +27,7 @@ function DrBadge({ value }: { value?: number }) {
 
 function fmtVisited(s?: string) {
   if (!s) return '—';
-  return new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 function sortValue(item: FindDomainItem, key: SortKey): number | string {

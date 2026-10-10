@@ -1,0 +1,93 @@
+{
+    "stable": true,
+    "versions": {
+        "0.4.0": {
+            "manifest": {
+                "id": "io.github.paulmassen.seoplayground",
+                "title": "SEO Playground",
+                "tagline": "Self-hosted SEO dashboard powered by DataForSEO",
+                "description": "SEO Playground is a self-hosted dashboard on top of the [DataForSEO](https://dataforseo.com) API. You bring your own DataForSEO account and pay DataForSEO directly for what you use; nothing is sent anywhere else.\n\n* **Rank Tracker** with daily history and the top 10 results of every check\n* **Local Finder / Geo-grid** rank maps with scheduled monitors and PDF reports\n* **Site Audit**, **Google Reviews** analysis and **web mentions**\n* **AI Visibility** and **Prompt Tracker**: see whether ChatGPT, Claude, Gemini or Perplexity mention your brand\n* **White-label PDF reports** with your own logo and colours\n* Multiple projects, each with its own database, and a spending overview\n",
+                "version": "0.4.0",
+                "upstreamVersion": "0.4.0",
+                "changelog": "* Initial Cloudron package of SEO Playground 0.4.0\n",
+                "postInstallMessage": "SEO Playground is installed. Only Cloudron users can open it: Cloudron's login screen sits in front of the app.\n\n1. Open the app and go to **Settings** to enter your DataForSEO login and password (or API key). They are stored in the app's database, which is part of the Cloudron backups.\n2. Everything you run is billed by DataForSEO, so grant access to people you trust with that credit.\n\nYour data lives in `/app/data` (one SQLite file per project). The scheduled Geo-grid and Prompt Tracker checks run inside the app, so there is nothing else to configure.\n",
+                "healthCheckPath": "/robots.txt",
+                "httpPort": 8000,
+                "configurePath": "/dashboard",
+                "manifestVersion": 2,
+                "minBoxVersion": "10.0.0",
+                "memoryLimit": 805306368,
+                "addons": {
+                    "localstorage": {},
+                    "proxyAuth": {}
+                },
+                "website": "https://github.com/paulmassen/seo-playground",
+                "documentationUrl": "https://github.com/paulmassen/seo-playground#readme",
+                "forumUrl": "https://github.com/paulmassen/seo-playground/issues",
+                "packageUrl": "https://github.com/paulmassen/seo-playground",
+                "packagerName": "Paul Massendari",
+                "packagerUrl": "https://github.com/paulmassen",
+                "iconUrl": "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/cloudron/icon.png",
+                "tags": [
+                    "seo",
+                    "analytics",
+                    "dataforseo",
+                    "marketing"
+                ],
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/hero.png",
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-rank-tracker.png",
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-local-finder.png"
+                ],
+                "dockerImage": "ghcr.io/paulmassen/seo-playground:cloudron-0.4.0"
+            },
+            "creationDate": "Thu, 08 Oct 2026 14:40:18 GMT",
+            "ts": "Thu, 08 Oct 2026 14:40:18 GMT",
+            "publishState": "published"
+        },
+        "0.4.1": {
+            "manifest": {
+                "id": "io.github.paulmassen.seoplayground",
+                "title": "SEO Playground",
+                "tagline": "Self-hosted SEO dashboard powered by DataForSEO",
+                "description": "SEO Playground is a self-hosted dashboard on top of the [DataForSEO](https://dataforseo.com) API. You bring your own DataForSEO account and pay DataForSEO directly for what you use; nothing is sent anywhere else.\n\n* **Rank Tracker** with daily history and the top 10 results of every check\n* **Local Finder / Geo-grid** rank maps with scheduled monitors and PDF reports\n* **Site Audit**, **Google Reviews** analysis and **web mentions**\n* **AI Visibility** and **Prompt Tracker**: see whether ChatGPT, Claude, Gemini or Perplexity mention your brand\n* **White-label PDF reports** with your own logo and colours\n* Multiple projects, each with its own database, and a spending overview\n",
+                "version": "0.4.1",
+                "upstreamVersion": "0.4.0",
+                "changelog": "* Fix maps blocked by OpenStreetMap (\"app is not following the OSM tile usage policy\"): tiles and address search now send a Referer even behind the Cloudron proxy\n",
+                "postInstallMessage": "SEO Playground is installed. Only Cloudron users can open it: Cloudron's login screen sits in front of the app.\n\n1. Open the app and go to **Settings** to enter your DataForSEO login and password (or API key). They are stored in the app's database, which is part of the Cloudron backups.\n2. Everything you run is billed by DataForSEO, so grant access to people you trust with that credit.\n\nYour data lives in `/app/data` (one SQLite file per project). The scheduled Geo-grid and Prompt Tracker checks run inside the app, so there is nothing else to configure.\n",
+                "healthCheckPath": "/robots.txt",
+                "httpPort": 8000,
+                "configurePath": "/dashboard",
+                "manifestVersion": 2,
+                "minBoxVersion": "10.0.0",
+                "memoryLimit": 805306368,
+                "addons": {
+                    "localstorage": {},
+                    "proxyAuth": {}
+                },
+                "website": "https://github.com/paulmassen/seo-playground",
+                "documentationUrl": "https://github.com/paulmassen/seo-playground#readme",
+                "forumUrl": "https://github.com/paulmassen/seo-playground/issues",
+                "packageUrl": "https://github.com/paulmassen/seo-playground",
+                "packagerName": "Paul Massendari",
+                "packagerUrl": "https://github.com/paulmassen",
+                "iconUrl": "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/cloudron/icon.png",
+                "tags": [
+                    "seo",
+                    "analytics",
+                    "dataforseo",
+                    "marketing"
+                ],
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/hero.png",
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-rank-tracker.png",
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-local-finder.png"
+                ],
+                "dockerImage": "ghcr.io/paulmassen/seo-playground:cloudron-0.4.1"
+            },
+            "creationDate": "Thu, 08 Oct 2026 14:50:48 GMT",
+            "ts": "Thu, 08 Oct 2026 14:50:48 GMT",
+            "publishState": "published"
+        }
+    }
+}

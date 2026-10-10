@@ -12,10 +12,16 @@ process.env.DB_PATH = path.join(tmpDir, 'test.db');
 import {
   getSetting, setSetting, deleteSetting,
   getCredentials, saveCredentials, clearCredentials,
+  getActiveProject, getProjects, createProject, deleteProject, setActiveProject,
   getAiOptimizationHistory, saveAiOptimizationSearch, getAiOptimizationResults, type AiOptimizationEntry,
   getWebMentionsHistory, saveWebMentionsSearch, getWebMentionsItems, getWebMentionsSummary, type WebMentionsEntry,
   getSerpHistory, saveSerpSearch,
   getSpendByTool, getSpendByDay, getFirstSpendTs,
+  gridSeriesId, getGridSeriesHistory, getGridSchedule, saveGridSchedule, saveGridSearch, deleteGridSchedule, deleteGridSeries, type GridSearchEntry,
+  claimDueGridSchedules, retryClaimedGridSchedule,
+  getRankTrackerSchedule, saveRankTrackerSchedule, deleteRankTrackerSchedule,
+  getHistRankHistory, saveHistRankSearch,
+  addTrackedKeyword, saveRankCheck, getRankTopResultsHistory,
 } from './db';
 
 afterAll(() => {
@@ -156,5 +162,124 @@ describe('spending aggregates', () => {
 
   it('finds the oldest recorded call', () => {
     expect(getFirstSpendTs()).not.toBeNull();
+  });
+});
+
+describe('projects', () => {
+  it('keeps each project history in a separate data store', () => {
+    const defaultProject = getActiveProject();
+    const secondProject = createProject({
+      name: 'Second Project', domain: 'second-project.example', defaultLocation: 'France',
+      defaultLanguage: 'French', defaultCoordinates: '', rankTrackerDepth: '100',
+    });
+
+    setActiveProject(secondProject.id);
+    saveSerpSearch({
+      id: 'second-project-only', ts: Date.now(), keyword: 'isolated', location: 'France', language: 'French', device: 'desktop', depth: 10, count: 1,
+    }, []);
+    expect(getSerpHistory().some((entry) => entry.id === 'second-project-only')).toBe(true);
+
+    setActiveProject(defaultProject.id);
+    expect(getSerpHistory().some((entry) => entry.id === 'second-project-only')).toBe(false);
+
+    deleteProject(secondProject.id);
+    expect(getProjects().some((project) => project.id === secondProject.id)).toBe(false);
+  });
+});
+
+describe('Geo-grid monitoring', () => {
+  const seriesId = gridSeriesId('plombier paris', '48.8566,2.3522', 3, 1, 'Example Plumbing', 'French');
+  const base: Omit<GridSearchEntry, 'id' | 'ts'> = {
+    series_id: seriesId, keyword: 'plombier paris', target: 'Example Plumbing', center: '48.8566,2.3522',
+    grid_size: 3, spacing_km: 1, language: 'French', status: 'done', queue_mode: 'live',
+  };
+
+  it('groups separate snapshots under one stable series', () => {
+    saveGridSearch({ ...base, id: 'grid-monitor-one', ts: 1 }, [{ row: 0, col: 0, rank: 4 }]);
+    saveGridSearch({ ...base, id: 'grid-monitor-two', ts: 2 }, [{ row: 0, col: 0, rank: 2 }]);
+    expect(getGridSeriesHistory(seriesId).filter((run) => run.id.startsWith('grid-monitor-')).map((run) => run.id))
+      .toEqual(['grid-monitor-two', 'grid-monitor-one']);
+  });
+
+  it('keeps a series complete beyond the 100-run history cap', () => {
+    const otherSeries = gridSeriesId('other keyword', base.center, base.grid_size, base.spacing_km, base.target, base.language);
+    saveGridSearch({ ...base, id: 'grid-old-snapshot', ts: 10 }, [{ row: 0, col: 0, rank: 5 }]);
+    for (let index = 0; index < 101; index += 1) {
+      saveGridSearch({ ...base, series_id: otherSeries, id: `grid-other-${index}`, ts: 1_000 + index }, [{ row: 0, col: 0, rank: 1 }]);
+    }
+    expect(getGridSeriesHistory(seriesId).map((run) => run.id)).toContain('grid-old-snapshot');
+  });
+
+  it('reopens a claimed run for a retry, but not once the slot is too old', () => {
+    const saved = saveGridSchedule({ ...base, frequency: 'daily', weekday: null, time_of_day: '08:30', time_zone: 'Europe/Paris' });
+    const slot = saved.next_run_at;
+    const [claimed] = claimDueGridSchedules(slot + 1_000).filter((item) => item.series_id === seriesId);
+    expect(claimed.scheduled_at).toBe(slot);
+    expect(claimDueGridSchedules(slot + 2_000).some((item) => item.series_id === seriesId)).toBe(false);
+
+    expect(retryClaimedGridSchedule(claimed.projectId, claimed, slot + 1_000)).toBe(true);
+    expect(getGridSchedule(seriesId)?.next_run_at).toBe(slot + 1_000 + 5 * 60_000);
+
+    const [reclaimed] = claimDueGridSchedules(slot + 7 * 3_600_000).filter((item) => item.series_id === seriesId);
+    expect(retryClaimedGridSchedule(reclaimed.projectId, { ...reclaimed, scheduled_at: slot }, slot + 7 * 3_600_000)).toBe(false);
+    deleteGridSchedule(seriesId);
+  });
+
+  it('persists and removes a daily schedule', () => {
+    const saved = saveGridSchedule({ ...base, frequency: 'daily', weekday: null, time_of_day: '08:30', time_zone: 'Europe/Paris' });
+    expect(saved.next_run_at).toBeGreaterThan(Date.now());
+    expect(getGridSchedule(seriesId)).toMatchObject({ frequency: 'daily', time_of_day: '08:30', time_zone: 'Europe/Paris' });
+    deleteGridSchedule(seriesId);
+    expect(getGridSchedule(seriesId)).toBeNull();
+  });
+
+  it('deletes a whole monitor: every snapshot and its schedule', () => {
+    const doomed = gridSeriesId('delete me', base.center, base.grid_size, base.spacing_km, base.target, base.language);
+    saveGridSearch({ ...base, series_id: doomed, id: 'grid-delete-one', ts: 5 }, [{ row: 0, col: 0, rank: 1 }]);
+    saveGridSearch({ ...base, series_id: doomed, id: 'grid-delete-two', ts: 6 }, [{ row: 0, col: 0, rank: 2 }]);
+    saveGridSchedule({ ...base, series_id: doomed, frequency: 'weekly', weekday: 1, time_of_day: '09:00', time_zone: 'UTC' });
+    deleteGridSeries(doomed);
+    expect(getGridSeriesHistory(doomed)).toEqual([]);
+    expect(getGridSchedule(doomed)).toBeNull();
+    expect(getGridSeriesHistory(seriesId).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Rank Tracker monitoring', () => {
+  it('persists and removes a daily Standard schedule', () => {
+    const saved = saveRankTrackerSchedule({ timeOfDay: '07:45', timeZone: 'Europe/Paris' });
+    expect(saved.nextRunAt).toBeGreaterThan(Date.now());
+    expect(getRankTrackerSchedule()).toMatchObject({ timeOfDay: '07:45', timeZone: 'Europe/Paris' });
+    deleteRankTrackerSchedule();
+    expect(getRankTrackerSchedule()).toBeNull();
+  });
+});
+
+describe('Historical Rank search cache', () => {
+  it('keeps the requested historical range with the saved result', () => {
+    saveHistRankSearch({
+      id: 'historical-rank-range', ts: Date.now(), target: 'example.com', location: 'France', language: 'French',
+      dateFrom: '2020-10-01', dateTo: '2026-09-27', cost: 0.01,
+    }, []);
+    expect(getHistRankHistory().find((entry) => entry.id === 'historical-rank-range')).toMatchObject({
+      dateFrom: '2020-10-01', dateTo: '2026-09-27',
+    });
+  });
+});
+
+describe('rank check top results', () => {
+  const top = (domain: string) => [{ position: 1, domain, url: `https://${domain}/`, title: null }];
+
+  it('keeps the first results page of a check and skips checks that have none', () => {
+    const id = addTrackedKeyword('top results kw', 'example.com', 'France', 'French');
+    saveRankCheck(id, { position: null, url: null, title: null, aiOverview: null, topResults: null }, null);
+    expect(getRankTopResultsHistory(id)).toEqual([]);
+
+    // A second check on the same day replaces the first rather than adding a row.
+    saveRankCheck(id, { position: 2, url: 'https://example.com/', title: null, aiOverview: null, topResults: top('a.com') }, null);
+    const history = getRankTopResultsHistory(id);
+    expect(history).toHaveLength(1);
+    expect(history[0].topResults).toEqual(top('a.com'));
+    expect(history[0].position).toBe(2);
   });
 });

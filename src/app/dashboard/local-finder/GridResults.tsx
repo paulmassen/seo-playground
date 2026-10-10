@@ -1,8 +1,11 @@
 'use client';
 
-import { lazy, Suspense, useMemo, useState } from 'react';
+import type { BrandStyle } from '@/lib/brand';
+
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { GridPoint } from '@/lib/db';
 import { computeCompetitors, computeGridSummary, computeRingStats, type CompetitorSummary } from './grid-insights';
+import GridPdfExportButton from './GridPdfExportButton';
 
 const GridMap = lazy(() => import('./GridMap'));
 
@@ -13,6 +16,14 @@ interface Props {
   keyword: string;
   target: string;
   cost?: number;
+  language: string;
+  searchedAt: number;
+  snapshotDate?: number;
+  brandName: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
+  brandFooter?: string;
+  brandStyle?: Partial<BrandStyle>;
 }
 
 function rankColor(rank: number | null): string {
@@ -26,8 +37,16 @@ function rankColor(rank: number | null): string {
   return '#ef4444';
 }
 
-export default function GridResults({ results, gridSize, spacingKm, keyword, target, cost }: Props) {
+function formatSnapshotDate(ts: number) {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(ts));
+}
+
+export default function GridResults({ results, gridSize, spacingKm, keyword, target, cost, language, searchedAt, snapshotDate, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle }: Props) {
   const [highlight, setHighlight] = useState<CompetitorSummary | null>(null);
+
+  // A competitor key belongs to one snapshot. Clear it when the timeline moves
+  // to another run, so the map and competitor list cannot describe different dates.
+  useEffect(() => setHighlight(null), [results]);
 
   const { foundCount, top3Count: top3, top10Count: top10, avgRank, ato } = computeGridSummary(results);
 
@@ -80,7 +99,7 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
             <p className="text-[10px] text-slate-400">Ranked by grid presence</p>
           </div>
           <p className="text-[11px] text-slate-400 mb-4">
-            Businesses appearing in the top 20 across the grid, compared to your own visibility.
+            {snapshotDate ? `Snapshot from ${formatSnapshotDate(snapshotDate)} · ` : ''}Businesses appearing in the top 20 across the grid, compared to your own visibility.
           </p>
 
           <div className="space-y-2">
@@ -138,7 +157,7 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
       {/* Map card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <p className="text-sm font-black text-slate-900">
               {highlight ? highlight.name : keyword}
@@ -153,6 +172,19 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <GridPdfExportButton
+              results={results}
+              gridSize={gridSize}
+              spacingKm={spacingKm}
+              keyword={keyword}
+              target={target}
+              language={language}
+              searchedAt={searchedAt}
+              brandName={brandName}
+              brandLogoUrl={brandLogoUrl}
+              brandColor={brandColor}
+              brandFooter={brandFooter} brandStyle={brandStyle}
+            />
             {cost !== undefined && (
               <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>
             )}

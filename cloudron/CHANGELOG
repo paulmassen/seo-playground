@@ -1,0 +1,5 @@
+[0.4.1]
+* Fix maps blocked by OpenStreetMap ("app is not following the OSM tile usage policy"): tiles and address search now send a Referer even behind the Cloudron proxy
+
+[0.4.0]
+* Initial Cloudron package of SEO Playground 0.4.0

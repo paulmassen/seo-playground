@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getDomainTechHistory,
@@ -10,7 +11,6 @@ import {
   type DomainFindEntry,
 } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
-import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import TechFindTable from './TechFindTable';
@@ -142,7 +142,7 @@ function entryLabel(e: DomainFindEntry) {
 
 // ---- Page ----
 
-export default async function TechnologiesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function TechnologiesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
 
@@ -561,3 +561,5 @@ export default async function TechnologiesPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(TechnologiesPage);

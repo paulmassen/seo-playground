@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GridPoint } from '@/lib/db';
 import { competitorKey } from './grid-insights';
 
@@ -11,6 +11,10 @@ interface Props {
   /** When set, markers show this competitor's rank at each point instead of the target's. */
   highlightKey?: string;
   highlightName?: string;
+  /** Previous snapshot, used to show the per-marker movement in timeline mode. */
+  previousPoints?: GridPoint[] | null;
+  /** A stable DOM id allows the PDF export to capture this exact map. */
+  captureId?: string;
 }
 
 function rankColor(rank: number | null): string {
@@ -81,6 +85,47 @@ function buildPopupHtml(point: GridPoint, target: string, highlightKey?: string)
     </div>`;
 }
 
+/**
+ * Bulky 5-point star in a 100×100 viewBox. The inner radius is fatter than a classic star
+ * (0.52 vs 0.38) and the stroke uses round joins to soften the tips — clip-path can't round
+ * polygon corners, hence SVG.
+ */
+const STAR_PATH = (() => {
+  const cx = 50, cy = 53, outer = 44, inner = 23;
+  const pts = Array.from({ length: 10 }, (_, i) => {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    return `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
+  });
+  return `M${pts.join('L')}Z`;
+})();
+
+function starMarkerHtml(size: number, fontSize: number, color: string, label: string, isCenter: boolean, movement = '', movementColor = '#065f46'): string {
+  // The center point loses its dashed border as a star, so a white halo keeps the "grid center" cue.
+  const halo = isCenter
+    ? `<path d="${STAR_PATH}" fill="white" stroke="white" stroke-width="20" stroke-linejoin="round"/>`
+    : '';
+  return `
+    <div style="
+      position:relative;width:${size}px;height:${size}px;
+      cursor:pointer;transition:transform 0.1s;
+      filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+    " onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'">
+      <!-- z-index:0 overrides Leaflet's ".leaflet-map-pane svg { z-index: 200 }", which would hide the label -->
+      <svg viewBox="0 0 100 100" width="${size}" height="${size}" style="position:absolute;inset:0;z-index:0;overflow:visible">
+        ${halo}
+        <path d="${STAR_PATH}" fill="${color}" stroke="${color}" stroke-width="8" stroke-linejoin="round"/>
+      </svg>
+      <div style="
+        position:absolute;inset:0;z-index:1;padding-top:${Math.round(size * 0.06)}px;
+        display:flex;align-items:center;justify-content:center;
+        font-size:${fontSize}px;font-weight:900;color:white;
+        font-family:system-ui,sans-serif;
+      ">${label}</div>
+      ${movement ? `<span style="position:absolute;bottom:-5px;left:50%;z-index:2;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);padding:1px 3px;font-size:9px;line-height:11px;font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22)">${movement}</span>` : ''}
+    </div>`;
+}
+
 /** Resolves the rank to display at a point, given whether a competitor is being highlighted. */
 function pointRank(point: GridPoint, highlightKey?: string): number | null {
   if (!highlightKey) return point.rank;
@@ -88,18 +133,17 @@ function pointRank(point: GridPoint, highlightKey?: string): number | null {
   return match ? match.rank_group : null;
 }
 
-export default function GridMap({ points, gridSize, target, highlightKey, highlightName }: Props) {
+export default function GridMap({ points, gridSize, target, highlightKey, highlightName, previousPoints, captureId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('leaflet').Map | null>(null);
-  const half = Math.floor(gridSize / 2);
+  const leafletRef = useRef<typeof import('leaflet') | null>(null);
+  const markerLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
+  const boundsSignatureRef = useRef<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     let isMounted = true;
-
-    // Filter points that have coordinates
-    const geoPoints = points.filter((p) => p.lat != null && p.lng != null);
-    if (geoPoints.length === 0) return;
 
     import('leaflet').then((L) => {
       if (!isMounted || !containerRef.current || mapRef.current) return;
@@ -113,70 +157,21 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      // Init map
-      const map = L.map(containerRef.current!, { zoomControl: true }).setView(
-        [geoPoints[0].lat!, geoPoints[0].lng!], 13
-      );
+      // The basemap is intentionally initialized only once. Snapshot changes use
+      // the marker layer below, keeping the exact same geographic context in view.
+      const map = L.map(containerRef.current!, { zoomControl: true }).setView([0, 0], 2);
       mapRef.current = map;
+      leafletRef.current = L;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
+        crossOrigin: true,
+        // See MapPicker: keep the Referer that OSM's tile usage policy asks for behind strict proxies.
+        referrerPolicy: 'strict-origin-when-cross-origin',
       }).addTo(map);
-
-      // Cell size based on grid
-      const cellPx = gridSize <= 3 ? 52 : gridSize <= 5 ? 44 : gridSize <= 7 ? 38 : 32;
-      const fontSize = gridSize <= 5 ? 15 : 13;
-
-      geoPoints.forEach((point) => {
-        const isCenter = point.row === half && point.col === half;
-        const rank = pointRank(point, highlightKey);
-        const color = rankColor(rank);
-        const label = rank != null ? String(rank) : '—';
-
-        const border = isCenter
-          ? `border: 3px dashed rgba(255,255,255,0.85);`
-          : `border: 2px solid rgba(255,255,255,0.4);`;
-
-        const shadow = `box-shadow: 0 2px 8px rgba(0,0,0,0.35);`;
-
-        const html = `
-          <div style="
-            width:${cellPx}px;height:${cellPx}px;
-            background:${color};
-            border-radius:${Math.round(cellPx * 0.22)}px;
-            display:flex;align-items:center;justify-content:center;
-            font-size:${fontSize}px;font-weight:900;color:white;
-            font-family:system-ui,sans-serif;
-            ${border}${shadow}
-            cursor:pointer;
-            transition:transform 0.1s;
-          " onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'">
-            ${label}
-          </div>`;
-
-        const icon = L.divIcon({
-          html,
-          className: '',
-          iconSize: [cellPx, cellPx],
-          iconAnchor: [cellPx / 2, cellPx / 2],
-        });
-
-        const marker = L.marker([point.lat!, point.lng!], { icon }).addTo(map);
-
-        // Popup with full local pack list
-        const popupContent = buildPopupHtml(point, target, highlightKey);
-        marker.bindPopup(popupContent, {
-          maxWidth: 280,
-          maxHeight: 260,
-          className: 'grid-popup',
-          autoPan: false,
-        });
-      });
-
-      // Fit map to all grid points
-      const bounds = L.latLngBounds(geoPoints.map((p) => [p.lat!, p.lng!] as [number, number]));
-      map.fitBounds(bounds, { padding: [48, 48] });
+      markerLayerRef.current = L.layerGroup().addTo(map);
+      setMapReady(true);
     });
 
     return () => {
@@ -186,8 +181,54 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
         mapRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const markerLayer = markerLayerRef.current;
+    if (!mapReady || !L || !map || !markerLayer) return;
+
+    const geoPoints = points.filter((point) => point.lat != null && point.lng != null);
+    if (geoPoints.length === 0) return;
+    const half = Math.floor(gridSize / 2);
+    const previousByPoint = new Map((previousPoints ?? []).map((point) => [`${point.row}:${point.col}`, point]));
+    const cellPx = gridSize <= 3 ? 52 : gridSize <= 5 ? 44 : gridSize <= 7 ? 38 : 32;
+    const fontSize = gridSize <= 5 ? 15 : 13;
+
+    // Only the dynamic layer changes when selecting a different date.
+    markerLayer.clearLayers();
+    geoPoints.forEach((point) => {
+      const isCenter = point.row === half && point.col === half;
+      const rank = pointRank(point, highlightKey);
+      const color = rankColor(rank);
+      const label = rank != null ? String(rank) : '—';
+      const before = pointRank(previousByPoint.get(`${point.row}:${point.col}`) ?? { ...point, rank: null }, highlightKey);
+      const movement = before === null && rank === null ? ''
+        : before === null ? 'new'
+          : rank === null ? 'lost'
+            : before - rank === 0 ? ''
+              : `${before - rank > 0 ? '+' : ''}${before - rank}`;
+      const movementColor = before === null || (rank !== null && before > rank) ? '#065f46' : '#991b1b';
+      const border = isCenter ? 'border: 3px dashed rgba(255,255,255,0.85);' : 'border: 2px solid rgba(255,255,255,0.4);';
+      const markerPx = rank === 1 ? Math.round(cellPx * 1.3) : cellPx;
+      const html = rank === 1
+        ? starMarkerHtml(markerPx, fontSize, color, label, isCenter, movement, movementColor)
+        : `<div style="position:relative;width:${cellPx}px;height:${cellPx}px;background:${color};border-radius:${Math.round(cellPx * 0.22)}px;display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:900;color:white;font-family:system-ui,sans-serif;${border}box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'"><span>${label}</span>${movement ? `<span style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);padding:1px 3px;font-size:9px;line-height:11px;font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22)">${movement}</span>` : ''}</div>`;
+      const icon = L.divIcon({ html, className: '', iconSize: [markerPx, markerPx], iconAnchor: [markerPx / 2, markerPx / 2] });
+      const marker = L.marker([point.lat!, point.lng!], { icon }).addTo(markerLayer);
+      marker.bindPopup(buildPopupHtml(point, target, highlightKey), {
+        maxWidth: 260, maxHeight: 240, className: 'grid-popup', autoPan: true, keepInView: true,
+        autoPanPadding: [28, 28], closeButton: true, closeOnClick: true,
+      });
+    });
+
+    const signature = geoPoints.map((point) => `${point.lat}:${point.lng}`).join('|');
+    if (boundsSignatureRef.current !== signature) {
+      boundsSignatureRef.current = signature;
+      map.fitBounds(L.latLngBounds(geoPoints.map((point) => [point.lat!, point.lng!] as [number, number])), { padding: [48, 48] });
+    }
+  }, [mapReady, points, gridSize, target, highlightKey, previousPoints]);
 
   return (
     <>
@@ -215,7 +256,7 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
           background: white;
         }
       `}</style>
-      <div className="relative">
+      <div id={captureId} className="relative bg-slate-100">
         {highlightKey && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
             Showing: {highlightName ?? 'competitor'}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PLATFORMS, MODELS_BY_PLATFORM, type LlmPlatform } from '@/lib/llm-options';
+import { PLATFORMS, MODELS_BY_PLATFORM, DEFAULT_MODEL_BY_PLATFORM, type LlmPlatform } from '@/lib/llm-options';
 
 interface Props {
   defaults: {
@@ -17,7 +17,7 @@ interface Props {
 
 export default function LlmResponseForm({ defaults, disabled = false }: Props) {
   const [platform, setPlatform] = useState<LlmPlatform>(defaults.platform);
-  const [model, setModel] = useState(defaults.model || MODELS_BY_PLATFORM[defaults.platform][0]);
+  const [model, setModel] = useState(defaults.model || DEFAULT_MODEL_BY_PLATFORM[defaults.platform]);
   const [webSearch, setWebSearch] = useState(defaults.webSearch);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,7 +26,7 @@ export default function LlmResponseForm({ defaults, disabled = false }: Props) {
 
   function handlePlatformChange(next: LlmPlatform) {
     setPlatform(next);
-    setModel(MODELS_BY_PLATFORM[next][0]);
+    setModel(DEFAULT_MODEL_BY_PLATFORM[next]);
   }
 
   return (

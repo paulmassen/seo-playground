@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getSearchIntentHistory, saveSearchIntentSearch, getSearchIntentResults, type SearchIntentEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
@@ -35,7 +36,7 @@ const INTENT_CONFIG: Record<string, { label: string; cls: string }> = {
 
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-export default async function SearchIntentPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SearchIntentPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
@@ -106,7 +107,7 @@ export default async function SearchIntentPage({ searchParams }: { searchParams:
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Keywords <span className="normal-case font-normal tracking-normal text-slate-300">(one per line, max 1000)</span></label>
-            <textarea name="keywords" rows={6} defaultValue={activeEntry?.keywords?.split(', ').join('\n') ?? rawKeywords} placeholder={"plombier paris\ndébouchage urgence\nmeilleur plombier"} required
+            <textarea name="keywords" rows={6} defaultValue={activeEntry?.keywords?.split(', ').join('\n') ?? rawKeywords} placeholder={"plumber paris\nemergency drain repair\nbest plumber"} required
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-y bg-white dark:bg-slate-800" />
           </div>
           <LabsLocationLanguageFields
@@ -181,3 +182,5 @@ export default async function SearchIntentPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(SearchIntentPage);

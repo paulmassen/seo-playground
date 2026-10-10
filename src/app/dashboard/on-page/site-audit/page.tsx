@@ -1,11 +1,15 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSiteAuditHistory, getSiteAuditTask, upsertSiteAuditTask,
   saveSiteAuditResult, getSiteAuditSummary, getSiteAuditPages,
   type SiteAuditEntry,
 } from '@/lib/db';
 import { redirect } from 'next/navigation';
+import { getBrandSettings } from '@/lib/brand-server';
 import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
+import ExportExcelButton from '@/components/ExportExcelButton';
+import ReportPdfExportButton from '@/components/ReportPdfExportButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import SiteAuditPagesTable from './SiteAuditPagesTable';
 import KeywordDensityTable from './KeywordDensityTable';
@@ -58,9 +62,10 @@ interface AuditPage {
     internal_links_count?: number;
     external_links_count?: number;
     images_count?: number;
+    content?: { plain_text_word_count?: number };
   };
   page_timing?: { duration_time?: number; waiting_time?: number };
-  content?: { plain_text_word_count?: number };
+
   checks?: Record<string, boolean | undefined>;
 }
 
@@ -101,6 +106,8 @@ interface ResourceItem {
   checks?: { broken_resources?: boolean; is_redirect?: boolean };
   accept_type?: string;
 }
+
+interface NonIndexableItem { url?: string; reason?: string }
 
 interface DuplicateTagPage { url?: string; meta?: { title?: string; description?: string } }
 interface DuplicateTagItem {
@@ -247,7 +254,7 @@ async function fetchKeywordDensity(taskId: string, keywordLength: number, login:
   const res = await fetch('https://api.dataforseo.com/v3/on_page/keyword_density', {
     method: 'POST',
     headers: { Authorization: auth(login, pass), 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ id: taskId, keyword_length: keywordLength, limit: 200, order_by: [['frequency', 'desc']] }]),
+    body: JSON.stringify([{ id: taskId, keyword_length: keywordLength, limit: 200, order_by: ['frequency,desc'] }]),
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) return { error: `HTTP ${res.status}` };
@@ -285,33 +292,42 @@ async function fetchResources(taskId: string, login: string, pass: string): Prom
   return { items: task.result?.[0]?.items ?? [] };
 }
 
+interface DuplicateTagGroup { accumulator?: string; total_count?: number; pages?: DuplicateTagPage[] }
+
+/** DataForSEO returns one kind of duplicate per request, so titles and descriptions are fetched separately. */
 async function fetchDuplicateTags(taskId: string, login: string, pass: string): Promise<{ items?: DuplicateTagItem[]; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/on_page/duplicate_tags', {
-    method: 'POST',
-    headers: { Authorization: auth(login, pass), 'Content-Type': 'application/json' },
-    body: JSON.stringify([{ id: taskId, limit: 200 }]),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!res.ok) return { error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; result?: Array<{ items?: DuplicateTagItem[] }> }> };
-  const task = data?.tasks?.[0];
-  if (!task || (task.status_code && task.status_code !== 20000)) return { error: `DataForSEO: ${task?.status_message}` };
-  return { items: task.result?.[0]?.items ?? [] };
+  const types = ['duplicate_title', 'duplicate_description'];
+  const results = await Promise.all(types.map(async (type) => {
+    const res = await fetch('https://api.dataforseo.com/v3/on_page/duplicate_tags', {
+      method: 'POST',
+      headers: { Authorization: auth(login, pass), 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ id: taskId, type, limit: 200 }]),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+    const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; result?: Array<{ items?: DuplicateTagGroup[] | null }> }> };
+    const task = data?.tasks?.[0];
+    if (!task || (task.status_code && task.status_code !== 20000)) return { error: `DataForSEO: ${task?.status_message}` };
+    return {
+      items: (task.result?.[0]?.items ?? []).map((group): DuplicateTagItem => ({
+        type, tag: group.accumulator, pages: group.pages ?? [], pages_count: group.total_count,
+      })),
+    };
+  }));
+  const failed = results.find((result) => result.error);
+  if (failed) return { error: failed.error };
+  return { items: results.flatMap((result) => result.items ?? []) };
 }
 
-async function fetchNonIndexable(taskId: string, login: string, pass: string): Promise<{ items?: AuditPage[]; error?: string }> {
-  const res = await fetch('https://api.dataforseo.com/v3/on_page/pages', {
+async function fetchNonIndexable(taskId: string, login: string, pass: string): Promise<{ items?: NonIndexableItem[]; error?: string }> {
+  const res = await fetch('https://api.dataforseo.com/v3/on_page/non_indexable', {
     method: 'POST',
     headers: { Authorization: auth(login, pass), 'Content-Type': 'application/json' },
-    body: JSON.stringify([{
-      id: taskId,
-      limit: 1000,
-      filters: [['resource_type', '=', 'html'], 'and', ['non_indexable', '=', true]],
-    }]),
+    body: JSON.stringify([{ id: taskId, limit: 1000 }]),
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) return { error: `HTTP ${res.status}` };
-  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; result?: Array<{ items?: AuditPage[] }> }> };
+  const data = await res.json() as { tasks?: Array<{ status_code?: number; status_message?: string; result?: Array<{ items?: NonIndexableItem[] | null }> }> };
   const task = data?.tasks?.[0];
   if (!task || (task.status_code && task.status_code !== 20000)) return { error: `DataForSEO: ${task?.status_message}` };
   return { items: task.result?.[0]?.items ?? [] };
@@ -345,9 +361,12 @@ function IssueRow({ label, count, sev }: { label: string; count: number; sev: Se
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function SiteAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function SiteAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
+  const brand = getBrandSettings();
+  const brandName = brand.name;
+  const brandLogoUrl = brand.logo ?? undefined;
   const view = params.view ?? 'overview';
   const kwLen = parseInt(params.kw_len ?? '1', 10) || 1;
 
@@ -445,7 +464,7 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
     else dupTagItems = items ?? [];
   }
 
-  let nonIndexItems: AuditPage[] | null = null;
+  let nonIndexItems: NonIndexableItem[] | null = null;
   let nonIndexError: string | null = null;
   if (view === 'non_indexable' && params.task_id && creds && activeTask?.status === 'finished') {
     const { items, error } = await fetchNonIndexable(params.task_id, creds.login, creds.pass);
@@ -489,9 +508,23 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
       errors: e,
       warnings: w,
       load_time_ms: p.page_timing?.duration_time ?? '',
-      word_count: p.content?.plain_text_word_count ?? '',
+      word_count: p.meta?.content?.plain_text_word_count ?? '',
     };
   });
+  const pageExportColumns = [
+    { key: 'url', label: 'URL' }, { key: 'status_code', label: 'Status' }, { key: 'onpage_score', label: 'Score' },
+    { key: 'title', label: 'Title' }, { key: 'title_length', label: 'Title Length' }, { key: 'description', label: 'Description' },
+    { key: 'errors', label: 'Errors' }, { key: 'warnings', label: 'Warnings' }, { key: 'load_time_ms', label: 'Load Time (ms)' }, { key: 'word_count', label: 'Word Count' },
+  ];
+  const auditFileStem = activeTask?.target.replace(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '').toLowerCase() || 'site-audit';
+  const auditOverviewRows = summary ? [
+    { metric: 'On-page score', value: score?.toFixed(1) ?? '' },
+    { metric: 'Pages crawled', value: String(summary.crawl_status.pages_crawled) },
+    { metric: 'Broken links', value: String(summary.page_metrics?.broken_links ?? '') },
+    { metric: 'Non-indexable pages', value: String(summary.page_metrics?.non_indexable ?? '') },
+    { metric: 'Duplicate titles', value: String(summary.page_metrics?.duplicate_title ?? '') },
+    { metric: 'Duplicate descriptions', value: String(summary.page_metrics?.duplicate_description ?? '') },
+  ] : [];
 
   return (
     <div className="space-y-6">
@@ -606,6 +639,30 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
               {/* ── Overview tab ── */}
               {view === 'overview' && summary && (
                 <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Export audit report</p>
+                    <div className="flex items-center gap-3">
+                      <ReportPdfExportButton brandName={brandName} brandLogoUrl={brandLogoUrl} brandColor={brand.color} brandFooter={brand.footer} brandStyle={brand} filename={`${auditFileStem}-site-audit-report.pdf`}
+                        title="Site audit report" subject={activeTask!.target} generatedAt={activeTask!.ts}
+                        metrics={[
+                          { label: 'On-page score', value: score?.toFixed(1) ?? '—', detail: 'out of 100' },
+                          { label: 'Pages crawled', value: fmt(summary.crawl_status.pages_crawled), detail: `${fmt(summary.crawl_status.max_crawl_pages)} maximum` },
+                          { label: 'Critical errors', value: String(errors.reduce((total, issue) => total + issue.count, 0)), detail: `${errors.length} issue types` },
+                          { label: 'Warnings', value: String(warnings.reduce((total, issue) => total + issue.count, 0)), detail: `${warnings.length} issue types` },
+                        ]}
+                        sections={[
+                          { title: 'Critical issues', rows: errors.slice(0, 15).map((issue) => [issue.label, `${issue.count} pages`]) },
+                          { title: 'Warnings', rows: warnings.slice(0, 15).map((issue) => [issue.label, `${issue.count} pages`]) },
+                          { title: 'Domain health', rows: [[ 'CMS', summary.domain_info?.cms ?? '—' ], [ 'Server', summary.domain_info?.server ?? '—' ], [ 'SSL certificate', summary.domain_info?.ssl_info?.valid_certificate ? 'Valid' : 'Not verified' ]].filter((row) => row[1] !== '—') as Array<[string, string]> },
+                        ]} />
+                      <ExportExcelButton filename={`${auditFileStem}-site-audit.xls`} sheets={[
+                        { name: 'Overview', columns: [{ key: 'metric', label: 'Metric' }, { key: 'value', label: 'Value' }], data: auditOverviewRows },
+                        { name: 'Issues', columns: [{ key: 'severity', label: 'Severity' }, { key: 'issue', label: 'Issue' }, { key: 'pages', label: 'Affected pages' }], data: issuesList.map((issue) => ({ severity: issue.sev, issue: issue.label, pages: issue.count })) },
+                        { name: 'Pages', columns: pageExportColumns, data: csvData },
+                      ]} />
+                      <ExportCSVButton data={csvData} columns={pageExportColumns} filename={`${auditFileStem}-site-audit-pages.csv`} />
+                    </div>
+                  </div>
                   {/* Score + crawl stats */}
                   <div className="flex gap-4 items-start flex-wrap">
                     {score !== undefined && (
@@ -739,7 +796,7 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                   )}
 
                   {kwDensityItems && kwDensityItems.length === 0 && (
-                    <div className="px-6 py-12 text-center text-sm text-slate-400">No results.</div>
+                    <div className="px-6 py-12 text-center text-sm text-slate-400">No keyword density data: this audit was crawled without DataForSEO&apos;s keyword density option.</div>
                   )}
 
                   {kwDensityItems && kwDensityItems.length > 0 && (
@@ -757,34 +814,12 @@ export default async function SiteAuditPage({ searchParams }: { searchParams: Pr
                       <div className="flex items-center gap-2">
                         <CopyMarkdownButton
                           data={csvData}
-                          columns={[
-                            { key: 'url', label: 'URL' },
-                            { key: 'status_code', label: 'Status' },
-                            { key: 'onpage_score', label: 'Score' },
-                            { key: 'title', label: 'Title' },
-                            { key: 'title_length', label: 'Title Length' },
-                            { key: 'description', label: 'Description' },
-                            { key: 'errors', label: 'Errors' },
-                            { key: 'warnings', label: 'Warnings' },
-                            { key: 'load_time_ms', label: 'Load Time (ms)' },
-                            { key: 'word_count', label: 'Word Count' },
-                          ]}
+                          columns={pageExportColumns}
                         />
                         <ExportCSVButton
                           data={csvData}
                           filename={`site-audit-${activeTask!.target}.csv`}
-                          columns={[
-                            { key: 'url', label: 'URL' },
-                            { key: 'status_code', label: 'Status' },
-                            { key: 'onpage_score', label: 'Score' },
-                            { key: 'title', label: 'Title' },
-                            { key: 'title_length', label: 'Title Length' },
-                            { key: 'description', label: 'Description' },
-                            { key: 'errors', label: 'Errors' },
-                            { key: 'warnings', label: 'Warnings' },
-                            { key: 'load_time_ms', label: 'Load Time (ms)' },
-                            { key: 'word_count', label: 'Word Count' },
-                          ]}
+                          columns={pageExportColumns}
                         />
                       </div>
                     )}
@@ -936,3 +971,5 @@ function StatusBadge({ status }: { status: SiteAuditEntry['status'] }) {
   };
   return <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${map[status]}`}>{labels[status]}</span>;
 }
+
+export default withProjectScope(SiteAuditPage);

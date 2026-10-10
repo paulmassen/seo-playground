@@ -1,3 +1,4 @@
+import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
   getSetting,
@@ -7,22 +8,27 @@ import {
   type AiVisibilityEntry,
   type AiVisibilityMode,
 } from '@/lib/db';
-import { toLabsCountry } from '@/lib/geo-options';
+import { labsLocationLabel, toLabsCountry } from '@/lib/geo-options';
+import { getBrandSettings } from '@/lib/brand-server';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
+import ExportCSVButton from '@/components/ExportCSVButton';
+import ExportExcelButton, { type ExportSheet } from '@/components/ExportExcelButton';
+import ReportPdfExportButton, { type ReportMetric, type ReportSection } from '@/components/ReportPdfExportButton';
 import LeaderboardTables from './LeaderboardTables';
 import HistoricalTargetingFields from './HistoricalTargetingFields';
+import MentionTargetingFields from './MentionTargetingFields';
 
 // ---- Types ----
 
-interface AggMetric {
+export interface AggMetric {
   key: string | number;
   mentions: number;
   ai_search_volume: number;
 }
 
-interface AggregatedMetrics {
+export interface AggregatedMetrics {
   location?: AggMetric[];
   language?: AggMetric[];
   platform?: AggMetric[];
@@ -33,6 +39,17 @@ interface AggregatedMetrics {
   total?: { mentions: number; ai_search_volume: number };
 }
 
+type MetricBreakdowns = Omit<AggregatedMetrics, 'total'>;
+const METRIC_DIMENSIONS: ReadonlyArray<[keyof MetricBreakdowns, string]> = [
+  ['location', 'Location'],
+  ['language', 'Language'],
+  ['platform', 'Platform'],
+  ['sources_domain', 'Source domain'],
+  ['search_results_domain', 'Search-result domain'],
+  ['brand_entities_title', 'Brand entity'],
+  ['brand_entities_category', 'Brand entity category'],
+];
+
 interface TargetMetricsResult {
   total_count: number;
   aggregated_metrics: AggregatedMetrics;
@@ -41,12 +58,29 @@ interface TargetMetricsResult {
 export interface LeaderboardItem {
   domain?: string;
   brand?: string;
+  location?: AggMetric[];
+  language?: AggMetric[];
+  platform?: AggMetric[];
+  sources_domain?: AggMetric[];
+  search_results_domain?: AggMetric[];
+  brand_entities_title?: AggMetric[];
+  brand_entities_category?: AggMetric[];
   total: { mentions: number; ai_search_volume: number };
 }
 
 interface LeaderboardResult {
   domains: LeaderboardItem[];
   brands: LeaderboardItem[];
+  domainsAggregatedMetrics?: AggregatedMetrics;
+  brandsAggregatedMetrics?: AggregatedMetrics;
+  domainsTotalCount?: number;
+  brandsTotalCount?: number;
+}
+
+interface LeaderboardResponse {
+  total_count?: number;
+  aggregated_metrics?: AggregatedMetrics;
+  items?: LeaderboardItem[];
 }
 
 interface HistoricalItem {
@@ -74,10 +108,9 @@ interface SearchParams {
 }
 
 // ---- API ----
-// Verified via live test calls: `target` must be an array of {domain|keyword, search_filter,
-// search_scope} objects even for a single target. Neither target_metrics nor
-// top_mentioned_domains/top_mentioned_brands accept location_name/location_code — location and
-// language are output breakdown dimensions in aggregated_metrics, not input filters.
+// `target` must be an array of {domain|keyword, search_filter, search_scope} objects even for a
+// single target. DataForSEO supports country/language targeting for Google AI; ChatGPT is fixed to
+// United States / English, so we rely on its documented defaults for that platform.
 
 function buildTargetObj(value: string, type: 'domain' | 'keyword') {
   return type === 'domain'
@@ -92,28 +125,44 @@ async function callLlmMentions<T>(
 }
 
 async function fetchTargetMetrics(
-  value: string, type: 'domain' | 'keyword', platform: string, login: string, pass: string,
+  value: string, type: 'domain' | 'keyword', platform: string, location: string, language: string, login: string, pass: string,
 ): Promise<{ result?: TargetMetricsResult; cost?: number; error?: string }> {
+  const body: Record<string, unknown> = { target: [buildTargetObj(value, type)], platform };
+  if (platform === 'google') {
+    body.location_name = location;
+    body.language_name = language;
+  }
   return callLlmMentions<TargetMetricsResult>(
     'target_metrics',
-    { target: [buildTargetObj(value, type)], platform },
+    body,
     login, pass,
   );
 }
 
 async function fetchLeaderboard(
-  value: string, type: 'domain' | 'keyword', platform: string, limit: number, login: string, pass: string,
+  value: string, type: 'domain' | 'keyword', platform: string, location: string, language: string, limit: number, login: string, pass: string,
 ): Promise<{ result?: LeaderboardResult; cost?: number; error?: string }> {
-  const body = { target: [buildTargetObj(value, type)], platform, limit };
+  const body: Record<string, unknown> = { target: [buildTargetObj(value, type)], platform, limit };
+  if (platform === 'google') {
+    body.location_name = location;
+    body.language_name = language;
+  }
   const [domainsRes, brandsRes] = await Promise.all([
-    callLlmMentions<{ items?: LeaderboardItem[] }>('top_mentioned_domains', body, login, pass),
-    callLlmMentions<{ items?: LeaderboardItem[] }>('top_mentioned_brands', body, login, pass),
+    callLlmMentions<LeaderboardResponse>('top_mentioned_domains', body, login, pass),
+    callLlmMentions<LeaderboardResponse>('top_mentioned_brands', body, login, pass),
   ]);
   if (domainsRes.error || brandsRes.error) {
     return { error: domainsRes.error ?? brandsRes.error };
   }
   return {
-    result: { domains: domainsRes.result?.items ?? [], brands: brandsRes.result?.items ?? [] },
+    result: {
+      domains: domainsRes.result?.items ?? [],
+      brands: brandsRes.result?.items ?? [],
+      domainsAggregatedMetrics: domainsRes.result?.aggregated_metrics,
+      brandsAggregatedMetrics: brandsRes.result?.aggregated_metrics,
+      domainsTotalCount: domainsRes.result?.total_count,
+      brandsTotalCount: brandsRes.result?.total_count,
+    },
     cost: (domainsRes.cost ?? 0) + (brandsRes.cost ?? 0),
   };
 }
@@ -142,20 +191,26 @@ const PLATFORM_LABELS: Record<string, string> = { google: 'Google AI', chat_gpt:
 function fmt(n?: number) { return n != null ? n.toLocaleString('en-GB') : '—'; }
 function formatDate(ts: number) { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-function BreakdownList({ title, items, unit }: { title: string; items?: AggMetric[]; unit: string }) {
+function BreakdownList({ title, items, formatKey = String }: {
+  title: string;
+  items?: AggMetric[];
+  formatKey?: (key: AggMetric['key']) => string;
+}) {
   if (!items || items.length === 0) return null;
   const max = Math.max(...items.map((i) => i.mentions), 1);
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
       <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">{title}</h2>
       <div className="space-y-2">
-        {items.slice(0, 8).map((item, i) => {
+        {items.map((item, i) => {
           const pct = Math.round((item.mentions / max) * 100);
           return (
             <div key={i}>
               <div className="flex items-center justify-between mb-1 gap-2">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{String(item.key)}</span>
-                <span className="text-xs font-mono text-slate-500 shrink-0">{fmt(item.mentions)} {unit}</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{formatKey(item.key)}</span>
+                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0 tabular-nums">
+                  {fmt(item.mentions)} mentions · {fmt(item.ai_search_volume)} volume
+                </span>
               </div>
               <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div className="h-full bg-violet-400 rounded-full" style={{ width: `${pct}%` }} />
@@ -216,7 +271,7 @@ function MonthlyTrendChart({ title, items, metric }: { title: string; items: His
 
 // ---- Page ----
 
-export default async function AiVisibilityPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+async function AiVisibilityPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const creds = getCredentials();
   const params = await searchParams;
   const historyId = params.history_id;
@@ -229,6 +284,9 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
   const limit = Math.min(Math.max(parseInt(params.limit ?? '10', 10) || 10, 1), 50);
   const defaultLocation = toLabsCountry(getSetting('default_location') ?? 'France');
   const defaultLanguage = getSetting('default_language') ?? 'French';
+  const brand = getBrandSettings();
+  const brandName = brand.name;
+  const brandLogoUrl = brand.logo ?? undefined;
   const location = platform === 'chat_gpt' ? 'United States' : (params.location ?? defaultLocation);
   const language = platform === 'chat_gpt' ? 'English' : (params.language ?? defaultLanguage);
   const dateFrom = params.date_from ?? '';
@@ -258,7 +316,7 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
     } else {
       const dedupeId = mode === 'historical'
         ? stableSearchId(['ai-visibility', mode, targetValue, targetType, platform, location, language, dateFrom, dateTo])
-        : stableSearchId(['ai-visibility', mode, targetValue, targetType, platform, limit]);
+        : stableSearchId(['ai-visibility', mode, targetValue, targetType, platform, location, language, limit]);
       const cached = getAiVisibilityResult<TargetMetricsResult | LeaderboardResult | HistoricalResult>(dedupeId);
 
       if (cached) {
@@ -268,9 +326,9 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
         cost = getAiVisibilityHistory().find((e) => e.id === dedupeId)?.cost;
       } else {
         const res = mode === 'target'
-          ? await fetchTargetMetrics(targetValue, targetType, platform, creds.login, creds.pass)
+          ? await fetchTargetMetrics(targetValue, targetType, platform, location, language, creds.login, creds.pass)
           : mode === 'leaderboard'
-            ? await fetchLeaderboard(targetValue, targetType, platform, limit, creds.login, creds.pass)
+            ? await fetchLeaderboard(targetValue, targetType, platform, location, language, limit, creds.login, creds.pass)
             : await fetchHistorical(targetValue, targetType, platform, location, language, dateFrom, dateTo, creds.login, creds.pass);
 
         error = res.error ?? null;
@@ -292,6 +350,92 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
   const hasQuery = !!(historyId || targetValue);
   const displayTarget = activeEntry?.target ?? targetValue;
   const agg = targetResult?.aggregated_metrics;
+  const formatBreakdownKey = (dimension: string, key: AggMetric['key']) =>
+    dimension === 'Location' ? labsLocationLabel(key) : String(key);
+  const reportDate = activeEntry?.ts ?? Date.now();
+  const reportSlug = displayTarget.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 48) || 'report';
+  let reportMetrics: ReportMetric[] = [];
+  let reportSections: ReportSection[] = [];
+  let reportSheets: ExportSheet[] = [];
+  let reportCsvData: Record<string, unknown>[] = [];
+  let reportCsvColumns: Array<{ key: string; label: string }> = [];
+
+  if (mode === 'target' && targetResult) {
+    const breakdowns: Array<[string, AggMetric[] | undefined]> = [
+      ['Platform', agg?.platform], ['Location', agg?.location], ['Language', agg?.language], ['Source domain', agg?.sources_domain],
+      ['Search-result domain', agg?.search_results_domain], ['Brand entity', agg?.brand_entities_title], ['Brand entity category', agg?.brand_entities_category],
+    ];
+    reportMetrics = [
+      { label: 'Platform', value: PLATFORM_LABELS[platform] ?? platform },
+      { label: 'Mentions', value: fmt(agg?.total?.mentions) },
+      { label: 'AI search volume', value: fmt(agg?.total?.ai_search_volume) },
+    ];
+    reportSections = breakdowns.map(([title, items]) => ({
+      title: `Mentions by ${title.toLowerCase()}`,
+      rows: (items ?? []).slice(0, 12).map((item) => [formatBreakdownKey(title, item.key), `${fmt(item.mentions)} mentions`]),
+    }));
+    reportSheets = [
+      { name: 'Overview', columns: [{ key: 'metric', label: 'Metric' }, { key: 'value', label: 'Value' }], data: reportMetrics.map((metric) => ({ metric: metric.label, value: metric.value })) },
+      ...breakdowns.map(([name, items]) => ({
+        name: name.slice(0, 31),
+        columns: [{ key: 'name', label: name }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }],
+        data: (items ?? []).map((item) => ({ name: formatBreakdownKey(name, item.key), mentions: item.mentions, volume: item.ai_search_volume })),
+      })),
+    ];
+    reportCsvColumns = [{ key: 'dimension', label: 'Dimension' }, { key: 'name', label: 'Name' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }];
+    reportCsvData = breakdowns.flatMap(([dimension, items]) => (items ?? []).map((item) => ({ dimension, name: formatBreakdownKey(dimension, item.key), mentions: item.mentions, volume: item.ai_search_volume })));
+  } else if (mode === 'leaderboard' && leaderboardResult) {
+    const toRows = (items: LeaderboardItem[], field: 'domain' | 'brand') => items.map((item) => ({
+      name: item[field] ?? '', mentions: item.total?.mentions ?? 0, volume: item.total?.ai_search_volume ?? 0,
+    }));
+    const domains = toRows(leaderboardResult.domains, 'domain');
+    const brands = toRows(leaderboardResult.brands, 'brand');
+    const detailedRows = (scope: string, name: string, metrics?: MetricBreakdowns) =>
+      METRIC_DIMENSIONS.flatMap(([dimension, label]) => (metrics?.[dimension] ?? []).map((item) => ({
+        scope, name, dimension: label, key: formatBreakdownKey(label, item.key), mentions: item.mentions, volume: item.ai_search_volume,
+      })));
+    const metricDetails = [
+      ...detailedRows('Domain leaderboard', 'All domains', leaderboardResult.domainsAggregatedMetrics),
+      ...detailedRows('Brand leaderboard', 'All brands', leaderboardResult.brandsAggregatedMetrics),
+      ...leaderboardResult.domains.flatMap((item) => detailedRows('Domain', item.domain ?? '—', item)),
+      ...leaderboardResult.brands.flatMap((item) => detailedRows('Brand', item.brand ?? '—', item)),
+    ];
+    reportMetrics = [
+      { label: 'Platform', value: PLATFORM_LABELS[platform] ?? platform },
+      { label: 'Domains ranked', value: String(domains.length) },
+      { label: 'Brands ranked', value: String(brands.length) },
+    ];
+    reportSections = [
+      { title: 'Top mentioned domains', rows: domains.slice(0, 12).map((row) => [String(row.name), `${fmt(Number(row.mentions))} mentions`]) },
+      { title: 'Top mentioned brands', rows: brands.slice(0, 12).map((row) => [String(row.name), `${fmt(Number(row.mentions))} mentions`]) },
+    ];
+    reportSheets = [
+      { name: 'Domains', columns: [{ key: 'name', label: 'Domain' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }], data: domains },
+      { name: 'Brands', columns: [{ key: 'name', label: 'Brand' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }], data: brands },
+      { name: 'Metric details', columns: [{ key: 'scope', label: 'Scope' }, { key: 'name', label: 'Name' }, { key: 'dimension', label: 'Dimension' }, { key: 'key', label: 'Value' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }], data: metricDetails },
+    ];
+    reportCsvColumns = [{ key: 'scope', label: 'Scope' }, { key: 'name', label: 'Name' }, { key: 'dimension', label: 'Dimension' }, { key: 'key', label: 'Value' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }];
+    reportCsvData = [
+      ...domains.map((row) => ({ scope: 'Domain', name: row.name, dimension: 'Total', key: '', mentions: row.mentions, volume: row.volume })),
+      ...brands.map((row) => ({ scope: 'Brand', name: row.name, dimension: 'Total', key: '', mentions: row.mentions, volume: row.volume })),
+      ...metricDetails,
+    ];
+  } else if (mode === 'historical' && historicalResult) {
+    const months = [...historicalResult.items].sort((a, b) => (a.year - b.year) || (a.month - b.month)).map((item) => ({
+      month: `${item.year}-${String(item.month).padStart(2, '0')}`, mentions: item.metrics.mentions, volume: item.metrics.ai_search_volume,
+    }));
+    reportMetrics = [
+      { label: 'Platform', value: PLATFORM_LABELS[platform] ?? platform },
+      { label: 'Months tracked', value: String(months.length) },
+      { label: 'Latest mentions', value: fmt(months.at(-1)?.mentions) },
+      { label: 'Latest AI volume', value: fmt(months.at(-1)?.volume) },
+    ];
+    reportSections = [{ title: 'Monthly history', rows: months.slice(-18).reverse().map((row) => [row.month, `${fmt(row.mentions)} mentions · ${fmt(row.volume)} volume`]) }];
+    reportSheets = [{ name: 'Monthly history', columns: [{ key: 'month', label: 'Month' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }], data: months }];
+    reportCsvColumns = [{ key: 'month', label: 'Month' }, { key: 'mentions', label: 'Mentions' }, { key: 'volume', label: 'AI Search Volume' }];
+    reportCsvData = months;
+  }
+  const canExportReport = reportMetrics.length > 0;
 
   return (
     <div className="space-y-6">
@@ -355,14 +499,7 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
             />
           ) : (
             <>
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Platform</label>
-                <select name="platform" defaultValue={platform}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white dark:bg-slate-800">
-                  <option value="chat_gpt">ChatGPT</option>
-                  <option value="google">Google AI</option>
-                </select>
-              </div>
+              <MentionTargetingFields defaultPlatform={platform} defaultLocation={location} defaultLanguage={language} />
 
               {mode === 'leaderboard' && (
                 <div>
@@ -379,6 +516,18 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
       </SearchForm>
 
       {error && <div className="bg-red-50 dark:bg-red-950 border border-red-100 text-red-600 dark:text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>}
+
+      {canExportReport && (
+        <div className="flex items-center justify-between gap-4 border-y border-slate-100 dark:border-slate-800 py-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Export current report</p>
+          <div className="flex items-center gap-3">
+            <ReportPdfExportButton brandName={brandName} brandLogoUrl={brandLogoUrl} brandColor={brand.color} brandFooter={brand.footer} brandStyle={brand} filename={`ai-visibility-${reportSlug}.pdf`}
+              title="AI visibility report" subject={displayTarget} generatedAt={reportDate} metrics={reportMetrics} sections={reportSections} />
+            <ExportExcelButton sheets={reportSheets} filename={`ai-visibility-${reportSlug}.xls`} />
+            <ExportCSVButton data={reportCsvData} columns={reportCsvColumns} filename={`ai-visibility-${reportSlug}.csv`} />
+          </div>
+        </div>
+      )}
 
       {hasQuery && !error && mode === 'target' && targetResult && (
         <div id="results" className="space-y-4">
@@ -406,12 +555,13 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <BreakdownList title="By platform" items={agg?.platform} unit="mentions" />
-              <BreakdownList title="By location" items={agg?.location} unit="mentions" />
-              <BreakdownList title="Top referring source domains" items={agg?.sources_domain} unit="mentions" />
-              <BreakdownList title="Top search-result domains" items={agg?.search_results_domain} unit="mentions" />
-              <BreakdownList title="Brand entities mentioned alongside" items={agg?.brand_entities_title} unit="mentions" />
-              <BreakdownList title="Brand entity categories" items={agg?.brand_entities_category} unit="mentions" />
+              <BreakdownList title="By platform" items={agg?.platform} />
+              <BreakdownList title="By location" items={agg?.location} formatKey={labsLocationLabel} />
+              <BreakdownList title="By language" items={agg?.language} />
+              <BreakdownList title="Top referring source domains" items={agg?.sources_domain} />
+              <BreakdownList title="Top search-result domains" items={agg?.search_results_domain} />
+              <BreakdownList title="Brand entities mentioned alongside" items={agg?.brand_entities_title} />
+              <BreakdownList title="Brand entity categories" items={agg?.brand_entities_category} />
             </div>
           )}
         </div>
@@ -425,7 +575,15 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
             {isFromHistory && <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-md">History</span>}
             {cost !== undefined && <span className="text-[10px] font-mono text-slate-400 ml-auto">cost: ${cost.toFixed(4)}</span>}
           </div>
-          <LeaderboardTables domains={leaderboardResult.domains} brands={leaderboardResult.brands} topic={displayTarget} />
+          <LeaderboardTables
+            domains={leaderboardResult.domains}
+            brands={leaderboardResult.brands}
+            domainAggregates={leaderboardResult.domainsAggregatedMetrics}
+            brandAggregates={leaderboardResult.brandsAggregatedMetrics}
+            domainsTotalCount={leaderboardResult.domainsTotalCount}
+            brandsTotalCount={leaderboardResult.brandsTotalCount}
+            topic={displayTarget}
+          />
         </div>
       )}
 
@@ -503,3 +661,5 @@ export default async function AiVisibilityPage({ searchParams }: { searchParams:
     </div>
   );
 }
+
+export default withProjectScope(AiVisibilityPage);
