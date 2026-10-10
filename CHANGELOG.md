@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Referring Domains** no longer fails with `Invalid Field: 'order_by'` ([#12](https://github.com/paulmassen/seo-playground/issues/12)). The page sorted on `domain_from_rank` and filtered on `dofollow`, two fields that `backlinks/referring_domains/live` does not have. It now sorts on `rank`, and the DR column, CSV export and history read that rank. Nofollow referring domains are now listed too, since the endpoint cannot filter them out.
+
 ---
 
 ## [0.5.0] — 2026-10-09

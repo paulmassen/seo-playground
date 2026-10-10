@@ -16,13 +16,20 @@ interface SearchParams {
 }
 
 async function fetchRefDomains(target: string, limit: number, login: string, pass: string): Promise<{ items: RefDomain[]; total: number; cost: number; error?: string }> {
-  const { result, cost, error } = await callDataForSeoFirst<{ total_count?: number; items?: RefDomain[] }>(
+  // This endpoint exposes the referring domain's rank as `rank` (not `domain_from_rank`,
+  // which belongs to backlinks/backlinks) and has no `dofollow` field to filter on.
+  const { result, cost, error } = await callDataForSeoFirst<{
+    total_count?: number;
+    items?: (Omit<RefDomain, 'domain_from_rank'> & { rank: number })[];
+  }>(
     'backlinks/referring_domains/live',
-    { target, limit, order_by: ['domain_from_rank,desc'], filters: ['dofollow', '=', true], include_subdomains: true },
+    { target, limit, order_by: ['rank,desc'], include_subdomains: true },
     { login, pass },
   );
   if (error) return { items: [], total: 0, cost: 0, error };
-  return { items: result?.items ?? [], total: result?.total_count ?? 0, cost: cost ?? 0 };
+  // Map `rank` back to `domain_from_rank` so the table, CSV export and saved history stay unchanged.
+  const items = (result?.items ?? []).map(({ rank, ...rest }) => ({ ...rest, domain_from_rank: rank }));
+  return { items, total: result?.total_count ?? 0, cost: cost ?? 0 };
 }
 
 async function RefDomainsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
