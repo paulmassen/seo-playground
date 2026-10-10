@@ -1,12 +1,15 @@
 import { withProjectScope } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import { getBrandSettings } from '@/lib/brand-server';
+import { getGridPreferences } from '@/lib/grid-preferences-server';
+import { formatDistance, unitToKm } from '@/lib/grid-preferences';
 import {
   getCurrentProject, getCredentials, getSetting, getGridHistory, getGridEntry, saveGridSearch,
   saveGridSearchPending, getGridResults, getGridSeriesHistory, getGridSchedule, gridSeriesId, type GridSearchEntry, type GridPoint, type GridQueueMode,
 } from '@/lib/db';
 import LocalFinderForm from '../local-finder/LocalFinderForm';
 import GridPending from '../local-finder/GridPending';
+import { GridPreferencesProvider } from '../local-finder/GridPreferences';
 import GridTimeline from '../local-finder/GridTimeline';
 import type { GridPositionTrendPoint } from '../local-finder/GridPositionTrend';
 import type { GridMapSnapshot } from '../local-finder/GridSnapshotMapPanel';
@@ -57,6 +60,8 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
   const brand = getBrandSettings();
   const brandName = brand.name;
   const brandLogoUrl = brand.logo ?? undefined;
+  const gridPreferences = getGridPreferences();
+  const { distanceUnit } = gridPreferences;
 
   let gridResults: GridPoint[] | null = null;
   let gridEntry: GridSearchEntry | null = null;
@@ -196,7 +201,8 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
     gridMode: true,
     forceGridMode: true,
     gridSize: (params.grid_size ?? gridEntry?.grid_size ?? '5').toString(),
-    spacingKm: (params.spacing_km ?? gridEntry?.spacing_km ?? '1').toString(),
+    // A new monitor starts at 1 km or 1 mi, following the Settings distance unit.
+    spacingKm: (params.spacing_km ?? gridEntry?.spacing_km ?? unitToKm(1, distanceUnit)).toString(),
     gridTarget: (params.grid_target ?? gridEntry?.target ?? defaultDomain).toString(),
     queueMode: (params.queue_mode ?? gridEntry?.queue_mode ?? 'live').toString(),
   };
@@ -217,7 +223,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
             )}
           </div>
           <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-            {entry.target} · {entry.spacing_km} km spacing
+            {entry.target} · {formatDistance(entry.spacing_km, distanceUnit)} spacing
             {entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}
           </p>
           {entry.summary && (
@@ -250,6 +256,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
   });
 
   return (
+    <GridPreferencesProvider value={gridPreferences}>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Geo-grid monitors</h1>
@@ -328,6 +335,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
                   brandFooter={brand.footer}
                   brandStyle={brand}
                   trend={trend}
+                  distanceUnit={distanceUnit}
                 />
               </>
             )}
@@ -339,6 +347,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
         )}
       </div>
     </div>
+    </GridPreferencesProvider>
   );
 }
 

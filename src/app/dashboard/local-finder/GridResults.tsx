@@ -6,6 +6,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { GridPoint } from '@/lib/db';
 import { computeCompetitors, computeGridSummary, computeRingStats, type CompetitorSummary } from './grid-insights';
 import GridPdfExportButton from './GridPdfExportButton';
+import { formatDistance } from '@/lib/grid-preferences';
+import { useGridPreferences } from './GridPreferences';
 
 const GridMap = lazy(() => import('./GridMap'));
 
@@ -43,6 +45,8 @@ function formatSnapshotDate(ts: number) {
 
 export default function GridResults({ results, gridSize, spacingKm, keyword, target, cost, language, searchedAt, snapshotDate, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle }: Props) {
   const [highlight, setHighlight] = useState<CompetitorSummary | null>(null);
+  const { distanceUnit, pinStyle } = useGridPreferences();
+  const swatchShape = pinStyle === 'square' ? 'rounded-sm' : 'rounded-full';
 
   // A competitor key belongs to one snapshot. Clear it when the timeline moves
   // to another run, so the map and competitor list cannot describe different dates.
@@ -208,12 +212,12 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
         <div className="flex flex-wrap gap-2 mb-4">
           {legend.map((item) => (
             <div key={item.label} className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+              <div className={`w-3 h-3 ${swatchShape}`} style={{ backgroundColor: item.color }} />
               <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
             </div>
           ))}
           <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-200">
-            <div className="w-3 h-3 rounded-sm border-2 border-dashed border-slate-400" />
+            <div className={`w-3 h-3 ${swatchShape} border-2 border-dashed border-slate-400`} />
             <span className="text-[10px] font-bold text-slate-500">Center</span>
           </div>
         </div>
@@ -246,7 +250,7 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
             {ringStats.map((r) => (
               <div key={r.ring} className="flex items-center gap-3">
                 <span className="text-[10px] font-black text-slate-400 w-20 shrink-0 tabular-nums">
-                  {r.ring === 0 ? 'Center' : `~${r.distanceKm} km`}
+                  {r.ring === 0 ? 'Center' : `~${formatDistance(r.distanceKm, distanceUnit, 1)}`}
                 </span>
                 <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div

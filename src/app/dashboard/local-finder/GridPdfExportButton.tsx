@@ -6,6 +6,8 @@ import type { GridPoint } from '@/lib/db';
 import { computeCompetitors, computeGridSummary } from './grid-insights';
 import { brandPalette, fitBox, footerPalette, imageSize, resolveBrandStyle, type BrandStyle } from '@/lib/brand';
 import { drawFooter, drawHeaderBand } from '@/lib/brand-pdf';
+import { formatDistance } from '@/lib/grid-preferences';
+import { useGridPreferences } from './GridPreferences';
 
 type Props = {
   results: GridPoint[];
@@ -107,6 +109,7 @@ function filenamePart(value: string) {
 
 export default function GridPdfExportButton(props: Props) {
   const [isExporting, setIsExporting] = useState(false);
+  const { distanceUnit } = useGridPreferences();
 
   const exportReport = async () => {
     setIsExporting(true);
@@ -168,7 +171,7 @@ export default function GridPdfExportButton(props: Props) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       setColor(palette.muted);
-      text(`Target: ${props.target}  /  ${props.gridSize} x ${props.gridSize} points  /  ${props.spacingKm} km spacing  /  ${props.language}`, margin, 60);
+      text(`Target: ${props.target}  /  ${props.gridSize} x ${props.gridSize} points  /  ${formatDistance(props.spacingKm, distanceUnit)} spacing  /  ${props.language}`, margin, 60);
 
       const metrics = [
         ['ATO SCORE', `${summary.ato}%`, 'Local visibility'],

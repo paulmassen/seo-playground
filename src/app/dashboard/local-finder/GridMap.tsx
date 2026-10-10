@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GridPoint } from '@/lib/db';
+import type { PinStyle } from '@/lib/grid-preferences';
 import { competitorKey } from './grid-insights';
+import { useGridPreferences } from './GridPreferences';
 
 interface Props {
   points: GridPoint[];
@@ -126,6 +128,33 @@ function starMarkerHtml(size: number, fontSize: number, color: string, label: st
     </div>`;
 }
 
+/** Marker and label sizes for a grid, per pin style. Circles and dots leave more of the basemap visible. */
+function markerMetrics(gridSize: number, pinStyle: PinStyle) {
+  const cellPx = gridSize <= 3 ? 52 : gridSize <= 5 ? 44 : gridSize <= 7 ? 38 : 32;
+  const fontSize = gridSize <= 5 ? 15 : 13;
+  if (pinStyle === 'circle') return { size: Math.round(cellPx * 0.9), fontSize: fontSize - 1, starScale: 1.3 };
+  if (pinStyle === 'dot') return { size: Math.max(22, Math.round(cellPx * 0.6)), fontSize: gridSize <= 5 ? 11 : 10, starScale: 1.45 };
+  return { size: cellPx, fontSize, starScale: 1.3 };
+}
+
+function shapeMarkerHtml(pinStyle: PinStyle, size: number, fontSize: number, color: string, label: string, isCenter: boolean, movement: string, movementColor: string): string {
+  const round = pinStyle !== 'square';
+  const radius = round ? '50%' : `${Math.round(size * 0.22)}px`;
+  // Round pins get a crisp white ring so they stay readable on top of busy map tiles.
+  const border = isCenter
+    ? `border: ${pinStyle === 'dot' ? 2 : 3}px dashed rgba(255,255,255,0.9);`
+    : round
+      ? `border: ${pinStyle === 'dot' ? 1.5 : 2}px solid rgba(255,255,255,0.95);`
+      : 'border: 2px solid rgba(255,255,255,0.4);';
+  const shadow = pinStyle === 'dot' ? '0 1px 4px rgba(0,0,0,0.35)' : '0 2px 8px rgba(0,0,0,0.35)';
+  // Movement badges shrink with dots so they don't outweigh the pin itself.
+  const badgeSize = pinStyle === 'dot' ? 'bottom:-6px;padding:0 2px;font-size:7.5px;line-height:9px;' : 'bottom:-7px;padding:1px 3px;font-size:9px;line-height:11px;';
+  const badge = movement
+    ? `<span style="position:absolute;left:50%;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);${badgeSize}font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22);white-space:nowrap">${movement}</span>`
+    : '';
+  return `<div style="position:relative;box-sizing:border-box;width:${size}px;height:${size}px;background:${color};border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:900;color:white;font-family:system-ui,sans-serif;${border}box-shadow:${shadow};cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'"><span>${label}</span>${badge}</div>`;
+}
+
 /** Resolves the rank to display at a point, given whether a competitor is being highlighted. */
 function pointRank(point: GridPoint, highlightKey?: string): number | null {
   if (!highlightKey) return point.rank;
@@ -140,6 +169,7 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
   const markerLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
   const boundsSignatureRef = useRef<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const { pinStyle } = useGridPreferences();
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -193,8 +223,7 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
     if (geoPoints.length === 0) return;
     const half = Math.floor(gridSize / 2);
     const previousByPoint = new Map((previousPoints ?? []).map((point) => [`${point.row}:${point.col}`, point]));
-    const cellPx = gridSize <= 3 ? 52 : gridSize <= 5 ? 44 : gridSize <= 7 ? 38 : 32;
-    const fontSize = gridSize <= 5 ? 15 : 13;
+    const { size, fontSize, starScale } = markerMetrics(gridSize, pinStyle);
 
     // Only the dynamic layer changes when selecting a different date.
     markerLayer.clearLayers();
@@ -210,11 +239,10 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
             : before - rank === 0 ? ''
               : `${before - rank > 0 ? '+' : ''}${before - rank}`;
       const movementColor = before === null || (rank !== null && before > rank) ? '#065f46' : '#991b1b';
-      const border = isCenter ? 'border: 3px dashed rgba(255,255,255,0.85);' : 'border: 2px solid rgba(255,255,255,0.4);';
-      const markerPx = rank === 1 ? Math.round(cellPx * 1.3) : cellPx;
+      const markerPx = rank === 1 ? Math.round(size * starScale) : size;
       const html = rank === 1
         ? starMarkerHtml(markerPx, fontSize, color, label, isCenter, movement, movementColor)
-        : `<div style="position:relative;width:${cellPx}px;height:${cellPx}px;background:${color};border-radius:${Math.round(cellPx * 0.22)}px;display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:900;color:white;font-family:system-ui,sans-serif;${border}box-shadow:0 2px 8px rgba(0,0,0,0.35);cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'"><span>${label}</span>${movement ? `<span style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);padding:1px 3px;font-size:9px;line-height:11px;font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22)">${movement}</span>` : ''}</div>`;
+        : shapeMarkerHtml(pinStyle, size, fontSize, color, label, isCenter, movement, movementColor);
       const icon = L.divIcon({ html, className: '', iconSize: [markerPx, markerPx], iconAnchor: [markerPx / 2, markerPx / 2] });
       const marker = L.marker([point.lat!, point.lng!], { icon }).addTo(markerLayer);
       marker.bindPopup(buildPopupHtml(point, target, highlightKey), {
@@ -228,7 +256,7 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
       boundsSignatureRef.current = signature;
       map.fitBounds(L.latLngBounds(geoPoints.map((point) => [point.lat!, point.lng!] as [number, number])), { padding: [48, 48] });
     }
-  }, [mapReady, points, gridSize, target, highlightKey, previousPoints]);
+  }, [mapReady, points, gridSize, target, highlightKey, previousPoints, pinStyle]);
 
   return (
     <>

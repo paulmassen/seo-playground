@@ -6,6 +6,8 @@ import { getBrandSettings } from '@/lib/brand-server';
 import { DEFAULT_BRAND_COLOR, normalizeHexColor } from '@/lib/brand';
 import { updateSettings, deleteCredentials } from './actions';
 import BrandIdentityFields from './BrandIdentityFields';
+import GridPreferenceFields from './GridPreferenceFields';
+import { getGridPreferences } from '@/lib/grid-preferences-server';
 
 interface DFUserResponse {
   tasks?: Array<{
@@ -26,6 +28,7 @@ async function SettingsPage() {
   const resolvedBrand = getBrandSettings();
   const brandLogo = resolvedBrand.logo;
   const brandStyle = resolvedBrand;
+  const gridPreferences = getGridPreferences();
 
   let balance = 0;
   let status = 'NOT CONNECTED';
@@ -122,6 +125,15 @@ async function SettingsPage() {
                 initialStyle={brandStyle}
                 currentLogo={brandLogo}
               />
+            </div>
+
+            <div className="border-t border-slate-200 dark:border-slate-700" />
+
+            {/* Geo-grid display preferences */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Geo-grid</p>
+              <p className="text-xs text-slate-400 mb-6">How the Geo-grid tracker shows distances and ranking pins.</p>
+              <GridPreferenceFields initial={gridPreferences} />
             </div>
 
             <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-700 shadow-xl shadow-blue-200 dark:shadow-none transition-all active:scale-[0.98]">

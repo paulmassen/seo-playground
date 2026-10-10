@@ -3,6 +3,8 @@
 import { useState, lazy, Suspense } from 'react';
 import { LANGUAGES } from '@/lib/geo-options';
 import { formatBusinessTarget } from '@/lib/grid-target';
+import { formatDistance, spacingOptions, type DistanceUnit } from '@/lib/grid-preferences';
+import { useGridPreferences } from './GridPreferences';
 
 const MapPicker = lazy(() => import('./MapPicker'));
 
@@ -50,7 +52,7 @@ function formatLiveDuration(totalPoints: number) {
   return `~${Math.ceil(seconds / 60)} min`;
 }
 
-function GridPreview({ size, spacingKm }: { size: number; spacingKm: number }) {
+function GridPreview({ size, spacingKm, unit }: { size: number; spacingKm: number; unit: DistanceUnit }) {
   const half = Math.floor(size / 2);
   return (
     <div className="flex flex-col items-center gap-2 py-2">
@@ -72,7 +74,7 @@ function GridPreview({ size, spacingKm }: { size: number; spacingKm: number }) {
         })}
       </div>
       <p className="text-[10px] text-slate-400 font-medium">
-        {size}×{size} points · {spacingKm} km spacing · ~{((size - 1) * spacingKm).toFixed(1)} km coverage
+        {size}×{size} points · {formatDistance(spacingKm, unit)} spacing · ~{formatDistance((size - 1) * spacingKm, unit, 1)} coverage
       </p>
     </div>
   );
@@ -89,6 +91,8 @@ export default function LocalFinderForm({ defaults }: Props) {
   const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'live');
   const [language, setLanguage] = useState(defaults.language || 'English');
   const [gridTarget, setGridTarget] = useState(defaults.gridTarget ?? '');
+  const { distanceUnit } = useGridPreferences();
+  const spacingChoices = spacingOptions(distanceUnit, spacingKm);
 
   const osOptions =
     device === 'mobile'
@@ -153,6 +157,7 @@ export default function LocalFinderForm({ defaults }: Props) {
               showGrid={isGrid && !!coordinate}
               gridSize={isGrid ? gridSize : undefined}
               spacingKm={isGrid ? spacingKm : undefined}
+              distanceUnit={distanceUnit}
               language={language}
               onBusinessSelect={isGrid ? (business) => setGridTarget(formatBusinessTarget(business.title, business.cid)) : undefined}
             />
@@ -211,19 +216,15 @@ export default function LocalFinderForm({ defaults }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Spacing (km)</label>
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Spacing ({distanceUnit})</label>
+              {/* Values are always kilometres; only the labels follow the Settings distance unit. */}
               <select
                 name="spacing_km"
                 value={spacingKm}
                 onChange={(e) => setSpacingKm(parseFloat(e.target.value))}
                 className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
               >
-                <option value="0.5">0.5 km</option>
-                <option value="1">1 km</option>
-                <option value="2">2 km</option>
-                <option value="3">3 km</option>
-                <option value="5">5 km</option>
-                <option value="10">10 km</option>
+                {spacingChoices.map((option) => <option key={option.km} value={option.km}>{option.label}</option>)}
               </select>
             </div>
           </div>
@@ -231,7 +232,7 @@ export default function LocalFinderForm({ defaults }: Props) {
           {/* Grid preview */}
           <div className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 text-center">Grid preview</p>
-            <GridPreview size={gridSize} spacingKm={spacingKm} />
+            <GridPreview size={gridSize} spacingKm={spacingKm} unit={distanceUnit} />
           </div>
 
           {/* Queue mode */}

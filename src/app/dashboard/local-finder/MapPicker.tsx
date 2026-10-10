@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatDistance, type DistanceUnit } from '@/lib/grid-preferences';
 
 export interface BusinessResult {
   title: string;
@@ -20,6 +21,8 @@ interface Props {
   showGrid?: boolean;
   gridSize?: number;
   spacingKm?: number;
+  /** Unit used to label the spacing (Settings → Geo-grid). */
+  distanceUnit?: DistanceUnit;
   /** Language name from the form (e.g. "French"); used for the Google Maps business search. */
   language?: string;
   /** Called when a Google listing is picked from the search results. */
@@ -52,7 +55,7 @@ function calcGridCoords(
   return coords;
 }
 
-export default function MapPicker({ coordinate, onChange, showGrid, gridSize, spacingKm, language, onBusinessSelect }: Props) {
+export default function MapPicker({ coordinate, onChange, showGrid, gridSize, spacingKm, distanceUnit = 'km', language, onBusinessSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('leaflet').Map | null>(null);
   const markerRef = useRef<import('leaflet').Marker | null>(null);
@@ -308,7 +311,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       />
       {showGrid && coordinate && gridSize && spacingKm && (
         <p className="text-[11px] text-slate-400 -mt-1">
-          {gridSize}×{gridSize} grid · {spacingKm < 1 ? `${spacingKm * 1000} m` : `${spacingKm} km`} spacing · {gridSize ** 2} points
+          {gridSize}×{gridSize} grid · {distanceUnit === 'km' && spacingKm < 1 ? `${spacingKm * 1000} m` : formatDistance(spacingKm, distanceUnit)} spacing · {gridSize ** 2} points
         </p>
       )}
     </>

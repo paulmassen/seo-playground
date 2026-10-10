@@ -5,6 +5,7 @@ import { runWithCurrentProject } from '@/lib/db';
 import { saveCredentials, clearCredentials, setSetting } from '@/lib/db';
 import { BRAND_SETTING_KEYS } from '@/lib/brand-server';
 import { cleanBrandFooter, cleanBrandName, normalizeHeaderStyle, normalizeHexColor, validateLogoUpload } from '@/lib/brand';
+import { GRID_PREFERENCE_KEYS, normalizeDistanceUnit, normalizePinStyle } from '@/lib/grid-preferences';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -42,7 +43,11 @@ export async function updateSettings(formData: FormData) {
       setSetting(BRAND_SETTING_KEYS.logoUrl, '');
     }
 
+    setSetting(GRID_PREFERENCE_KEYS.distanceUnit, normalizeDistanceUnit(formData.get('grid_distance_unit') as string | null));
+    setSetting(GRID_PREFERENCE_KEYS.pinStyle, normalizePinStyle(formData.get('grid_pin_style') as string | null));
+
     revalidatePath('/dashboard/settings');
+    revalidatePath('/dashboard/geo-grid');
   });
 }
 
