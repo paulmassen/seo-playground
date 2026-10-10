@@ -648,6 +648,17 @@ function initSchema(db: Database.Database) {
       items TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS bl_broken (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      target TEXT NOT NULL,
+      dofollow_only INTEGER NOT NULL DEFAULT 0,
+      result_count INTEGER NOT NULL,
+      total INTEGER,
+      cost REAL,
+      items TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS keyword_ideas_searches (
       id TEXT PRIMARY KEY,
       ts INTEGER NOT NULL,
@@ -2715,6 +2726,24 @@ export function getBlBulkRdResults<T>(id: string): T[] | null {
   if (!row) return null; try { return JSON.parse(row.items) as T[]; } catch { return null; }
 }
 
+// ─── Backlinks: Broken Backlinks ─────────────────────────────────────────────
+
+/** `count` = links fetched, `total` = all broken backlinks DataForSEO knows of for the target. */
+export interface BlBrokenEntry { id: string; ts: number; target: string; dofollowOnly: boolean; count: number; total?: number; cost?: number; }
+type BlBrokenRow = { id: string; ts: number; target: string; dofollow_only: number; result_count: number; total: number | null; cost: number | null };
+export function getBlBrokenHistory(): BlBrokenEntry[] {
+  return (getDb().prepare('SELECT id, ts, target, dofollow_only, result_count, total, cost FROM bl_broken ORDER BY ts DESC LIMIT 20').all() as BlBrokenRow[])
+    .map((r) => ({ id: r.id, ts: r.ts, target: r.target, dofollowOnly: r.dofollow_only === 1, count: r.result_count, total: r.total ?? undefined, cost: r.cost ?? undefined }));
+}
+export function saveBlBroken(entry: BlBrokenEntry, items: unknown[]): void {
+  getDb().prepare('INSERT OR REPLACE INTO bl_broken (id, ts, target, dofollow_only, result_count, total, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.target, entry.dofollowOnly ? 1 : 0, entry.count, entry.total ?? null, entry.cost ?? null, JSON.stringify(items));
+}
+export function getBlBrokenResults<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT items FROM bl_broken WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null; try { return JSON.parse(row.items) as T[]; } catch { return null; }
+}
+
 // ─── AI Keyword Data ──────────────────────────────────────────────────────────
 
 export interface AiKwDataEntry { id: string; ts: number; keywords: string; location: string; language: string; count: number; cost?: number; }
@@ -3060,6 +3089,7 @@ export const SPEND_SOURCES: Array<{ table: string; tool: string; href: string | 
   { table: 'bl_history', tool: 'Backlinks History', href: '/dashboard/backlinks/history' },
   { table: 'bl_bulk_backlinks', tool: 'Bulk Backlinks', href: '/dashboard/backlinks/bulk-backlinks' },
   { table: 'bl_bulk_ref_domains', tool: 'Bulk Ref. Domains', href: '/dashboard/backlinks/bulk-referring-domains' },
+  { table: 'bl_broken', tool: 'Broken Backlinks', href: '/dashboard/backlinks/broken' },
   { table: 'serp_searches', tool: 'SERP Checker', href: '/dashboard/serp' },
   { table: 'lf_searches', tool: 'Local Finder', href: '/dashboard/local-finder' },
   { table: 'grid_searches', tool: 'Geo-Grid Ranking', href: '/dashboard/geo-grid' },

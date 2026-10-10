@@ -135,7 +135,7 @@ function Delta({ value, invert = false }: { value?: number; invert?: boolean }) 
   );
 }
 
-function StatCard({ label, value, new: newVal, lost }: { label: string; value?: number; new?: number; lost?: number }) {
+function StatCard({ label, value, new: newVal, lost, href, hrefLabel }: { label: string; value?: number; new?: number; lost?: number; href?: string; hrefLabel?: string }) {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
@@ -146,6 +146,9 @@ function StatCard({ label, value, new: newVal, lost }: { label: string; value?: 
           {newVal !== undefined && lost !== undefined && ' · '}
           {lost !== undefined && <><Delta value={-lost} invert /> lost</>}
         </p>
+      )}
+      {href && (
+        <a href={href} className="inline-block text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline mt-0.5">{hrefLabel ?? 'View'} →</a>
       )}
     </div>
   );
@@ -334,7 +337,8 @@ async function BacklinksPage({ searchParams }: { searchParams: Promise<SearchPar
                 <StatCard label="Referring pages" value={summary.referring_pages} />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <StatCard label="Broken backlinks" value={summary.broken_backlinks} />
+                <StatCard label="Broken backlinks" value={summary.broken_backlinks}
+                  href={summary.broken_backlinks ? `/dashboard/backlinks/broken?target=${encodeURIComponent(displayTarget)}` : undefined} hrefLabel="See broken links" />
                 <StatCard label="Broken pages" value={summary.broken_pages} />
                 <StatCard label="Referring subnets" value={summary.referring_subnets} />
               </div>

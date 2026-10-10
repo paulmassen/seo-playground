@@ -4,7 +4,7 @@ import {
   TrendingUp, Link2, Users, BarChart2, Activity, GitMerge, Clock, FolderKanban, Anchor,
   Gauge, Lightbulb, BrainCircuit, Star, Flame, Cpu, ShieldCheck, Grid3X3,
   Sparkles, Target, Layers, Network, LineChart, Tag, ScanText,
-  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet, CalendarCheck,
+  History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet, CalendarCheck, Unlink,
 } from 'lucide-react';
 
 // Single source of truth for the tool list: the Sidebar and the Dashboard home both render from it.
@@ -76,6 +76,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { name: 'Backlinks', href: '/dashboard/backlinks', icon: Link2, desc: 'Incoming links list', exact: true },
       { name: 'Referring Domains', href: '/dashboard/backlinks/referring-domains', icon: FolderKanban, desc: 'Domains linking to you' },
+      { name: 'Broken Backlinks', href: '/dashboard/backlinks/broken', icon: Unlink, desc: 'Links pointing to 4xx/5xx pages to reclaim' },
       { name: 'Anchors', href: '/dashboard/backlinks/anchors', icon: Anchor, desc: 'Anchor texts in use' },
       { name: 'Referring Networks', href: '/dashboard/backlinks/referring-networks', icon: Server, desc: 'IP subnets sending backlinks' },
       { name: 'Page Intersection', href: '/dashboard/backlinks/page-intersection', icon: Copy, desc: 'Pages linking to multiple targets' },
