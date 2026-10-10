@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, Search, X } from 'lucide-react';
-import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/sidebar';
-import { NAV_SECTIONS as sections, NAV_FOOTER as footerItems, type NavItem } from '@/lib/nav';
+import { ChevronRight, Search, Star, X } from 'lucide-react';
+import { SIDEBAR_COLLAPSED_COOKIE, SIDEBAR_FAVORITES_COOKIE, FAVORITES_SECTION_KEY, serializeList } from '@/lib/sidebar';
+import { NAV_SECTIONS as sections, NAV_FOOTER as footerItems, type NavItem, type NavSection } from '@/lib/nav';
 import type { Project } from '@/lib/db';
 import ProjectSwitcher from './ProjectSwitcher';
+
+const itemsByHref = new Map(sections.flatMap((s) => s.items).map((i) => [i.href, i]));
 
 // The single most specific item for this path, so /dashboard/on-page/content-parsing
 // highlights Content Parsing only, not On Page as well.
@@ -20,60 +22,110 @@ function findActiveHref(pathname: string): string | null {
   return best;
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({ item, active, favorite, onToggleFavorite }: {
+  item: NavItem;
+  active: boolean;
+  /** Undefined for items that can't be starred (the pinned footer). */
+  favorite?: boolean;
+  onToggleFavorite?: () => void;
+}) {
+  const starrable = onToggleFavorite !== undefined;
   return (
-    <Link
-      href={item.href}
-      aria-current={active ? 'page' : undefined}
-      className={`group flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-150 ${
-        active
-          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-semibold'
-          : 'text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
-      }`}
-    >
-      <item.icon className={`mr-2.5 h-[15px] w-[15px] shrink-0 transition-colors ${
-        active
-          ? 'text-blue-500 dark:text-blue-400'
-          : 'text-slate-300 dark:text-slate-600 group-hover:text-slate-400 dark:group-hover:text-slate-400'
-      }`} />
-      {item.name}
-    </Link>
+    <div className="group/item relative">
+      <Link
+        href={item.href}
+        draggable={false}
+        aria-current={active ? 'page' : undefined}
+        className={`group flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-150 ${starrable ? 'pr-8' : ''} ${
+          active
+            ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-semibold'
+            : 'text-slate-500 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
+        }`}
+      >
+        <item.icon className={`mr-2.5 h-[15px] w-[15px] shrink-0 transition-colors ${
+          active
+            ? 'text-blue-500 dark:text-blue-400'
+            : 'text-slate-300 dark:text-slate-600 group-hover:text-slate-400 dark:group-hover:text-slate-400'
+        }`} />
+        <span className="truncate">{item.name}</span>
+      </Link>
+      {starrable && (
+        <button
+          type="button"
+          onClick={onToggleFavorite}
+          aria-pressed={favorite}
+          aria-label={favorite ? `Remove ${item.name} from favorites` : `Add ${item.name} to favorites`}
+          title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 text-slate-300 dark:text-slate-600 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-opacity"
+        >
+          <Star className={`h-3.5 w-3.5 ${favorite ? 'fill-amber-400 text-amber-400' : ''}`} />
+        </button>
+      )}
+    </div>
   );
 }
 
-function saveCollapsed(keys: Set<string>) {
-  // A cookie (not localStorage) so the server renders sections already collapsed, without a flash
-  document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${encodeURIComponent([...keys].join(','))}; path=/; max-age=31536000; samesite=lax`;
+function writeCookie(name: string, values: Iterable<string>) {
+  document.cookie = `${name}=${serializeList(values)}; path=/; max-age=31536000; samesite=lax`;
 }
 
-export default function Sidebar({ initialCollapsed = [], projects, activeProject }: { initialCollapsed?: string[]; projects: Project[]; activeProject: Project }) {
+export default function Sidebar({ initialCollapsed = [], initialFavorites = [], projects, activeProject }: {
+  initialCollapsed?: string[];
+  initialFavorites?: string[];
+  projects: Project[];
+  activeProject: Project;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState(() => new Set(initialCollapsed));
+  // Hrefs in the order the user arranged them; stale hrefs (a removed tool) are ignored, not shown.
+  const [favorites, setFavorites] = useState(() => initialFavorites.filter((h) => itemsByHref.has(h)));
+  const [dragging, setDragging] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const activeHref = findActiveHref(pathname);
+  const favoriteSet = new Set(favorites);
+
+  const updateFavorites = (next: string[]) => {
+    setFavorites(next);
+    writeCookie(SIDEBAR_FAVORITES_COOKIE, next);
+  };
+  const toggleFavorite = (href: string) => {
+    updateFavorites(favoriteSet.has(href) ? favorites.filter((h) => h !== href) : [...favorites, href]);
+  };
+  // Puts `href` in the slot `over` occupies, so dragging works both upwards and downwards.
+  const moveFavorite = (href: string, over: string) => {
+    const to = favorites.indexOf(over);
+    if (href === over || to < 0) return;
+    const next = favorites.filter((h) => h !== href);
+    next.splice(to, 0, href);
+    updateFavorites(next);
+  };
 
   const toggleSection = (key: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
-      saveCollapsed(next);
+      writeCookie(SIDEBAR_COLLAPSED_COOKIE, next);
       return next;
     });
   };
 
-  // Opening a page inside a collapsed section (via the filter, a link, back button) expands that section
+  // Opening a page inside a collapsed section (via the filter, a link, back button) expands that section,
+  // unless the page is already visible in the open Favorites group.
   useEffect(() => {
     const activeSection = sections.find((s) => s.items.some((i) => i.href === activeHref));
     if (!activeSection) return;
     setCollapsed((prev) => {
       if (!prev.has(activeSection.key)) return prev;
+      if (activeHref && favorites.includes(activeHref) && !prev.has(FAVORITES_SECTION_KEY)) return prev;
       const next = new Set(prev);
       next.delete(activeSection.key);
-      saveCollapsed(next);
+      writeCookie(SIDEBAR_COLLAPSED_COOKIE, next);
       return next;
     });
+    // Only on navigation: starring the current page must not reshuffle the menu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHref]);
 
   // "/" focuses the filter from anywhere, unless the user is already typing somewhere
@@ -101,6 +153,12 @@ export default function Sidebar({ initialCollapsed = [], projects, activeProject
         }))
         .filter((section) => section.items.length > 0)
     : sections;
+
+  const favoritesSection: NavSection | null = !q && favorites.length > 0
+    ? { key: FAVORITES_SECTION_KEY, label: 'Favorites', color: 'yellow', items: favorites.map((h) => itemsByHref.get(h)!).filter(Boolean) }
+    : null;
+  const shown = favoritesSection ? [favoritesSection, ...filtered] : filtered;
+  // "Collapse all" shrinks the tool groups but leaves Favorites alone: that's the point of starring.
   const allCollapsed = sections.every((s) => collapsed.has(s.key));
 
   return (
@@ -161,7 +219,8 @@ export default function Sidebar({ initialCollapsed = [], projects, activeProject
               type="button"
               onClick={() => {
                 const next = new Set(allCollapsed ? [] : sections.map((s) => s.key));
-                saveCollapsed(next);
+                if (collapsed.has(FAVORITES_SECTION_KEY)) next.add(FAVORITES_SECTION_KEY);
+                writeCookie(SIDEBAR_COLLAPSED_COOKIE, next);
                 setCollapsed(next);
               }}
               className="text-[10px] font-semibold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-1 transition-colors"
@@ -176,12 +235,13 @@ export default function Sidebar({ initialCollapsed = [], projects, activeProject
         {filtered.length === 0 && (
           <p className="px-3 text-xs text-slate-400">No tool matches &ldquo;{query.trim()}&rdquo;.</p>
         )}
-        {filtered.map((section) => {
+        {shown.map((section) => {
+          const isFavorites = section.key === FAVORITES_SECTION_KEY;
           // While filtering, every matching section is shown open regardless of its saved state
           const isOpen = q !== '' || !collapsed.has(section.key);
           const hasActive = section.items.some((i) => i.href === activeHref);
           return (
-            <div key={section.key}>
+            <div key={section.key} className={isFavorites ? 'pb-1 mb-1 border-b border-slate-100 dark:border-slate-800' : undefined}>
               <button
                 type="button"
                 onClick={() => toggleSection(section.key)}
@@ -190,6 +250,7 @@ export default function Sidebar({ initialCollapsed = [], projects, activeProject
                 aria-controls={`nav-section-${section.key}`}
                 className="group w-full flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 disabled:hover:text-slate-400 dark:disabled:hover:text-slate-500 transition-colors"
               >
+                {isFavorites && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />}
                 <span className="truncate">{section.label}</span>
                 {!isOpen && hasActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" aria-label="Contains the current page" />}
                 {!isOpen && (
@@ -204,9 +265,34 @@ export default function Sidebar({ initialCollapsed = [], projects, activeProject
               >
                 <div className="overflow-hidden">
                   <div className="space-y-px pt-0.5 pb-2">
-                    {section.items.map((item) => (
-                      <NavLink key={item.href} item={item} active={item.href === activeHref} />
-                    ))}
+                    {section.items.map((item) =>
+                      isFavorites ? (
+                        // Favorites can be reordered by dragging
+                        <div
+                          key={item.href}
+                          draggable
+                          onDragStart={(e) => { setDragging(item.href); e.dataTransfer.effectAllowed = 'move'; }}
+                          onDragEnd={() => setDragging(null)}
+                          onDragOver={(e) => {
+                            if (!dragging) return;
+                            e.preventDefault();
+                            if (dragging !== item.href) moveFavorite(dragging, item.href);
+                          }}
+                          onDrop={(e) => e.preventDefault()}
+                          className={`cursor-grab active:cursor-grabbing ${dragging === item.href ? 'opacity-40' : ''}`}
+                        >
+                          <NavLink item={item} active={item.href === activeHref} favorite onToggleFavorite={() => toggleFavorite(item.href)} />
+                        </div>
+                      ) : (
+                        <NavLink
+                          key={item.href}
+                          item={item}
+                          active={item.href === activeHref}
+                          favorite={favoriteSet.has(item.href)}
+                          onToggleFavorite={() => toggleFavorite(item.href)}
+                        />
+                      ),
+                    )}
                   </div>
                 </div>
               </div>

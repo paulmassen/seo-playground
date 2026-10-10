@@ -1,7 +1,7 @@
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
-import { SIDEBAR_COLLAPSED_COOKIE, parseCollapsedSections } from '@/lib/sidebar';
+import { SIDEBAR_COLLAPSED_COOKIE, SIDEBAR_FAVORITES_COOKIE, parseCollapsedSections, parseFavorites } from '@/lib/sidebar';
 import BalanceBadge from '@/components/BalanceBadge';
 import ThemeToggle from '@/components/ThemeToggle';
 import UpdateBanner from '@/components/UpdateBanner';
@@ -20,13 +20,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (!session) redirect('/login');
     accountEmail = session.user.email;
   }
-  const collapsed = parseCollapsedSections((await cookies()).get(SIDEBAR_COLLAPSED_COOKIE)?.value);
+  const cookieStore = await cookies();
+  const collapsed = parseCollapsedSections(cookieStore.get(SIDEBAR_COLLAPSED_COOKIE)?.value);
+  const favorites = parseFavorites(cookieStore.get(SIDEBAR_FAVORITES_COOKIE)?.value);
   const activeProject = getActiveProject();
   const projects = getProjects();
 
   return (
     <div className="flex h-dvh bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
-      <Sidebar initialCollapsed={collapsed} projects={projects} activeProject={activeProject} />
+      <Sidebar initialCollapsed={collapsed} initialFavorites={favorites} projects={projects} activeProject={activeProject} />
       <ProjectSync projectId={activeProject.id} projectName={activeProject.name} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <UpdateBanner />
