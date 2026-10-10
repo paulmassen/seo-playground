@@ -1,6 +1,6 @@
 {
   "name": "seo-playground",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/run-with-worker.mjs dev",

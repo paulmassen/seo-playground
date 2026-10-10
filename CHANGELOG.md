@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.6.0] — 2026-10-10
+
 ### Added
 - **Broken Backlinks** (`/dashboard/backlinks/broken`) — lists the live backlinks of a domain or page that point to URLs answering 4xx or 5xx (DataForSEO's `is_broken` filter on `backlinks/backlinks/live`), optionally dofollow only, up to 1,000 links. "By broken page" groups the links by dead URL with its status code, referring domains, links, dofollow count and best DR, sorted by referring domains: the order to 301-redirect or restore those pages. "All links" shows every link in a sortable table. Run it on a competitor to find broken link building opportunities. Includes CSV export, Markdown copy and history, and the cost appears in Spending. The "Broken backlinks" card on the Backlinks page links to it.
 - **Sidebar favorites** — hover a tool in the sidebar and click its star to pin it to a Favorites group at the top of the menu; drag to reorder, click the star again to remove it. "Collapse all" folds every group except Favorites, so the menu can be reduced to the tools you use. Favorites are stored in a cookie, shared across projects, and rendered by the server without a flash.
