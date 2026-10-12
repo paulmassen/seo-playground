@@ -2,24 +2,31 @@
 
 ![SEO Playground — the free, open-source, self-hosted SEO & Local SEO dashboard](public/readme/hero.png)
 
-## ✨ Update — v0.6.0
+## ✨ What's new
 
-SEO Playground is actively evolving. Here are the latest substantial additions:
+SEO Playground is actively evolving. Highlights of the latest releases:
 
-- 🏆 **Review Velocity** — see whether a Google listing gains reviews faster or slower than its local competitors. Pick up to 10 listings on the map; the report ranks them on reviews per week, momentum, recent rating, owner replies and Maps position, with an overall score, and exports to PDF and Excel.
-- 🔗 **Broken Backlinks** — find the links that point to pages answering 4xx or 5xx, grouped by dead page and sorted by referring domains: the pages to redirect or restore first. Run it on a competitor for broken link building.
-- ⭐ **Sidebar favorites** — star the tools you use to pin them at the top of the menu, and drag to reorder them.
-- 📏 **Geo-grid in miles** — Settings → Geo-grid switches distances to miles and the map pins to squares, circles or small dots.
-- 🔐 **Optional login (email + password)** — off by default, so a local install works exactly as before. Set `AUTH_ENABLED=true` to protect the whole dashboard and its API before putting it online: the first visit creates your account, then registration closes. No external service needed; it works with Docker and Node. See [Login (optional)](#login-optional).
-- 🧭 **Prompt Tracker** — save the prompts your audience asks AI assistants, then re-run them on demand or every day to see whether ChatGPT, Claude, Gemini or Perplexity mention your brand or domain. Each check keeps the answer, the cited sources and its cost, and each prompt shows its mention rate over time.
-- 🏷️ **White-label reports** — in Settings, brand every PDF with your own name, logo, report colour and header style (straight or wavy bar). The footer has its own text and colours, and e-mail addresses or domains in it become clickable links. A live preview shows the result before you save.
-- 📄 **PDF exports across the app** — Site Audit, Google Reviews, AI Visibility, Geo-grid and Prompt Tracker all export branded PDF reports, with the same header and footer settings everywhere.
-- 🗂️ **Multi-project workspace** — switch between clients or sites in one click. Each project has its own defaults, search history, results, and Rank Tracker depth.
-- 📍 **Geo-grid monitoring, not just one-off maps** — save keyword/location monitors, browse a timeline of snapshots, compare movement point by point, inspect visibility trends, and schedule daily or weekly checks.
-- ⏰ **Background tracking that keeps working** — scheduled Geo-grid and Rank Tracker runs continue without an open browser tab; a task center keeps their progress visible while you work elsewhere.
-- 📄 **Client-ready exports** — generate branded PDF reports for Site Audit, Google Reviews, AI Visibility, and Geo-grid results, plus Excel exports for Site Audit and AI Visibility.
-- 🧠 **Richer AI visibility analysis** — explore LLM mentions by platform, location, language, source domain, and brand entity; export target, topic-leaderboard, and historical views.
-- 🚀 **Safer self-hosted releases** — deploy immutable, multi-architecture Docker images with version-aware update notices and a production Compose setup.
+### v0.6.0 — 2026-10-10
+
+- 🏆 **Review Velocity** — compare how fast a Google listing gains reviews against up to 10 local competitors, with a ranked PDF/Excel report.
+- 🔗 **Broken Backlinks** — backlinks pointing to dead pages, sorted by the ones worth redirecting first.
+- ⭐ **Sidebar favorites** — pin the tools you use at the top of the menu.
+- 📏 **Geo-grid in miles** — plus a choice of square, circle or dot pins.
+
+### v0.5.0 — 2026-10-09
+
+- 🔐 **Optional login** — email + password, off by default (`AUTH_ENABLED=true`). See [Login (optional)](#login-optional).
+- 🧭 **Prompt Tracker** — check every day whether ChatGPT, Claude, Gemini or Perplexity mention your brand or domain.
+- 🏷️ **White-label reports** — your name, logo and colours on every PDF export.
+
+### v0.4.0 — 2026-09-28
+
+- 🗂️ **Multi-project workspace** — one project per client or site, each with its own defaults and history.
+- 📍 **Geo-grid monitoring** — snapshot timeline, point-by-point comparison and daily or weekly checks.
+- ⏰ **Background tracking** — scheduled Geo-grid and Rank Tracker checks run with no browser tab open.
+- 📄 **PDF and Excel exports** — branded reports for Site Audit, Google Reviews, AI Visibility and Geo-grid.
+- 🧠 **AI Visibility** — LLM mentions by platform, location, language, source and brand.
+- 🚀 **Versioned Docker releases** — multi-architecture images with in-app update notices.
 
 See the full [changelog](#changelog) for every improvement, fix, and release note.
 
@@ -289,7 +296,7 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 
 Full detailed history: [CHANGELOG.md](CHANGELOG.md).
 
-- **2026-10-10 — v0.6.0** — **Review Velocity** (`/dashboard/review-velocity`): benchmark the review pace, rating and owner replies of up to 10 local listings, with a ranked report and PDF/Excel exports. **Broken Backlinks** (`/dashboard/backlinks/broken`): backlinks pointing to 4xx/5xx pages, grouped by dead URL. Sidebar favorites. Geo-grid distances in miles and a choice of pin styles. Paid endpoints (`/api/business-search`, `/api/cron/geo-grid`) only answer POST, CSV exports neutralize spreadsheet formulas, and Rank Tracker can no longer submit (and bill) the same keyword twice. Referring Domains works again.
+- **2026-10-10 — v0.6.0** — Review Velocity, Broken Backlinks, sidebar favorites, Geo-grid in miles. Paid endpoints now require POST, CSV exports are formula-safe, and Rank Tracker can no longer bill a keyword twice. Referring Domains works again.
 - **2026-10-09 — v0.5.0** — Optional email + password login (`AUTH_ENABLED=true`). Cloudron community app package. Searches, checks and settings changes always save to the project they started in, even if you switch projects meanwhile. Node launches listen on `127.0.0.1` by default (`SEO_PLAYGROUND_BIND` to override). OpenStreetMap maps work behind strict proxies. **Prompt Tracker** (`/dashboard/prompt-tracker`): save prompts and re-run them on demand or daily to check brand/domain mentions in ChatGPT, Claude, Gemini and Perplexity answers, with stored answers, sources and costs, a mention calendar, and PDF/Markdown exports. **White-label reports**: Settings now control the brand name, an uploaded PNG/JPEG logo, the report colour, a straight or wavy header, and the footer text, background, text and link colours; the same identity applies to Site Audit, Google Reviews, AI Visibility, Geo-grid and Prompt Tracker PDFs. Geo-grid PDFs no longer overflow their competitor table, and logos keep their proportions. Rank Tracker shows AI Overview citations and the top 10 of each check. AI Prompt Test offers every DataForSEO model, with a default per platform.
 - **2026-10-01** — Rank Tracker checks stop crawling once the domain is found (lower cost per check), flag AI Overview citations with an "AI" badge, and show "Not found" with the last known position. Fixed Site Audit's word count and its Keyword Density, Duplicate Tags and Non-indexable tabs. Switching projects from the project switcher now keeps you on the current page instead of returning to the dashboard home.
 - **2026-09-28 — v0.4.0** — First versioned release, published as a multi-architecture Docker image on GHCR. Multi-project workspace (per-project defaults, history and schedules). Scheduled Geo-grid (daily/weekly) and Rank Tracker (daily) checks run by a background worker with no browser tab open, plus a task center for queued runs. Geo-grid snapshot timeline, comparison map and trend. PDF reports and Excel exports. Rank Tracker checks of several keywords at once fixed. Both Compose files now listen on `127.0.0.1` only by default, since the dashboard has no login.
