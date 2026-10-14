@@ -3,8 +3,8 @@
   "title": "SEO Playground",
   "tagline": "Self-hosted SEO dashboard powered by DataForSEO",
   "description": "file://cloudron/DESCRIPTION.md",
-  "version": "0.4.1",
-  "upstreamVersion": "0.4.0",
+  "version": "0.6.0",
+  "upstreamVersion": "0.6.0",
   "changelog": "file://cloudron/CHANGELOG",
   "postInstallMessage": "file://cloudron/POSTINSTALL.md",
   "healthCheckPath": "/robots.txt",
@@ -26,7 +26,6 @@
   "iconUrl": "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/cloudron/icon.png",
   "tags": ["seo", "analytics", "dataforseo", "marketing"],
   "mediaLinks": [
-    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/hero.png",
     "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-rank-tracker.png",
     "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-local-finder.png"
   ]

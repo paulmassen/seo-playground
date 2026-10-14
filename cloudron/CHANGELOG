@@ -1,3 +1,10 @@
+[0.6.0]
+* Update to SEO Playground 0.6.0
+* New: Broken Backlinks, Review Velocity (review pace vs. local competitors), sidebar favorites, Geo-grid distance unit (km/miles) and pin style settings
+* Fix: Rank Tracker could bill the same keyword twice; DataForSEO account errors (e.g. insufficient balance) no longer look like empty results; Referring Domains "Invalid Field" error
+* Security: paid API endpoints only answer POST, CSV exports are formula-safe, Next.js and jsPDF security updates
+* Includes 0.5.0: Prompt Tracker, white-label PDF reports, Geo-grid business search, Rank Tracker top 10 and AI Overview citations
+
 [0.4.1]
 * Fix maps blocked by OpenStreetMap ("app is not following the OSM tile usage policy"): tiles and address search now send a Referer even behind the Cloudron proxy
 
