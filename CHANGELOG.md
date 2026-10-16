@@ -9,6 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.1] — 2026-10-16
+
+### Fixed
+- **Geo-grid PDF map blocked by OpenStreetMap** — behind a proxy that sends `Referrer-Policy: same-origin` (Cloudron), the map in Geo-grid PDF reports showed OpenStreetMap's "Access blocked — App is not following the tile usage policy" tiles. The live map was fixed in 0.4.1, but the PDF export downloaded every tile again with a cache-busting query string and without a Referer. It now reuses the tiles the map already loaded and sends a Referer, as OSM's tile usage policy requires. A test now checks that every OpenStreetMap request sets its referrer policy and that no capture bypasses the cache.
+
+---
+
 ## [0.6.0] — 2026-10-10
 
 ### Added

@@ -7,6 +7,7 @@ import { computeCompetitors, computeGridSummary } from './grid-insights';
 import { brandPalette, fitBox, footerPalette, imageSize, resolveBrandStyle, type BrandStyle } from '@/lib/brand';
 import { drawFooter, drawHeaderBand } from '@/lib/brand-pdf';
 import { formatDistance } from '@/lib/grid-preferences';
+import { MAP_CAPTURE_FETCH_OPTIONS } from '@/lib/map-capture';
 import { useGridPreferences } from './GridPreferences';
 
 type Props = {
@@ -90,7 +91,9 @@ async function mapDataUrl(elementId?: string): Promise<MapCapture | null> {
     const dataUrl = await toPng(element, {
       width: Math.round(width),
       height: Math.round(height),
-      cacheBust: true,
+      // Keeps the Referer OSM requires and reuses the cached tiles; without it the
+      // PDF shows OSM's "Access blocked" tiles behind Cloudron's proxy.
+      ...MAP_CAPTURE_FETCH_OPTIONS,
       pixelRatio: 2,
       backgroundColor: '#e2e8f0',
       // Leaflet's controls/panes use transforms that are already fully rendered;
