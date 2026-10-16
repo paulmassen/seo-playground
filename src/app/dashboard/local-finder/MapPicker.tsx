@@ -62,6 +62,8 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
   const gridLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
 
   const [expanded, setExpanded] = useState(false);
+  // Leaflet loads asynchronously: effects that need the map re-run once it exists.
+  const [mapReady, setMapReady] = useState(false);
   const [query, setQuery] = useState('');
   const [geocoding, setGeocodng] = useState(false);
   const [geoError, setGeoError] = useState('');
@@ -116,6 +118,8 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
         onChange(rounded);
         setExpanded(true);
       });
+
+      setMapReady(true);
     });
 
     return () => {
@@ -126,6 +130,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
         markerRef.current = null;
         gridLayerRef.current = null;
       }
+      setMapReady(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -134,7 +139,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
   useEffect(() => {
     if (!mapRef.current) return;
     setTimeout(() => mapRef.current?.invalidateSize(), 200);
-  }, [expanded]);
+  }, [expanded, mapReady]);
 
   // ── Sync pin when coordinate changes externally ───────────────────────────
   useEffect(() => {
@@ -185,7 +190,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
         setExpanded(true);
       }
     });
-  }, [showGrid, coordinate, gridSize, spacingKm]);
+  }, [mapReady, showGrid, coordinate, gridSize, spacingKm]);
 
   // ── Business / address search ──────────────────────────────────────────────
   // Search Google Maps (DataForSEO) first so a business can be picked by name and
