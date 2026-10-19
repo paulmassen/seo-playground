@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Geo-grid competitors with several Google Business Profiles** — competitors were grouped by website, so each location of a multi-location business (e.g. two clinics of the same chain) was merged into one row, mixing their rankings and pushing grid presence above 100%. Competitors are now identified by their Google listing (CID), and a listing counts once per grid point. Older snapshots without a CID fall back to the business name. ([#16](https://github.com/paulmassen/seo-playground/issues/16))
+
 ---
 
 ## [0.6.2] — 2026-10-19
