@@ -1,3 +1,9 @@
+[0.6.2]
+* Update to SEO Playground 0.6.2
+* Geo-grid: create square, diamond or circle monitors, rotate the grid to follow streets or coastlines, and skip individual points so they are not billed
+* Geo-grid: one-click competitor switcher above the analysis map; the creation form keeps its full width while a compact monitors list appears beside opened results
+* Fix: monitor cards now show the latest scheduled run, rather than the monitor's creation run
+
 [0.6.1]
 * Update to SEO Playground 0.6.1
 * Fix Geo-grid PDF reports showing OpenStreetMap's "Access blocked" tiles ("app is not following the tile usage policy"): the PDF export now sends a Referer and reuses the map's tiles instead of downloading them again
