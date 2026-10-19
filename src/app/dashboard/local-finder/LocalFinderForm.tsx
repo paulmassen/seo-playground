@@ -162,250 +162,259 @@ export default function LocalFinderForm({ defaults }: Props) {
 
   return (
     <form method="GET" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4" onSubmit={() => setIsLoading(true)}>
-      {/* Keyword */}
-      <div>
-        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-          Keyword to monitor <span className="text-red-400">*</span>
-        </label>
-        <input
-          type="text"
-          name="keyword"
-          defaultValue={defaults.keyword}
-          placeholder="e.g. plumber, italian restaurant, dentist…"
-          required
-          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
-        />
-      </div>
-
-      {/* Language */}
-      <div>
-        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-          Language <span className="text-red-400">*</span>
-        </label>
-        <select
-          name="language"
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
-        >
-          {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-        </select>
-      </div>
-
-      {/* Map */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="block text-xs font-black uppercase tracking-widest text-slate-400">
-            {isGrid ? 'Location to monitor (map)' : 'Location (map)'} <span className="text-red-400">*</span>
-          </label>
-          {coordinate && (
-            <button
-              type="button"
-              onClick={() => setCoordinate('')}
-              className="text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Suspense fallback={<div className="h-64 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />}>
-            <MapPicker
-              coordinate={coordinate}
-              onChange={setCoordinate}
-              showGrid={isGrid && !!coordinate}
-              gridSize={isGrid ? gridSize : undefined}
-              spacingKm={isGrid ? spacingKm : undefined}
-              gridLayout={isGrid ? gridLayout : undefined}
-              onToggleCell={isGrid ? toggleCell : undefined}
-              distanceUnit={distanceUnit}
-              language={language}
-              onBusinessSelect={isGrid ? (business) => setGridTarget(formatBusinessTarget(business.title, business.cid)) : undefined}
-            />
-          </Suspense>
-          <input
-            type="text"
-            name="location_coordinate"
-            value={coordinate}
-            onChange={(e) => setCoordinate(e.target.value)}
-            placeholder="Click on the map to set a point — or type lat,lng"
-            className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-700 dark:text-slate-300 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
-          />
-          {coordinate && (
-            <p className="text-[11px] text-blue-600">
-              {isGrid ? 'Grid will be centered on this point.' : 'Coordinates active — search will be centered on this point.'}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {isGrid ? (
-        /* Grid-specific fields */
-        <>
-          {/* Target business */}
+      {/* Grid mode: location on the left, grid settings on the right, so the map preview stays in view while shaping the grid. */}
+      <div className={isGrid ? 'grid gap-x-8 gap-y-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:items-start' : 'space-y-4'}>
+        <div className="space-y-4">
+          {/* Keyword */}
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-              Target domain or business <span className="text-red-400">*</span>
+              Keyword to monitor <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
-              name="grid_target"
-              value={gridTarget}
-              onChange={(e) => setGridTarget(e.target.value)}
-              placeholder="Pick a Google listing above, or enter a domain / business name"
+              name="keyword"
+              defaultValue={defaults.keyword}
+              placeholder="e.g. plumber, italian restaurant, dentist…"
               required
               className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
             />
-            <p className="text-[11px] text-slate-400 mt-1">Picking a listing from the map search matches that exact Google listing. A domain matches with or without https:// and www; a name matches partially.</p>
           </div>
 
-          {/* Grid size + spacing */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid size</label>
-              <select
-                name="grid_size"
-                value={gridSize}
-                onChange={(e) => {
-                  setGridSize(parseInt(e.target.value, 10));
-                  // Skipped cells are row/column positions, which mean other places on another grid size.
-                  setExcludedCells([]);
-                }}
-                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
-              >
-                {[3, 5, 7, 9, 11].map((size) => (
-                  <option key={size} value={size}>
-                    {size}×{size} ({gridPointCount(size, { shape: gridShape, rotationDeg: 0, excluded: [] })} points)
-                  </option>
-                ))}
-              </select>
+          {/* Language */}
+          <div>
+            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
+              Language <span className="text-red-400">*</span>
+            </label>
+            <select
+              name="language"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
+            >
+              {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
+          </div>
+
+          {/* Map */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-400">
+                {isGrid ? 'Location to monitor (map)' : 'Location (map)'} <span className="text-red-400">*</span>
+              </label>
+              {coordinate && (
+                <button
+                  type="button"
+                  onClick={() => setCoordinate('')}
+                  className="text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Spacing ({distanceUnit})</label>
-              {/* Values are always kilometres; only the labels follow the Settings distance unit. */}
-              <select
-                name="spacing_km"
-                value={spacingKm}
-                onChange={(e) => setSpacingKm(parseFloat(e.target.value))}
-                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
-              >
-                {spacingChoices.map((option) => <option key={option.km} value={option.km}>{option.label}</option>)}
-              </select>
+            <div className="space-y-2">
+              <Suspense fallback={<div className="h-64 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />}>
+                <MapPicker
+                  coordinate={coordinate}
+                  onChange={setCoordinate}
+                  showGrid={isGrid && !!coordinate}
+                  gridSize={isGrid ? gridSize : undefined}
+                  spacingKm={isGrid ? spacingKm : undefined}
+                  gridLayout={isGrid ? gridLayout : undefined}
+                  onToggleCell={isGrid ? toggleCell : undefined}
+                  distanceUnit={distanceUnit}
+                  language={language}
+                  onBusinessSelect={isGrid ? (business) => setGridTarget(formatBusinessTarget(business.title, business.cid)) : undefined}
+                />
+              </Suspense>
+              <input
+                type="text"
+                name="location_coordinate"
+                value={coordinate}
+                onChange={(e) => setCoordinate(e.target.value)}
+                placeholder="Click on the map to set a point — or type lat,lng"
+                className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-700 dark:text-slate-300 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+              />
+              {coordinate && (
+                <p className="text-[11px] text-blue-600">
+                  {isGrid ? 'Grid will be centered on this point.' : 'Coordinates active — search will be centered on this point.'}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Grid shape + rotation */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {isGrid && (
+            /* Target business */
             <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid shape</label>
-              <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Grid shape">
-                {GRID_SHAPES.map((option) => {
-                  const active = gridShape === option.value;
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                Target domain or business <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                name="grid_target"
+                value={gridTarget}
+                onChange={(e) => setGridTarget(e.target.value)}
+                placeholder="Pick a Google listing above, or enter a domain / business name"
+                required
+                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Picking a listing from the map search matches that exact Google listing. A domain matches with or without https:// and www; a name matches partially.</p>
+            </div>
+          )}
+        </div>
+
+        {isGrid && (
+          /* Grid settings */
+          <div className="space-y-4">
+            {/* Grid size + spacing */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid size</label>
+                <select
+                  name="grid_size"
+                  value={gridSize}
+                  onChange={(e) => {
+                    setGridSize(parseInt(e.target.value, 10));
+                    // Skipped cells are row/column positions, which mean other places on another grid size.
+                    setExcludedCells([]);
+                  }}
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
+                >
+                  {[3, 5, 7, 9, 11].map((size) => (
+                    <option key={size} value={size}>
+                      {size}×{size} ({gridPointCount(size, { shape: gridShape, rotationDeg: 0, excluded: [] })} points)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Spacing ({distanceUnit})</label>
+                {/* Values are always kilometres; only the labels follow the Settings distance unit. */}
+                <select
+                  name="spacing_km"
+                  value={spacingKm}
+                  onChange={(e) => setSpacingKm(parseFloat(e.target.value))}
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
+                >
+                  {spacingChoices.map((option) => <option key={option.km} value={option.km}>{option.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Grid shape + rotation */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid shape</label>
+                <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Grid shape">
+                  {GRID_SHAPES.map((option) => {
+                    const active = gridShape === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => {
+                          setGridShape(option.value);
+                          setExcludedCells([]);
+                        }}
+                        className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-black transition-all ${
+                          active
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                        }`}
+                      >
+                        <ShapeIcon shape={option.value} />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="grid-rotation" className="block text-xs font-black uppercase tracking-widest text-slate-400">Rotation</label>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs font-black tabular-nums text-slate-700 dark:text-slate-200">{rotationDeg}°</span>
+                    {rotationDeg !== 0 && (
+                      <button type="button" onClick={() => setRotationDeg(0)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">
+                        Reset
+                      </button>
+                    )}
+                  </span>
+                </div>
+                <input
+                  id="grid-rotation"
+                  type="range"
+                  min={-45}
+                  max={44}
+                  step={1}
+                  value={rotationDeg}
+                  onChange={(e) => setRotationDeg(normalizeRotation(Number(e.target.value)))}
+                  className="w-full accent-blue-600 mt-2"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Align the grid with the street layout or coastline.</p>
+              </div>
+            </div>
+            {Object.entries(gridLayoutParams(gridLayout)).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
+
+            {/* Grid preview */}
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 text-center">Grid preview</p>
+              <GridPreview
+                size={gridSize}
+                spacingKm={spacingKm}
+                unit={distanceUnit}
+                layout={gridLayout}
+                onToggle={toggleCell}
+                onResetSkipped={() => setExcludedCells([])}
+              />
+            </div>
+
+            {/* Queue mode */}
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">API mode</label>
+              <input type="hidden" name="queue_mode" value={queueMode} />
+              <div className="grid grid-cols-3 gap-2">
+                {QUEUE_MODES.map((mode) => {
+                  const active = queueMode === mode.value;
+                  const estCost = formatCost(pointCount * mode.costPerPoint);
                   return (
                     <button
-                      key={option.value}
+                      key={mode.value}
                       type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => {
-                        setGridShape(option.value);
-                        setExcludedCells([]);
-                      }}
-                      className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-black transition-all ${
+                      onClick={() => setQueueMode(mode.value)}
+                      className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
                         active
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      <ShapeIcon shape={option.value} />
-                      {option.label}
+                      <span className={`text-xs font-black ${active ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                        {mode.label}
+                      </span>
+                      <span className={`text-[10px] font-mono ${active ? 'text-blue-500' : 'text-slate-400'}`}>{estCost}</span>
+                      <span className="text-[10px] text-slate-400">{mode.wait}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="grid-rotation" className="block text-xs font-black uppercase tracking-widest text-slate-400">Rotation</label>
-                <span className="flex items-center gap-2">
-                  <span className="text-xs font-black tabular-nums text-slate-700 dark:text-slate-200">{rotationDeg}°</span>
-                  {rotationDeg !== 0 && (
-                    <button type="button" onClick={() => setRotationDeg(0)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">
-                      Reset
-                    </button>
-                  )}
-                </span>
-              </div>
-              <input
-                id="grid-rotation"
-                type="range"
-                min={-45}
-                max={44}
-                step={1}
-                value={rotationDeg}
-                onChange={(e) => setRotationDeg(normalizeRotation(Number(e.target.value)))}
-                className="w-full accent-blue-600 mt-2"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Align the grid with the street layout or coastline.</p>
+              <p className="text-[11px] text-slate-400 mt-2">
+                {queueMode === 'live' ? (
+                  <>Blocks the page for {formatLiveDuration(pointCount)} — DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
+                ) : queueMode === 'priority' ? (
+                  <>Tasks are queued with DataForSEO’s high-priority flag. The page will auto-refresh every 10 seconds until results are ready.</>
+                ) : (
+                  <>Tasks are queued for standard background processing. The page will check every 30 seconds — or you can come back later.</>
+                )}
+              </p>
             </div>
           </div>
-          {Object.entries(gridLayoutParams(gridLayout)).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
-          ))}
+        )}
+      </div>
 
-          {/* Grid preview */}
-          <div className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 text-center">Grid preview</p>
-            <GridPreview
-              size={gridSize}
-              spacingKm={spacingKm}
-              unit={distanceUnit}
-              layout={gridLayout}
-              onToggle={toggleCell}
-              onResetSkipped={() => setExcludedCells([])}
-            />
-          </div>
-
-          {/* Queue mode */}
-          <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">API mode</label>
-            <input type="hidden" name="queue_mode" value={queueMode} />
-            <div className="grid grid-cols-3 gap-2">
-              {QUEUE_MODES.map((mode) => {
-                const active = queueMode === mode.value;
-                const estCost = formatCost(pointCount * mode.costPerPoint);
-                return (
-                  <button
-                    key={mode.value}
-                    type="button"
-                    onClick={() => setQueueMode(mode.value)}
-                    className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                      active
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
-                  >
-                    <span className={`text-xs font-black ${active ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                      {mode.label}
-                    </span>
-                    <span className={`text-[10px] font-mono ${active ? 'text-blue-500' : 'text-slate-400'}`}>{estCost}</span>
-                    <span className="text-[10px] text-slate-400">{mode.wait}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              {queueMode === 'live' ? (
-                <>Blocks the page for {formatLiveDuration(pointCount)} — DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
-              ) : queueMode === 'priority' ? (
-                <>Tasks are queued with DataForSEO’s high-priority flag. The page will auto-refresh every 10 seconds until results are ready.</>
-              ) : (
-                <>Tasks are queued for standard background processing. The page will check every 30 seconds — or you can come back later.</>
-              )}
-            </p>
-          </div>
-        </>
-      ) : (
+      {!isGrid && (
         /* Standard local finder fields */
         <>
           {/* Device / OS / Depth */}
