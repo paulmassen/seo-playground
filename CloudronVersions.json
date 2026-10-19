@@ -218,6 +218,50 @@
             "creationDate": "Mon, 19 Oct 2026 11:50:13 GMT",
             "ts": "Mon, 19 Oct 2026 11:50:13 GMT",
             "publishState": "published"
+        },
+        "0.6.3": {
+            "manifest": {
+                "id": "io.github.paulmassen.seoplayground",
+                "title": "SEO Playground",
+                "tagline": "Self-hosted SEO dashboard powered by DataForSEO",
+                "description": "SEO Playground is a self-hosted dashboard on top of the [DataForSEO](https://dataforseo.com) API. You bring your own DataForSEO account and pay DataForSEO directly for what you use; nothing is sent anywhere else.\n\n* **Rank Tracker** with daily history and the top 10 results of every check\n* **Local Finder / Geo-grid** rank maps with scheduled monitors and PDF reports\n* **Site Audit**, **Google Reviews** analysis, **Review Velocity** and **web mentions**\n* **Backlinks** tools, including **Broken Backlinks** for link building opportunities\n* **AI Visibility** and **Prompt Tracker**: see whether ChatGPT, Claude, Gemini or Perplexity mention your brand\n* **White-label PDF reports** with your own logo and colours\n* Multiple projects, each with its own database, and a spending overview\n",
+                "version": "0.6.3",
+                "upstreamVersion": "0.6.3",
+                "changelog": "[0.6.3]\n* Update to SEO Playground 0.6.3\n* New: the dashboard bell follows Review Velocity and Rank Tracker checks across every page, and keeps completed checks until opened\n* Fix: Geo-grid distance units (km/miles) apply consistently wherever the shared grid form is used\n* New DataForSEO users can optionally support SEO Playground through a disclosed affiliate link during setup\n\n[0.6.2]\n* Update to SEO Playground 0.6.2\n* Geo-grid: create square, diamond or circle monitors, rotate the grid to follow streets or coastlines, and skip individual points so they are not billed\n* Geo-grid: one-click competitor switcher above the analysis map; the creation form keeps its full width while a compact monitors list appears beside opened results\n* Fix: monitor cards now show the latest scheduled run, rather than the monitor's creation run\n\n[0.6.1]\n* Update to SEO Playground 0.6.1\n* Fix Geo-grid PDF reports showing OpenStreetMap's \"Access blocked\" tiles (\"app is not following the tile usage policy\"): the PDF export now sends a Referer and reuses the map's tiles instead of downloading them again\n\n[0.6.0]\n* Update to SEO Playground 0.6.0\n* New: Broken Backlinks, Review Velocity (review pace vs. local competitors), sidebar favorites, Geo-grid distance unit (km/miles) and pin style settings\n* Fix: Rank Tracker could bill the same keyword twice; DataForSEO account errors (e.g. insufficient balance) no longer look like empty results; Referring Domains \"Invalid Field\" error\n* Security: paid API endpoints only answer POST, CSV exports are formula-safe, Next.js and jsPDF security updates\n* Includes 0.5.0: Prompt Tracker, white-label PDF reports, Geo-grid business search, Rank Tracker top 10 and AI Overview citations\n\n[0.4.1]\n* Fix maps blocked by OpenStreetMap (\"app is not following the OSM tile usage policy\"): tiles and address search now send a Referer even behind the Cloudron proxy\n\n[0.4.0]\n* Initial Cloudron package of SEO Playground 0.4.0\n",
+                "postInstallMessage": "SEO Playground is installed. Only Cloudron users can open it: Cloudron's login screen sits in front of the app.\n\n1. Open the app and go to **Settings** to enter your DataForSEO login and password (or API key). They are stored in the app's database, which is part of the Cloudron backups.\n2. Everything you run is billed by DataForSEO, so grant access to people you trust with that credit.\n\nYour data lives in `/app/data` (one SQLite file per project). The scheduled Geo-grid and Prompt Tracker checks run inside the app, so there is nothing else to configure.\n",
+                "healthCheckPath": "/robots.txt",
+                "httpPort": 8000,
+                "configurePath": "/dashboard",
+                "manifestVersion": 2,
+                "minBoxVersion": "10.0.0",
+                "memoryLimit": 805306368,
+                "addons": {
+                    "localstorage": {},
+                    "proxyAuth": {}
+                },
+                "website": "https://github.com/paulmassen/seo-playground",
+                "documentationUrl": "https://github.com/paulmassen/seo-playground#readme",
+                "forumUrl": "https://github.com/paulmassen/seo-playground/issues",
+                "packageUrl": "https://github.com/paulmassen/seo-playground",
+                "packagerName": "Paul Massendari",
+                "packagerUrl": "https://github.com/paulmassen",
+                "iconUrl": "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/cloudron/icon.png",
+                "tags": [
+                    "seo",
+                    "analytics",
+                    "dataforseo",
+                    "marketing"
+                ],
+                "mediaLinks": [
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/readme/hero.png",
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-rank-tracker.png",
+                    "https://raw.githubusercontent.com/paulmassen/seo-playground/cloudron-package/public/screenshot-local-finder.png"
+                ],
+                "dockerImage": "ghcr.io/paulmassen/seo-playground:cloudron-0.6.3"
+            },
+            "creationDate": "Mon, 19 Oct 2026 16:02:07 GMT",
+            "ts": "Mon, 19 Oct 2026 16:02:07 GMT",
+            "publishState": "published"
         }
     }
 }
