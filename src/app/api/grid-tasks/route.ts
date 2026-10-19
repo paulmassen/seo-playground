@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getActiveProject, getCredentials, getPendingGridEntriesForProject } from '@/lib/db';
 import { collectGridProgress } from '@/lib/grid-progress';
+import { DEFAULT_GRID_LAYOUT, gridPointCount } from '@/lib/grid-layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET() {
       tasks.push({ id: entry.id, keyword: entry.keyword, target: entry.target, ...progress });
     } catch {
       // Preserve the task in the feed; the next top-bar poll can retry it.
-      tasks.push({ id: entry.id, keyword: entry.keyword, target: entry.target, status: 'pending', ready: 0, total: entry.grid_size ** 2 });
+      tasks.push({ id: entry.id, keyword: entry.keyword, target: entry.target, status: 'pending', ready: 0, total: gridPointCount(entry.grid_size, entry.layout ?? DEFAULT_GRID_LAYOUT) });
     }
   }
   return NextResponse.json({ tasks });

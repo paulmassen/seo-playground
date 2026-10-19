@@ -1,5 +1,6 @@
 import type { GridPoint, GridLocalItem, GridTaskPoint } from '@/lib/db';
 import { matchesGridTarget } from '@/lib/grid-target';
+import { DEFAULT_GRID_LAYOUT, generateGridCoords, gridLayoutKey, type GridLayout } from '@/lib/grid-layout';
 
 export interface LocalPackItem {
   type: string;
@@ -14,25 +15,6 @@ export interface LocalPackItem {
   is_paid?: boolean;
   rating?: { value?: number; votes_count?: number; rating_max?: number };
   cid?: string;
-}
-
-export function generateGridCoords(
-  centerLat: number, centerLng: number, gridSize: number, spacingKm: number,
-) {
-  const latDeg = spacingKm / 111.32;
-  const lngDeg = spacingKm / (111.32 * Math.cos(centerLat * Math.PI / 180));
-  const half = Math.floor(gridSize / 2);
-  const coords: { row: number; col: number; lat: number; lng: number }[] = [];
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      coords.push({
-        row, col,
-        lat: centerLat + (half - row) * latDeg,
-        lng: centerLng + (col - half) * lngDeg,
-      });
-    }
-  }
-  return coords;
 }
 
 /** Runs `fn` over `items` with at most `limit` calls in flight at once. */
@@ -95,14 +77,14 @@ export async function fetchOneGridPoint(
 
 export async function fetchGridSearch(
   keyword: string, center: string, gridSize: number, spacingKm: number,
-  language: string, target: string, login: string, pass: string,
+  language: string, target: string, login: string, pass: string, layout: GridLayout = DEFAULT_GRID_LAYOUT,
 ): Promise<{ results: GridPoint[]; cost: number; error?: string }> {
   const parts = center.split(',').map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
     return { results: [], cost: 0, error: 'Invalid coordinates.' };
   }
   const [centerLat, centerLng] = parts;
-  const coords = generateGridCoords(centerLat, centerLng, gridSize, spacingKm);
+  const coords = generateGridCoords(centerLat, centerLng, gridSize, spacingKm, layout);
   const auth = btoa(`${login}:${pass}`);
 
   const pointResults = await mapWithConcurrency(
@@ -136,13 +118,14 @@ export async function fetchGridSearch(
 export async function postGridTasksQueue(
   keyword: string, center: string, gridSize: number, spacingKm: number,
   language: string, login: string, pass: string, priorityMode: 'priority' | 'standard' = 'standard',
+  layout: GridLayout = DEFAULT_GRID_LAYOUT,
 ): Promise<{ taskPoints: GridTaskPoint[]; cost: number; error?: string }> {
   const parts = center.split(',').map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
     return { taskPoints: [], cost: 0, error: 'Invalid coordinates.' };
   }
   const [centerLat, centerLng] = parts;
-  const coords = generateGridCoords(centerLat, centerLng, gridSize, spacingKm);
+  const coords = generateGridCoords(centerLat, centerLng, gridSize, spacingKm, layout);
   const auth = btoa(`${login}:${pass}`);
   // DataForSEO: priority=2 processes the task faster for a higher per-task cost; priority=1 is the default standard queue.
   const priority = priorityMode === 'priority' ? 2 : 1;
@@ -190,10 +173,11 @@ export async function postGridTasksQueue(
 
 export function stableGridId(
   keyword: string, center: string, gridSize: number,
-  spacingKm: number, target: string, queueMode: string,
+  spacingKm: number, target: string, queueMode: string, layout: GridLayout = DEFAULT_GRID_LAYOUT,
 ): string {
   const window = Math.floor(Date.now() / 60_000);
-  const key = `${window}|${keyword}|${center}|${gridSize}|${spacingKm}|${target}|${queueMode}`;
+  const layoutKey = gridLayoutKey(layout);
+  const key = `${window}|${keyword}|${center}|${gridSize}|${spacingKm}|${target}|${queueMode}${layoutKey ? `|${layoutKey}` : ''}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i);

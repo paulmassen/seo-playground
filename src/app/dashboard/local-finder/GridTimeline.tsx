@@ -1,6 +1,7 @@
 import type { BrandStyle } from '@/lib/brand';
 import type { GridPoint, GridSchedule, GridSearchEntry } from '@/lib/db';
 import { formatDistance, type DistanceUnit } from '@/lib/grid-preferences';
+import { DEFAULT_GRID_LAYOUT, describeGridLayout, gridLayoutParams } from '@/lib/grid-layout';
 import { computeGridSummary } from './grid-insights';
 import { GridSnapshotSelectionProvider, GridSelectedSnapshotExportButton } from './GridSnapshotSelection';
 import GridScheduleControl from './GridScheduleControl';
@@ -37,6 +38,11 @@ export default function GridTimeline({ entry, results, previousResults, snapshot
   const current = computeGridSummary(results);
   const previous = previousResults ? computeGridSummary(previousResults) : null;
   const mapId = `geo-grid-report-map-${entry.id}`;
+  const layout = entry.layout ?? DEFAULT_GRID_LAYOUT;
+  const runNowUrl = `/dashboard/geo-grid?${new URLSearchParams({
+    keyword: entry.keyword, location_coordinate: entry.center, grid_size: String(entry.grid_size), spacing_km: String(entry.spacing_km),
+    grid_target: entry.target, language: entry.language, queue_mode: entry.queue_mode, mode: 'grid', ...gridLayoutParams(layout),
+  }).toString()}`;
   const metrics = [
     { label: 'Visibility', value: `${current.ato}%`, delta: metricDelta(current.ato, previous?.ato ?? null), good: (current.ato - (previous?.ato ?? current.ato)) >= 0 },
     { label: 'Average rank', value: current.avgRank == null ? '—' : `#${current.avgRank}`, delta: metricDelta(current.avgRank, previous?.avgRank ?? null, true), good: (previous?.avgRank ?? current.avgRank ?? 0) - (current.avgRank ?? 0) >= 0 },
@@ -52,13 +58,13 @@ export default function GridTimeline({ entry, results, previousResults, snapshot
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">Ranking monitor</p>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white">{entry.keyword}</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.target} · {entry.grid_size}×{entry.grid_size} points · {formatDistance(entry.spacing_km, distanceUnit)} spacing</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.target} · {describeGridLayout(entry.grid_size, layout)} · {formatDistance(entry.spacing_km, distanceUnit)} spacing</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a href={`/dashboard/geo-grid?keyword=${encodeURIComponent(entry.keyword)}&location_coordinate=${encodeURIComponent(entry.center)}&grid_size=${entry.grid_size}&spacing_km=${entry.spacing_km}&grid_target=${encodeURIComponent(entry.target)}&language=${encodeURIComponent(entry.language)}&queue_mode=${entry.queue_mode}&mode=grid`} className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-900 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950">
+            <a href={runNowUrl} className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-900 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950">
               Run now
             </a>
-            <GridSelectedSnapshotExportButton snapshots={snapshots} fallbackResults={results} fallbackTs={entry.ts} gridSize={entry.grid_size} spacingKm={entry.spacing_km} keyword={entry.keyword} target={entry.target} language={entry.language} brandName={brandName} brandLogoUrl={brandLogoUrl} brandColor={brandColor} brandFooter={brandFooter} brandStyle={brandStyle} mapElementId={mapId} />
+            <GridSelectedSnapshotExportButton snapshots={snapshots} fallbackResults={results} fallbackTs={entry.ts} gridSize={entry.grid_size} layout={layout} spacingKm={entry.spacing_km} keyword={entry.keyword} target={entry.target} language={entry.language} brandName={brandName} brandLogoUrl={brandLogoUrl} brandColor={brandColor} brandFooter={brandFooter} brandStyle={brandStyle} mapElementId={mapId} />
             <DeleteMonitorButton runId={entry.id} />
           </div>
         </div>
@@ -83,6 +89,7 @@ export default function GridTimeline({ entry, results, previousResults, snapshot
             snapshots={snapshots}
             selectedId={entry.id}
             gridSize={entry.grid_size}
+            layout={layout}
             spacingKm={entry.spacing_km}
             keyword={entry.keyword}
             target={entry.target}

@@ -23,6 +23,7 @@ import {
   getHistRankHistory, saveHistRankSearch,
   addTrackedKeyword, saveRankCheck, getRankTopResultsHistory,
 } from './db';
+import { DEFAULT_GRID_LAYOUT, normalizeGridLayout } from './grid-layout';
 
 afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -231,6 +232,27 @@ describe('Geo-grid monitoring', () => {
     expect(getGridSchedule(seriesId)).toMatchObject({ frequency: 'daily', time_of_day: '08:30', time_zone: 'Europe/Paris' });
     deleteGridSchedule(seriesId);
     expect(getGridSchedule(seriesId)).toBeNull();
+  });
+
+  it('keeps legacy series ids for the default layout and separates custom layouts', () => {
+    expect(gridSeriesId('plombier paris', '48.8566,2.3522', 3, 1, 'Example Plumbing', 'French', DEFAULT_GRID_LAYOUT)).toBe(seriesId);
+    const diamond = normalizeGridLayout({ shape: 'diamond', rotationDeg: 30 }, 3);
+    expect(gridSeriesId('plombier paris', '48.8566,2.3522', 3, 1, 'Example Plumbing', 'French', diamond)).not.toBe(seriesId);
+  });
+
+  it('persists the layout on runs and schedules, and defaults legacy rows to a full square', () => {
+    const layout = normalizeGridLayout({ shape: 'circle', rotationDeg: -20, excluded: ['0:1'] }, 3);
+    const layoutSeries = gridSeriesId(base.keyword, base.center, base.grid_size, base.spacing_km, base.target, base.language, layout);
+    saveGridSearch({ ...base, series_id: layoutSeries, id: 'grid-layout-run', ts: 20, layout }, [{ row: 1, col: 1, rank: 1 }]);
+    expect(getGridSeriesHistory(layoutSeries)[0].layout).toEqual(layout);
+    expect(getGridSeriesHistory(seriesId)[0].layout).toEqual(DEFAULT_GRID_LAYOUT);
+
+    saveGridSchedule({ ...base, series_id: layoutSeries, layout, frequency: 'daily', weekday: null, time_of_day: '08:30', time_zone: 'UTC' });
+    const schedule = getGridSchedule(layoutSeries)!;
+    expect(schedule.layout).toEqual(layout);
+    const [claimed] = claimDueGridSchedules(schedule.next_run_at + 1).filter((item) => item.series_id === layoutSeries);
+    expect(claimed.layout).toEqual(layout);
+    deleteGridSeries(layoutSeries);
   });
 
   it('deletes a whole monitor: every snapshot and its schedule', () => {

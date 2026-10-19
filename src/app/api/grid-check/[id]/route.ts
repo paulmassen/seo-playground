@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActiveProject, getCredentials, getGridEntryForProject, projectExists } from '@/lib/db';
 import { collectGridProgress } from '@/lib/grid-progress';
+import { DEFAULT_GRID_LAYOUT, gridPointCount } from '@/lib/grid-layout';
 
 export async function GET(
   request: NextRequest,
@@ -14,7 +15,7 @@ export async function GET(
   const entry = getGridEntryForProject(projectId, id);
   if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const total = entry.grid_size ** 2;
+  const total = gridPointCount(entry.grid_size, entry.layout ?? DEFAULT_GRID_LAYOUT);
   if (entry.status === 'done') return NextResponse.json({ status: 'done', ready: total, total });
 
   const credentials = getCredentials();

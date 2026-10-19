@@ -1,4 +1,5 @@
 import { matchesGridTarget } from '@/lib/grid-target';
+import { DEFAULT_GRID_LAYOUT, gridPointCount } from '@/lib/grid-layout';
 import {
   getGridProgressForProject, updateGridProgressForProject,
   type GridLocalItem, type GridPoint, type GridSearchEntry, type GridTaskPoint,
@@ -38,7 +39,7 @@ async function collectGridProgressOnce(
   entry: GridSearchEntry & { task_ids?: GridTaskPoint[] },
   credentials: { login: string; pass: string },
 ): Promise<{ status: 'done' | 'pending'; ready: number; total: number }> {
-  const total = entry.grid_size ** 2;
+  const total = gridPointCount(entry.grid_size, entry.layout ?? DEFAULT_GRID_LAYOUT);
   const progress = getGridProgressForProject(projectId, entry.id);
   if (!progress || progress.pendingTasks.length === 0) return { status: 'pending', ready: 0, total };
 

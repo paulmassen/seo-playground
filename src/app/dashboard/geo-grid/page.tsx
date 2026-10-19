@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getBrandSettings } from '@/lib/brand-server';
 import { getGridPreferences } from '@/lib/grid-preferences-server';
 import { formatDistance, unitToKm } from '@/lib/grid-preferences';
+import { DEFAULT_GRID_LAYOUT, gridLayoutFromParams, gridLayoutParams, gridPointCount, type GridLayout } from '@/lib/grid-layout';
 import {
   getCurrentProject, getCredentials, getSetting, getGridHistory, getGridEntry, saveGridSearch,
   saveGridSearchPending, getGridResults, getGridSeriesHistory, getGridSchedule, gridSeriesId, type GridSearchEntry, type GridPoint, type GridQueueMode,
@@ -26,6 +27,9 @@ interface SearchParams {
   grid_target?: string;
   grid_history_id?: string;
   queue_mode?: string;
+  grid_shape?: string;
+  grid_rotation?: string;
+  grid_excluded?: string;
 }
 
 function formatDate(ts: number) {
@@ -35,8 +39,15 @@ function formatDate(ts: number) {
   });
 }
 
-function gridRerunUrl(entry: { keyword: string; center: string; grid_size: number; spacing_km: number; target: string; language: string; queue_mode: string }, basePath = '/dashboard/geo-grid') {
+/** "5×5", or "5×5 · diamond" for a non-square monitor. */
+function gridBadge(entry: { grid_size: number; layout?: GridLayout }) {
+  const shape = entry.layout?.shape ?? 'square';
+  return `${entry.grid_size}×${entry.grid_size}${shape === 'square' ? '' : ` · ${shape}`}`;
+}
+
+function gridRerunUrl(entry: { keyword: string; center: string; grid_size: number; spacing_km: number; target: string; language: string; queue_mode: string; layout?: GridLayout }, basePath = '/dashboard/geo-grid') {
   const p = new URLSearchParams({
+    ...gridLayoutParams(entry.layout ?? DEFAULT_GRID_LAYOUT),
     keyword: entry.keyword,
     location_coordinate: entry.center,
     grid_size: String(entry.grid_size),
@@ -75,7 +86,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
       gridError = 'Monitor not found.';
     } else if (entry.status === 'pending') {
       gridEntry = entry;
-      gridPending = { id: entry.id, totalPoints: entry.grid_size ** 2, queueMode: entry.queue_mode };
+      gridPending = { id: entry.id, totalPoints: gridPointCount(entry.grid_size, entry.layout ?? DEFAULT_GRID_LAYOUT), queueMode: entry.queue_mode };
     } else {
       gridResults = getGridResults(gridHistoryId);
       gridEntry = entry;
@@ -91,12 +102,14 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
       const spacingKm = parseFloat(params.spacing_km ?? '1');
       const queueMode = (params.queue_mode ?? 'live') as GridQueueMode;
       const language = params.language ?? defaultLanguage;
+      // Shape, rotation and skipped points are chosen once, when the monitor is created.
+      const layout = gridLayoutFromParams(params, gridSize);
       const seriesId = gridSeriesId(
-        params.keyword, params.location_coordinate, gridSize, spacingKm, params.grid_target, language,
+        params.keyword, params.location_coordinate, gridSize, spacingKm, params.grid_target, language, layout,
       );
 
       const id = stableGridId(
-        params.keyword, params.location_coordinate, gridSize, spacingKm, params.grid_target, queueMode,
+        params.keyword, params.location_coordinate, gridSize, spacingKm, params.grid_target, queueMode, layout,
       );
 
       if (!getGridEntry(id)) {
@@ -111,13 +124,14 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
           language,
           status: 'done',
           queue_mode: queueMode,
+          layout,
         };
 
         if (queueMode === 'live') {
           const result = await fetchGridSearch(
             params.keyword, params.location_coordinate,
             gridSize, spacingKm, params.language ?? defaultLanguage,
-            params.grid_target, creds.login, creds.pass,
+            params.grid_target, creds.login, creds.pass, layout,
           );
           if (result.error) {
             gridError = result.error;
@@ -128,7 +142,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
           const result = await postGridTasksQueue(
             params.keyword, params.location_coordinate,
             gridSize, spacingKm, params.language ?? defaultLanguage,
-            creds.login, creds.pass, queueMode,
+            creds.login, creds.pass, queueMode, layout,
           );
           if (result.error) gridError = result.error;
           // A failure after some chunks were posted still leaves billed tasks to collect.
@@ -174,7 +188,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
       if (run.status !== 'done') return [];
       const points = getGridResults(run.id);
       if (!points) return [];
-      const total = run.grid_size ** 2;
+      const total = gridPointCount(run.grid_size, run.layout ?? DEFAULT_GRID_LAYOUT);
       return [{
         id: run.id,
         ts: run.ts,
@@ -211,6 +225,9 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
     spacingKm: (params.spacing_km ?? gridEntry?.spacing_km ?? unitToKm(1, distanceUnit)).toString(),
     gridTarget: (params.grid_target ?? gridEntry?.target ?? defaultDomain).toString(),
     queueMode: (params.queue_mode ?? gridEntry?.queue_mode ?? 'live').toString(),
+    gridLayout: params.keyword
+      ? gridLayoutFromParams(params, parseInt(params.grid_size ?? '5', 10))
+      : gridEntry?.layout ?? DEFAULT_GRID_LAYOUT,
   };
 
   const monitorItems = latestBySeries.map((entry) => {
@@ -223,7 +240,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
             <p className={`text-sm font-bold truncate ${isActive ? 'text-blue-700' : 'text-slate-800 dark:text-slate-200'}`}>
               {entry.keyword}
             </p>
-            <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">{entry.grid_size}×{entry.grid_size}</span>
+            <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">{gridBadge(entry)}</span>
             {isPending && (
               <span className="text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">Pending</span>
             )}
@@ -298,7 +315,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
                   <a key={entry.id} href={`/dashboard/geo-grid?grid_history_id=${entry.id}#results`} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-950/5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0"><p className="truncate text-base font-black text-slate-900 dark:text-white">{entry.keyword}</p><p className="mt-1 truncate text-xs font-semibold text-blue-600 dark:text-blue-400">{entry.target}</p></div>
-                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-black tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-400">{entry.grid_size}×{entry.grid_size}</span>
+                      <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-black tabular-nums text-slate-500 dark:bg-slate-800 dark:text-slate-400">{gridBadge(entry)}</span>
                     </div>
                     <div className="mt-5 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
                       <div className="text-[11px] text-slate-400"><p>{entry.center}</p><p className="mt-0.5">Last run {formatDate(entry.ts)}</p></div>
@@ -324,6 +341,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
                 keyword={gridEntry.keyword}
                 target={gridEntry.target}
                 gridSize={gridEntry.grid_size}
+                layout={gridEntry.layout}
                 startedAt={gridEntry.ts}
               />
             )}

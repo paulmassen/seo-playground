@@ -9,10 +9,12 @@ import { drawFooter, drawHeaderBand } from '@/lib/brand-pdf';
 import { formatDistance } from '@/lib/grid-preferences';
 import { MAP_CAPTURE_FETCH_OPTIONS } from '@/lib/map-capture';
 import { useGridPreferences } from './GridPreferences';
+import { DEFAULT_GRID_LAYOUT, describeGridLayout, type GridLayout } from '@/lib/grid-layout';
 
 type Props = {
   results: GridPoint[];
   gridSize: number;
+  layout?: GridLayout;
   spacingKm: number;
   keyword: string;
   target: string;
@@ -46,6 +48,11 @@ function rankColor(rank: number | null): [number, number, number] {
   if (rank <= 15) return [245, 158, 11];
   if (rank <= 20) return [249, 115, 22];
   return [239, 68, 68];
+}
+
+/** The PDF text helper is ASCII-only: spell out the layout label's ×, · and ° signs. */
+function asciiLayoutLabel(label: string): string {
+  return label.replace(/×/g, ' x ').replace(/ · /g, ', ').replace(/(-?\d+)°/g, '$1 deg rotation');
 }
 
 function pdfText(value: string, max = 90): string {
@@ -174,7 +181,7 @@ export default function GridPdfExportButton(props: Props) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       setColor(palette.muted);
-      text(`Target: ${props.target}  /  ${props.gridSize} x ${props.gridSize} points  /  ${formatDistance(props.spacingKm, distanceUnit)} spacing  /  ${props.language}`, margin, 60);
+      text(`Target: ${props.target}  /  ${asciiLayoutLabel(describeGridLayout(props.gridSize, props.layout ?? DEFAULT_GRID_LAYOUT))}  /  ${formatDistance(props.spacingKm, distanceUnit)} spacing  /  ${props.language}`, margin, 60);
 
       const metrics = [
         ['ATO SCORE', `${summary.ato}%`, 'Local visibility'],
@@ -239,6 +246,8 @@ export default function GridPdfExportButton(props: Props) {
         for (let row = 0; row < props.gridSize; row += 1) {
           for (let col = 0; col < props.gridSize; col += 1) {
             const point = pointByCell.get(`${row}:${col}`);
+            // Cells outside the shape or skipped at creation were never scanned: leave them blank.
+            if (!point) continue;
             const color = rankColor(point?.rank ?? null);
             const x = gridX + col * cell;
             const y = gridTop + row * cell;

@@ -1,6 +1,7 @@
 'use client';
 
 import type { BrandStyle } from '@/lib/brand';
+import type { GridLayout } from '@/lib/grid-layout';
 
 import { useEffect, useMemo, useState } from 'react';
 import GridResults from './GridResults';
@@ -12,6 +13,7 @@ type Props = {
   snapshots: GridMapSnapshot[];
   selectedId: string;
   gridSize: number;
+  layout?: GridLayout;
   spacingKm: number;
   keyword: string;
   target: string;
@@ -25,7 +27,7 @@ type Props = {
   trend: GridPositionTrendPoint[];
 };
 
-export default function GridAnalysisPanel({ snapshots, selectedId, gridSize, spacingKm, keyword, target, language, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle, captureId, trend }: Props) {
+export default function GridAnalysisPanel({ snapshots, selectedId, gridSize, layout, spacingKm, keyword, target, language, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle, captureId, trend }: Props) {
   const selection = useGridSnapshotSelection();
   const [localId, setLocalId] = useState(selectedId);
   useEffect(() => setLocalId(selectedId), [selectedId]);
@@ -63,6 +65,7 @@ export default function GridAnalysisPanel({ snapshots, selectedId, gridSize, spa
           key={activeSnapshot.id}
           results={activeSnapshot.results}
           gridSize={gridSize}
+          layout={layout}
           spacingKm={spacingKm}
           keyword={keyword}
           target={target}

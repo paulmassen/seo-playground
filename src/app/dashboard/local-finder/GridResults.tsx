@@ -8,12 +8,14 @@ import { computeCompetitors, computeGridSummary, computeRingStats, type Competit
 import GridPdfExportButton from './GridPdfExportButton';
 import { formatDistance } from '@/lib/grid-preferences';
 import { useGridPreferences } from './GridPreferences';
+import { DEFAULT_GRID_LAYOUT, describeGridLayout, type GridLayout } from '@/lib/grid-layout';
 
 const GridMap = lazy(() => import('./GridMap'));
 
 interface Props {
   results: GridPoint[];
   gridSize: number;
+  layout?: GridLayout;
   spacingKm: number;
   keyword: string;
   target: string;
@@ -43,7 +45,7 @@ function formatSnapshotDate(ts: number) {
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(ts));
 }
 
-export default function GridResults({ results, gridSize, spacingKm, keyword, target, cost, language, searchedAt, snapshotDate, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle }: Props) {
+export default function GridResults({ results, gridSize, layout = DEFAULT_GRID_LAYOUT, spacingKm, keyword, target, cost, language, searchedAt, snapshotDate, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle }: Props) {
   const [highlight, setHighlight] = useState<CompetitorSummary | null>(null);
   const { distanceUnit, pinStyle } = useGridPreferences();
   const swatchShape = pinStyle === 'square' ? 'rounded-sm' : 'rounded-full';
@@ -56,7 +58,7 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
 
   const competitors = useMemo(() => computeCompetitors(results), [results]);
   const topCompetitors = competitors.slice(0, 5);
-  const ringStats = useMemo(() => computeRingStats(results, gridSize, spacingKm), [results, gridSize, spacingKm]);
+  const ringStats = useMemo(() => computeRingStats(results, gridSize, spacingKm, layout.shape), [results, gridSize, spacingKm, layout.shape]);
 
   const legend = [
     { color: '#059669', label: '#1' },
@@ -172,13 +174,14 @@ export default function GridResults({ results, gridSize, spacingKm, keyword, tar
               ) : (
                 <>Target: <span className="font-bold text-slate-600">{target}</span></>
               )}
-              {' · '}{gridSize}×{gridSize} points
+              {' · '}{describeGridLayout(gridSize, layout)}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <GridPdfExportButton
               results={results}
               gridSize={gridSize}
+              layout={layout}
               spacingKm={spacingKm}
               keyword={keyword}
               target={target}

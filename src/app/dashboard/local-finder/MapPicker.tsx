@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { formatDistance, type DistanceUnit } from '@/lib/grid-preferences';
+import { DEFAULT_GRID_LAYOUT, gridLayoutCoords, gridPointCount, type GridLayout } from '@/lib/grid-layout';
 
 export interface BusinessResult {
   title: string;
@@ -21,6 +22,10 @@ interface Props {
   showGrid?: boolean;
   gridSize?: number;
   spacingKm?: number;
+  /** Shape, rotation and skipped points of the grid preview. */
+  gridLayout?: GridLayout;
+  /** When set, clicking a preview point (other than the center) toggles it in or out of the scan. */
+  onToggleCell?: (row: number, col: number) => void;
   /** Unit used to label the spacing (Settings → Geo-grid). */
   distanceUnit?: DistanceUnit;
   /** Language name from the form (e.g. "French"); used for the Google Maps business search. */
@@ -35,31 +40,18 @@ interface NominatimResult {
   display_name: string;
 }
 
-function calcGridCoords(
-  centerLat: number, centerLng: number, gridSize: number, spacingKm: number,
-) {
-  const latDeg = spacingKm / 111.32;
-  const lngDeg = spacingKm / (111.32 * Math.cos(centerLat * Math.PI / 180));
-  const half = Math.floor(gridSize / 2);
-  const coords: { row: number; col: number; lat: number; lng: number; isCenter: boolean }[] = [];
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      coords.push({
-        row, col,
-        lat: centerLat + (half - row) * latDeg,
-        lng: centerLng + (col - half) * lngDeg,
-        isCenter: row === half && col === half,
-      });
-    }
-  }
-  return coords;
-}
-
-export default function MapPicker({ coordinate, onChange, showGrid, gridSize, spacingKm, distanceUnit = 'km', language, onBusinessSelect }: Props) {
+export default function MapPicker({ coordinate, onChange, showGrid, gridSize, spacingKm, gridLayout = DEFAULT_GRID_LAYOUT, onToggleCell, distanceUnit = 'km', language, onBusinessSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('leaflet').Map | null>(null);
   const markerRef = useRef<import('leaflet').Marker | null>(null);
   const gridLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
+  // Marker click handlers outlive renders; read the latest callback through a ref.
+  const toggleCellRef = useRef(onToggleCell);
+  useEffect(() => { toggleCellRef.current = onToggleCell; }, [onToggleCell]);
+  /** Geometry last fitted into view: toggling a point must not re-zoom the map. */
+  const fittedGeometryRef = useRef<string | null>(null);
+  /** Bounds of the drawn grid, re-fitted when the map container changes size. */
+  const gridBoundsRef = useRef<import('leaflet').LatLngBounds | null>(null);
 
   const [expanded, setExpanded] = useState(false);
   // Leaflet loads asynchronously: effects that need the map re-run once it exists.
@@ -75,6 +67,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     let isMounted = true;
+    let resizeObserver: ResizeObserver | null = null;
 
     import('leaflet').then((L) => {
       if (!isMounted || !containerRef.current || mapRef.current) return;
@@ -119,11 +112,22 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
         setExpanded(true);
       });
 
+      // The form can mount this map inside a closed <details> (zero size) and later grow it;
+      // Leaflet only tracks window resizes, so refresh its size and keep the grid framed.
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          map.invalidateSize({ animate: false });
+          if (gridBoundsRef.current) map.fitBounds(gridBoundsRef.current, { padding: [28, 28], maxZoom: 15, animate: false });
+        });
+        resizeObserver.observe(containerRef.current!);
+      }
+
       setMapReady(true);
     });
 
     return () => {
       isMounted = false;
+      resizeObserver?.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -162,35 +166,50 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
     if (!mapRef.current || !gridLayerRef.current) return;
     gridLayerRef.current.clearLayers();
 
-    if (!showGrid || !coordinate || !gridSize || !spacingKm) return;
+    if (!showGrid || !coordinate || !gridSize || !spacingKm) {
+      fittedGeometryRef.current = null;
+      gridBoundsRef.current = null;
+      return;
+    }
 
     const [centerLat, centerLng] = coordinate.split(',').map(Number);
     if (isNaN(centerLat) || isNaN(centerLng)) return;
 
     import('leaflet').then((L) => {
       if (!mapRef.current || !gridLayerRef.current) return;
-      const coords = calcGridCoords(centerLat, centerLng, gridSize, spacingKm);
+      // Effects can resolve out of order; a newer run may already have drawn the grid.
+      gridLayerRef.current.clearLayers();
+      const coords = gridLayoutCoords(centerLat, centerLng, gridSize, spacingKm, gridLayout);
       const bounds: [number, number][] = [];
+      const toggleable = !!toggleCellRef.current;
 
-      coords.forEach(({ lat, lng, isCenter }) => {
+      coords.forEach(({ row, col, lat, lng, isCenter, excluded }) => {
         bounds.push([lat, lng]);
-        L.circleMarker([lat, lng], {
-          radius: isCenter ? 9 : 6,
-          fillColor: isCenter ? '#3b82f6' : '#94a3b8',
-          color: isCenter ? '#1d4ed8' : '#475569',
-          weight: 1.5,
-          opacity: 0.9,
-          fillOpacity: isCenter ? 0.7 : 0.35,
-        }).addTo(gridLayerRef.current!);
+        const marker = L.circleMarker([lat, lng], isCenter ? {
+          radius: 9, fillColor: '#3b82f6', color: '#1d4ed8', weight: 1.5, opacity: 0.9, fillOpacity: 0.7,
+        } : excluded ? {
+          // Skipped points stay visible as dashed rings so they can be added back.
+          radius: 6, fillColor: '#ffffff', color: '#94a3b8', weight: 1.5, opacity: 0.9, fillOpacity: 0.15, dashArray: '2 3',
+          bubblingMouseEvents: false,
+        } : {
+          radius: 6, fillColor: '#94a3b8', color: '#475569', weight: 1.5, opacity: 0.9, fillOpacity: 0.35,
+          // Without this, the map's own click handler would also move the grid center here.
+          bubblingMouseEvents: !toggleable,
+        });
+        if (!isCenter && toggleable) marker.on('click', () => toggleCellRef.current?.(row, col));
+        marker.addTo(gridLayerRef.current!);
       });
 
-      if (bounds.length > 1) {
-        const llBounds = L.latLngBounds(bounds);
+      const geometry = `${coordinate}|${gridSize}|${spacingKm}|${gridLayout.shape}|${gridLayout.rotationDeg}`;
+      const llBounds = bounds.length > 1 ? L.latLngBounds(bounds) : null;
+      gridBoundsRef.current = llBounds;
+      if (llBounds && fittedGeometryRef.current !== geometry) {
+        fittedGeometryRef.current = geometry;
         mapRef.current!.fitBounds(llBounds, { padding: [28, 28], maxZoom: 15 });
         setExpanded(true);
       }
     });
-  }, [mapReady, showGrid, coordinate, gridSize, spacingKm]);
+  }, [mapReady, showGrid, coordinate, gridSize, spacingKm, gridLayout]);
 
   // ── Business / address search ──────────────────────────────────────────────
   // Search Google Maps (DataForSEO) first so a business can be picked by name and
@@ -316,7 +335,10 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       />
       {showGrid && coordinate && gridSize && spacingKm && (
         <p className="text-[11px] text-slate-400 -mt-1">
-          {gridSize}×{gridSize} grid · {distanceUnit === 'km' && spacingKm < 1 ? `${spacingKm * 1000} m` : formatDistance(spacingKm, distanceUnit)} spacing · {gridSize ** 2} points
+          {gridSize}×{gridSize} {gridLayout.shape === 'square' ? 'grid' : gridLayout.shape}
+          {gridLayout.rotationDeg !== 0 ? ` · ${gridLayout.rotationDeg}° rotation` : ''}
+          {' · '}{distanceUnit === 'km' && spacingKm < 1 ? `${spacingKm * 1000} m` : formatDistance(spacingKm, distanceUnit)} spacing · {gridPointCount(gridSize, gridLayout)} points
+          {onToggleCell ? ' · click a point to skip it' : ''}
         </p>
       )}
     </>

@@ -4,6 +4,7 @@ import type { BrandStyle } from '@/lib/brand';
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { GridPoint } from '@/lib/db';
+import type { GridLayout } from '@/lib/grid-layout';
 import GridPdfExportButton from './GridPdfExportButton';
 
 type Selection = { activeId: string; setActiveId: (id: string) => void };
@@ -29,6 +30,7 @@ type ExportProps = {
   fallbackResults: GridPoint[];
   fallbackTs: number;
   gridSize: number;
+  layout?: GridLayout;
   spacingKm: number;
   keyword: string;
   target: string;

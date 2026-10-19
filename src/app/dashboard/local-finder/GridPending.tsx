@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { GridQueueMode } from '@/lib/db';
+import { DEFAULT_GRID_LAYOUT, describeGridLayout, type GridLayout } from '@/lib/grid-layout';
 
 interface Props {
   searchId: string;
@@ -12,6 +13,7 @@ interface Props {
   keyword: string;
   target: string;
   gridSize: number;
+  layout?: GridLayout;
   startedAt: number;
 }
 
@@ -43,7 +45,7 @@ function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
-export default function GridPending({ searchId, projectId, totalPoints, queueMode, keyword, target, gridSize, startedAt }: Props) {
+export default function GridPending({ searchId, projectId, totalPoints, queueMode, keyword, target, gridSize, layout = DEFAULT_GRID_LAYOUT, startedAt }: Props) {
   const router = useRouter();
   const [ready, setReady] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -135,7 +137,7 @@ export default function GridPending({ searchId, projectId, totalPoints, queueMod
           <p className="text-sm font-bold text-slate-900 dark:text-white">{keyword}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
             Target: <span className="font-bold text-slate-600 dark:text-slate-300">{target}</span>
-            {' · '}{gridSize}×{gridSize} grid
+            {' · '}{describeGridLayout(gridSize, layout)}
           </p>
         </div>
 

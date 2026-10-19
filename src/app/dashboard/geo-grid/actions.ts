@@ -35,6 +35,7 @@ export async function updateGridSchedule(formData: FormData) {
         grid_size: entry.grid_size,
         spacing_km: entry.spacing_km,
         language: entry.language,
+        layout: entry.layout,
         queue_mode: queueMode === 'priority' || queueMode === 'standard' ? queueMode : 'standard',
         frequency,
         weekday: frequency === 'weekly' ? Number(formData.get('weekday')) : null,

@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, lazy, Suspense } from 'react';
+import { useMemo, useState, lazy, Suspense } from 'react';
 import { LANGUAGES } from '@/lib/geo-options';
 import { formatBusinessTarget } from '@/lib/grid-target';
 import { formatDistance, spacingOptions, type DistanceUnit } from '@/lib/grid-preferences';
+import {
+  DEFAULT_GRID_LAYOUT, GRID_SHAPES, gridCellKey, gridLayoutCells, gridLayoutParams, gridPointCount, normalizeGridLayout,
+  normalizeRotation, type GridLayout, type GridShape,
+} from '@/lib/grid-layout';
 import { useGridPreferences } from './GridPreferences';
 
 const MapPicker = lazy(() => import('./MapPicker'));
@@ -26,6 +30,7 @@ interface Props {
     spacingKm?: string;
     gridTarget?: string;
     queueMode?: string;
+    gridLayout?: GridLayout;
   };
 }
 
@@ -52,30 +57,69 @@ function formatLiveDuration(totalPoints: number) {
   return `~${Math.ceil(seconds / 60)} min`;
 }
 
-function GridPreview({ size, spacingKm, unit }: { size: number; spacingKm: number; unit: DistanceUnit }) {
-  const half = Math.floor(size / 2);
+function ShapeIcon({ shape }: { shape: GridShape }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-2">
-      <div
-        className="inline-grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
-      >
-        {Array.from({ length: size * size }).map((_, i) => {
-          const row = Math.floor(i / size);
-          const col = i % size;
-          const isCenter = row === half && col === half;
-          return (
-            <div
-              key={i}
-              className={`rounded-sm ${isCenter ? 'bg-blue-500 ring-2 ring-blue-300' : 'bg-slate-200 dark:bg-slate-700'}`}
-              style={{ width: Math.max(12, 48 / size), height: Math.max(12, 48 / size) }}
-            />
-          );
-        })}
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      {shape === 'square' && <rect x="2.5" y="2.5" width="11" height="11" rx="1" />}
+      {shape === 'diamond' && <path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" strokeLinejoin="round" />}
+      {shape === 'circle' && <circle cx="8" cy="8" r="6" />}
+    </svg>
+  );
+}
+
+/** Schematic of the scanned points. Clicking a point skips it (or adds it back); the center always stays. */
+function GridPreview({ size, spacingKm, unit, layout, onToggle, onResetSkipped }: {
+  size: number; spacingKm: number; unit: DistanceUnit; layout: GridLayout;
+  onToggle: (row: number, col: number) => void; onResetSkipped: () => void;
+}) {
+  const cells = new Map(gridLayoutCells(size, layout).map((cell) => [gridCellKey(cell.row, cell.col), cell]));
+  const cellPx = size <= 5 ? 20 : size <= 7 ? 17 : 14;
+  const pointCount = gridPointCount(size, layout);
+  return (
+    <div className="flex flex-col items-center gap-3 py-2">
+      {/* Padding leaves room for the corners once the lattice is rotated. */}
+      <div className="p-3">
+        <div
+          className="inline-grid gap-1 transition-transform duration-200"
+          style={{ gridTemplateColumns: `repeat(${size}, ${cellPx}px)`, transform: `rotate(${layout.rotationDeg}deg)` }}
+        >
+          {Array.from({ length: size * size }).map((_, i) => {
+            const row = Math.floor(i / size);
+            const col = i % size;
+            const cell = cells.get(gridCellKey(row, col));
+            if (!cell) return <span key={i} style={{ width: cellPx, height: cellPx }} aria-hidden="true" />;
+            if (cell.isCenter) {
+              return <span key={i} title="Grid center (always scanned)" className="rounded-sm bg-blue-500 ring-2 ring-blue-300" style={{ width: cellPx, height: cellPx }} />;
+            }
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onToggle(row, col)}
+                aria-pressed={!cell.excluded}
+                aria-label={`${cell.excluded ? 'Add back' : 'Skip'} point row ${row + 1}, column ${col + 1}`}
+                title={cell.excluded ? 'Skipped — click to scan this point' : 'Click to skip this point'}
+                className={`rounded-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  cell.excluded
+                    ? 'border border-dashed border-slate-300 bg-transparent hover:border-blue-400 dark:border-slate-600'
+                    : 'bg-slate-300 hover:bg-red-300 dark:bg-slate-600 dark:hover:bg-red-400/60'
+                }`}
+                style={{ width: cellPx, height: cellPx }}
+              />
+            );
+          })}
+        </div>
       </div>
-      <p className="text-[10px] text-slate-400 font-medium">
-        {size}×{size} points · {formatDistance(spacingKm, unit)} spacing · ~{formatDistance((size - 1) * spacingKm, unit, 1)} coverage
+      <p className="text-[10px] text-slate-400 font-medium text-center">
+        {pointCount} points · {formatDistance(spacingKm, unit)} spacing · ~{formatDistance((size - 1) * spacingKm, unit, 1)} coverage
+        {layout.excluded.length > 0 && (
+          <>
+            {' · '}{layout.excluded.length} skipped{' '}
+            <button type="button" onClick={onResetSkipped} className="font-black uppercase tracking-widest text-blue-600 hover:text-blue-800">Reset</button>
+          </>
+        )}
       </p>
+      <p className="text-[10px] text-slate-400 -mt-2">Click a point here or on the map to skip it — skipped points are not billed.</p>
     </div>
   );
 }
@@ -91,6 +135,21 @@ export default function LocalFinderForm({ defaults }: Props) {
   const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'live');
   const [language, setLanguage] = useState(defaults.language || 'English');
   const [gridTarget, setGridTarget] = useState(defaults.gridTarget ?? '');
+  const initialLayout = defaults.gridLayout ?? DEFAULT_GRID_LAYOUT;
+  const [gridShape, setGridShape] = useState<GridShape>(initialLayout.shape);
+  const [rotationDeg, setRotationDeg] = useState(initialLayout.rotationDeg);
+  const [excludedCells, setExcludedCells] = useState<string[]>(initialLayout.excluded);
+  // The layout is fixed at creation: shape, rotation and skipped points become part of the monitor.
+  const gridLayout = useMemo(
+    () => normalizeGridLayout({ shape: gridShape, rotationDeg, excluded: excludedCells }, gridSize),
+    [gridShape, rotationDeg, excludedCells, gridSize],
+  );
+  const pointCount = gridPointCount(gridSize, gridLayout);
+
+  function toggleCell(row: number, col: number) {
+    const key = gridCellKey(row, col);
+    setExcludedCells((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  }
   const { distanceUnit } = useGridPreferences();
   const spacingChoices = spacingOptions(distanceUnit, spacingKm);
 
@@ -157,6 +216,8 @@ export default function LocalFinderForm({ defaults }: Props) {
               showGrid={isGrid && !!coordinate}
               gridSize={isGrid ? gridSize : undefined}
               spacingKm={isGrid ? spacingKm : undefined}
+              gridLayout={isGrid ? gridLayout : undefined}
+              onToggleCell={isGrid ? toggleCell : undefined}
               distanceUnit={distanceUnit}
               language={language}
               onBusinessSelect={isGrid ? (business) => setGridTarget(formatBusinessTarget(business.title, business.cid)) : undefined}
@@ -205,14 +266,18 @@ export default function LocalFinderForm({ defaults }: Props) {
               <select
                 name="grid_size"
                 value={gridSize}
-                onChange={(e) => setGridSize(parseInt(e.target.value, 10))}
+                onChange={(e) => {
+                  setGridSize(parseInt(e.target.value, 10));
+                  // Skipped cells are row/column positions, which mean other places on another grid size.
+                  setExcludedCells([]);
+                }}
                 className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
               >
-                <option value="3">3×3 (9 points)</option>
-                <option value="5">5×5 (25 points)</option>
-                <option value="7">7×7 (49 points)</option>
-                <option value="9">9×9 (81 points)</option>
-                <option value="11">11×11 (121 points)</option>
+                {[3, 5, 7, 9, 11].map((size) => (
+                  <option key={size} value={size}>
+                    {size}×{size} ({gridPointCount(size, { shape: gridShape, rotationDeg: 0, excluded: [] })} points)
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -229,10 +294,76 @@ export default function LocalFinderForm({ defaults }: Props) {
             </div>
           </div>
 
+          {/* Grid shape + rotation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid shape</label>
+              <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Grid shape">
+                {GRID_SHAPES.map((option) => {
+                  const active = gridShape === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        setGridShape(option.value);
+                        setExcludedCells([]);
+                      }}
+                      className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-black transition-all ${
+                        active
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <ShapeIcon shape={option.value} />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="grid-rotation" className="block text-xs font-black uppercase tracking-widest text-slate-400">Rotation</label>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs font-black tabular-nums text-slate-700 dark:text-slate-200">{rotationDeg}°</span>
+                  {rotationDeg !== 0 && (
+                    <button type="button" onClick={() => setRotationDeg(0)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">
+                      Reset
+                    </button>
+                  )}
+                </span>
+              </div>
+              <input
+                id="grid-rotation"
+                type="range"
+                min={-45}
+                max={44}
+                step={1}
+                value={rotationDeg}
+                onChange={(e) => setRotationDeg(normalizeRotation(Number(e.target.value)))}
+                className="w-full accent-blue-600 mt-2"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Align the grid with the street layout or coastline.</p>
+            </div>
+          </div>
+          {Object.entries(gridLayoutParams(gridLayout)).map(([name, value]) => (
+            <input key={name} type="hidden" name={name} value={value} />
+          ))}
+
           {/* Grid preview */}
           <div className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 text-center">Grid preview</p>
-            <GridPreview size={gridSize} spacingKm={spacingKm} unit={distanceUnit} />
+            <GridPreview
+              size={gridSize}
+              spacingKm={spacingKm}
+              unit={distanceUnit}
+              layout={gridLayout}
+              onToggle={toggleCell}
+              onResetSkipped={() => setExcludedCells([])}
+            />
           </div>
 
           {/* Queue mode */}
@@ -242,8 +373,7 @@ export default function LocalFinderForm({ defaults }: Props) {
             <div className="grid grid-cols-3 gap-2">
               {QUEUE_MODES.map((mode) => {
                 const active = queueMode === mode.value;
-                const totalPoints = gridSize * gridSize;
-                const estCost = formatCost(totalPoints * mode.costPerPoint);
+                const estCost = formatCost(pointCount * mode.costPerPoint);
                 return (
                   <button
                     key={mode.value}
@@ -266,7 +396,7 @@ export default function LocalFinderForm({ defaults }: Props) {
             </div>
             <p className="text-[11px] text-slate-400 mt-2">
               {queueMode === 'live' ? (
-                <>Blocks the page for {formatLiveDuration(gridSize * gridSize)} — DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
+                <>Blocks the page for {formatLiveDuration(pointCount)} — DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
               ) : queueMode === 'priority' ? (
                 <>Tasks are queued with DataForSEO’s high-priority flag. The page will auto-refresh every 10 seconds until results are ready.</>
               ) : (

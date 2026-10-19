@@ -1,4 +1,5 @@
 import type { GridPoint, GridLocalItem } from '@/lib/db';
+import type { GridShape } from '@/lib/grid-layout';
 
 export interface GridSummary {
   totalPoints: number;
@@ -99,13 +100,18 @@ export interface RingStat {
   top3Pct: number;
 }
 
-/** Buckets grid points into concentric rings around the center and summarizes rank per ring — reveals how far the target's visibility actually reaches. */
-export function computeRingStats(results: GridPoint[], gridSize: number, spacingKm: number): RingStat[] {
+/**
+ * Buckets grid points into concentric rings around the center and summarizes rank per ring — reveals how far the target's visibility actually reaches.
+ * Square grids use square rings (their outline); diamonds and circles use round distance, which their outline approximates.
+ */
+export function computeRingStats(results: GridPoint[], gridSize: number, spacingKm: number, shape: GridShape = 'square'): RingStat[] {
   const half = Math.floor(gridSize / 2);
   const byRing = new Map<number, GridPoint[]>();
 
   for (const p of results) {
-    const ring = Math.max(Math.abs(p.row - half), Math.abs(p.col - half));
+    const dr = Math.abs(p.row - half);
+    const dc = Math.abs(p.col - half);
+    const ring = shape === 'square' ? Math.max(dr, dc) : Math.round(Math.hypot(dr, dc));
     if (!byRing.has(ring)) byRing.set(ring, []);
     byRing.get(ring)!.push(p);
   }
