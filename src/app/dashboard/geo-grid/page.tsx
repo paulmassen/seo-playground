@@ -185,7 +185,13 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
         top11Plus: points.filter((point) => point.rank !== null && point.rank >= 11).length,
       }];
     });
-  const latestBySeries = Array.from(new Map(gridHistory.map((entry) => [entry.series_id, entry])).values());
+  // gridHistory is newest-first: keep the first entry seen per series (its latest run).
+  // A plain `new Map(entries)` would let each older run overwrite it, surfacing the creation run.
+  const latestBySeriesMap = new Map<string, GridSearchEntry>();
+  for (const entry of gridHistory) {
+    if (!latestBySeriesMap.has(entry.series_id)) latestBySeriesMap.set(entry.series_id, entry);
+  }
+  const latestBySeries = Array.from(latestBySeriesMap.values());
 
   const formDefaults = {
     keyword: (params.keyword ?? gridEntry?.keyword ?? '').toString(),
