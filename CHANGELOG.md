@@ -9,6 +9,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.2] — 2026-10-19
+
+### Added
+- **Geo-grid shapes, rotation and skipped points** — when creating a monitor, choose a square, diamond or circle grid, rotate it from -45° to 44° to follow the street layout or a coastline, and click any point in the grid preview or on the map to skip it. Skipped points are never sent to DataForSEO, so they are not billed; the point count, cost and duration estimates follow the actual grid. The layout is fixed when the monitor is created and belongs to its identity: scheduled checks, "Run now", progress, "Visibility by distance" (round distance rings for diamonds and circles) and the PDF report all use it. Existing monitors keep their square grid, their identity and their whole history; the database gains a `grid_layout` column automatically on startup.
+- **Competitor switcher on the Geo-grid map** — a "Show on map" row (you plus the top 5 competitors, with their visibility) sits right above the analysis map, so switching between businesses no longer means scrolling between the competitor list and the map.
+
+### Changed
+- **Geo-grid monitor form in two columns** — keyword, language, map and target on the left; grid size, spacing, shape, rotation, preview and API mode on the right, next to the map. The form uses the full page width; the monitors list only appears beside an open monitor, in a narrower column.
+- **Competitive landscape below the map** — the detailed competitor table now follows the map, and its "View on grid" button brings the map back into view. "Back to target" is replaced by the "You" chip.
+- **Map preview framing** — the location map in the monitor form now frames the grid when the form is opened, instead of keeping the zoom computed while it was collapsed.
+
+### Fixed
+- **Geo-grid "Last run" date** — the monitor list showed the date, visibility and link of each monitor's first run instead of its latest one, so scheduled monitors looked like they never ran.
+
+---
+
 ## [0.6.1] — 2026-10-16
 
 ### Fixed

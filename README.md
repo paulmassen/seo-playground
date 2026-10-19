@@ -6,6 +6,12 @@
 
 SEO Playground is actively evolving. Highlights of the latest releases:
 
+### v0.6.2 — 2026-10-19
+
+- 🔷 **Geo-grid shapes and rotation** — square, diamond or circle grids, rotated to follow the streets.
+- 🎯 **Skip grid points** — click a point to leave it out of the scan; skipped points are not billed.
+- 🗺️ **Faster competitor comparison** — switch the Geo-grid map between you and your top competitors in one click.
+
 ### v0.6.0 — 2026-10-10
 
 - 🏆 **Review Velocity** — compare how fast a Google listing gains reviews against up to 10 local competitors, with a ranked PDF/Excel report.
@@ -81,7 +87,7 @@ https://github.com/user-attachments/assets/fb506723-0996-4704-a6a5-b12b1115b805
 - **Backlinks Domain Intersection** — Domains linking to you and a competitor
 - **Bulk Backlinks / Bulk Referring Domains** — Aggregated backlink metrics for a domain list
 - **Local Finder** — Google local pack results for any keyword and location, with map-based coordinate picker
-- **Geo-Grid Ranking** — Local visibility heatmap across a configurable grid of points (3×3 to 11×11), with a timeline of snapshots and point-by-point movement against the previous run. Choose between three API modes: Live (~6 s, instant results), Priority (~1 min, 40% cheaper) or Standard (background queue, 70% cheaper). A grid can be scheduled daily or weekly.
+- **Geo-Grid Ranking** — Local visibility heatmap across a configurable grid of points (3×3 to 11×11; square, diamond or circle, optionally rotated, with any point skippable), with a timeline of snapshots and point-by-point movement against the previous run. Choose between three API modes: Live (~6 s, instant results), Priority (~1 min, 40% cheaper) or Standard (background queue, 70% cheaper). A grid can be scheduled daily or weekly.
 - **On-Page Site Audit** — Full site crawl with pages, links, resources, duplicate tags and non-indexable pages
 - **On-Page Instant Pages** — Instant single-page audit without crawling
 - **Microdata Analysis** — Structured data inspection for any crawled URL
@@ -296,6 +302,7 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 
 Full detailed history: [CHANGELOG.md](CHANGELOG.md).
 
+- **2026-10-19 — v0.6.2** — Geo-grid improvements: square, diamond or circle grids with a rotation, and points you can skip (and are not billed for) when creating a monitor. Two-column monitor form with the map next to the grid settings, and a one-click competitor switcher above the analysis map. The monitor list now shows each monitor's latest run instead of its first.
 - **2026-10-16 — v0.6.1** — Geo-grid PDF reports no longer show OpenStreetMap's "Access blocked" tiles behind strict proxies such as Cloudron.
 - **2026-10-10 — v0.6.0** — Review Velocity, Broken Backlinks, sidebar favorites, Geo-grid in miles. Paid endpoints now require POST, CSV exports are formula-safe, and Rank Tracker can no longer bill a keyword twice. Referring Domains works again.
 - **2026-10-09 — v0.5.0** — Optional email + password login (`AUTH_ENABLED=true`). Cloudron community app package. Searches, checks and settings changes always save to the project they started in, even if you switch projects meanwhile. Node launches listen on `127.0.0.1` by default (`SEO_PLAYGROUND_BIND` to override). OpenStreetMap maps work behind strict proxies. **Prompt Tracker** (`/dashboard/prompt-tracker`): save prompts and re-run them on demand or daily to check brand/domain mentions in ChatGPT, Claude, Gemini and Perplexity answers, with stored answers, sources and costs, a mention calendar, and PDF/Markdown exports. **White-label reports**: Settings now control the brand name, an uploaded PNG/JPEG logo, the report colour, a straight or wavy header, and the footer text, background, text and link colours; the same identity applies to Site Audit, Google Reviews, AI Visibility, Geo-grid and Prompt Tracker PDFs. Geo-grid PDFs no longer overflow their competitor table, and logos keep their proportions. Rank Tracker shows AI Overview citations and the top 10 of each check. AI Prompt Test offers every DataForSEO model, with a default per platform.
