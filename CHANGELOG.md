@@ -7,7 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.6.3] — 2026-10-19
+
+### Added
+- **Review Velocity and Rank Tracker notifications in the bell** — the top-bar bell now lists Review Velocity analyses and Rank Tracker checks that are still fetching or ready to open. Fetches are collected from the bell too, so work completes even when you are on another page. A finished analysis or check stays in the bell until you open it, including after a reload; failures are identified. Existing work is not announced on upgrade.
+
+### Changed
+- The top-bar "Geo-grid tasks" bell is now "Tasks", since it covers Geo-grid, Review Velocity and Rank Tracker.
+
 ### Fixed
+- **SQLite test reliability** — database-backed Vitest suites now run serially, preventing false timeout failures from concurrent worker contention.
+- **Geo-grid miles/km preference** — Local Finder now receives the saved distance unit wherever the shared form is used, and the map labels `0.5 km` consistently instead of switching to `500 m`.
 - **Geo-grid competitors with several Google Business Profiles** — competitors were grouped by website, so each location of a multi-location business (e.g. two clinics of the same chain) was merged into one row, mixing their rankings and pushing grid presence above 100%. Competitors are now identified by their Google listing (CID), and a listing counts once per grid point. Older snapshots without a CID fall back to the business name. ([#16](https://github.com/paulmassen/seo-playground/issues/16))
 
 ---

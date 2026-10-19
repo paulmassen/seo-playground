@@ -30,7 +30,14 @@ async function DashboardPage() {
     return (
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-10 max-w-lg mx-auto mt-10">
         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">DataForSEO Login</h2>
-        <p className="text-slate-500 text-sm mb-8">Enter your DataForSEO API credentials to get started. Stored locally only.</p>
+        <p className="text-slate-500 text-sm mb-6">Enter your DataForSEO API credentials to get started. Stored locally only.</p>
+        <aside className="mb-8 border-l-2 border-blue-500 bg-blue-50/70 px-4 py-3.5 dark:border-blue-400 dark:bg-blue-950/25">
+          <p className="text-xs font-bold text-slate-800 dark:text-slate-100">New to DataForSEO?</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+            You can choose to <a href="https://try.dataforseo.com/nrjev32kinaz" target="_blank" rel="noreferrer" className="font-bold text-blue-700 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-100">create a DataForSEO account through this affiliate link ↗</a>{' '}to support SEO Playground&apos;s development, at no extra cost to you.
+          </p>
+          <p className="mt-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">Affiliate link for new customers only — I may earn a commission if you become a customer.</p>
+        </aside>
         <form action={saveCredentialsAction} className="space-y-4">
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">API Login</label>

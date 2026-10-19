@@ -1,3 +1,9 @@
+[0.6.3]
+* Update to SEO Playground 0.6.3
+* New: the dashboard bell follows Review Velocity and Rank Tracker checks across every page, and keeps completed checks until opened
+* Fix: Geo-grid distance units (km/miles) apply consistently wherever the shared grid form is used
+* New DataForSEO users can optionally support SEO Playground through a disclosed affiliate link during setup
+
 [0.6.2]
 * Update to SEO Playground 0.6.2
 * Geo-grid: create square, diamond or circle monitors, rotate the grid to follow streets or coastlines, and skip individual points so they are not billed

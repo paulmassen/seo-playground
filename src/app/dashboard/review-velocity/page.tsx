@@ -7,7 +7,7 @@ import { getCredentials, getCurrentProject, getSetting } from '@/lib/db';
 import { getBrandSettings } from '@/lib/brand-server';
 import { buildComparisonReport, CRITERIA, formatCriterion, rgbCss, seriesColors, type ComparisonReport } from '@/lib/review-report';
 import { comparisonReportMetrics, comparisonReportSections } from '@/lib/review-report-pdf';
-import { getBenchmark, getBenchmarkListings, getReviewsByListing, getTasks, listBenchmarks, type Benchmark } from '@/lib/review-velocity-db';
+import { getBenchmark, getBenchmarkListings, getReviewsByListing, getTasks, listBenchmarks, markAnalysisSeen, type Benchmark } from '@/lib/review-velocity-db';
 import { collectReviewTasks } from '@/lib/review-velocity-tasks';
 import AutoRefresh from '@/components/AutoRefresh';
 import ExportExcelButton from '@/components/ExportExcelButton';
@@ -68,6 +68,8 @@ async function ReviewVelocityPage({ searchParams }: { searchParams: Promise<Sear
   if (active && credentials) {
     try { await collectReviewTasks(projectId, credentials, active.id); } catch { /* shown as still pending */ }
   }
+  // Opening the analysis clears its bell notification (after collecting, so a fetch finished just now is not lost).
+  if (active) markAnalysisSeen(active.id, projectId);
 
   const benchmarks = listBenchmarks();
   const historyItems = benchmarks.map((b) => (

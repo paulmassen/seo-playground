@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import {
   getCredentials, getTrackedKeywords, getRankHistory, getLatestRankCheck,
-  getSetting, getTargetDomains, getPendingRankTasks, getRankTrackerSchedule,
+  getSetting, getTargetDomains, getPendingRankTasks, getRankTrackerSchedule, markRankTaskSeen,
 } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
 import {
@@ -19,7 +19,7 @@ import RankTrackerScheduleControl from './RankTrackerScheduleControl';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SearchParams = { domain?: string };
+type SearchParams = { domain?: string; task_id?: string };
 
 const inputCls = 'w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-slate-900 dark:text-white text-sm font-medium transition-all';
 
@@ -44,6 +44,8 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
 
   // Active domain from URL, or first available
   const activeDomain = params.domain ?? domains[0] ?? null;
+  // A completed task is cleared only when its notification destination is opened.
+  if (params.task_id) markRankTaskSeen(params.task_id);
 
   // Keywords for the active domain
   const keywords = activeDomain ? allKeywords.filter((k) => k.domain === activeDomain) : [];

@@ -6,6 +6,12 @@
 
 SEO Playground is actively evolving. Highlights of the latest releases:
 
+### v0.6.3 — 2026-10-19
+
+- 🔔 **Unified task notifications** — the bell tracks Geo-grid, Review Velocity and Rank Tracker work across the dashboard, including completed checks until opened.
+- 📐 **Consistent Geo-grid units** — miles/km preferences now apply wherever the shared Geo-grid form appears.
+- 🤝 **Support the project** — new DataForSEO users can choose the disclosed affiliate link during setup, at no extra cost.
+
 ### v0.6.2 — 2026-10-19
 
 - 🔷 **Geo-grid shapes and rotation** — square, diamond or circle grids, rotated to follow the streets.
@@ -302,6 +308,7 @@ Search history and results are cached locally in `seo-playground.db`. The databa
 
 Full detailed history: [CHANGELOG.md](CHANGELOG.md).
 
+- **2026-10-19 — v0.6.3** — The dashboard bell now follows Geo-grid, Review Velocity and Rank Tracker tasks while you work elsewhere, keeping completions until opened. Geo-grid mile/km labels are consistent throughout the shared form and map preview. New users can optionally support development through a disclosed DataForSEO affiliate link during setup.
 - **2026-10-19 — v0.6.2** — Geo-grid improvements: square, diamond or circle grids with a rotation, and points you can skip (and are not billed for) when creating a monitor. Two-column monitor form with the map next to the grid settings, and a one-click competitor switcher above the analysis map. The monitor list now shows each monitor's latest run instead of its first.
 - **2026-10-16 — v0.6.1** — Geo-grid PDF reports no longer show OpenStreetMap's "Access blocked" tiles behind strict proxies such as Cloudron.
 - **2026-10-10 — v0.6.0** — Review Velocity, Broken Backlinks, sidebar favorites, Geo-grid in miles. Paid endpoints now require POST, CSV exports are formula-safe, and Rank Tracker can no longer bill a keyword twice. Referring Domains works again.

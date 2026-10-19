@@ -8,12 +8,13 @@ process.env.DB_PATH = path.join(tmpDir, 'test.db');
 
 import { getActiveProject } from './db';
 import {
-  createBenchmark, deleteBenchmark, getBenchmarkListings, getPendingTasks, getReviewsByListing, getTasks, reserveTask,
+  createBenchmark, deleteBenchmark, getAnalysisActivity, getBenchmarkListings, getPendingTasks, getReviewsByListing, getTasks, markAnalysisSeen, reserveTask,
 } from './review-velocity-db';
 import { backfillRequests, collectReviewTasks, postReviewTasks, refreshRequests, toStoredReview, type ApiReview } from './review-velocity-tasks';
 
 const DAY = 86_400_000;
 const credentials = { login: 'l', pass: 'p' };
+let taskCounter = 0;
 
 afterAll(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 afterEach(() => vi.unstubAllGlobals());
@@ -37,12 +38,11 @@ function json(body: unknown) {
 /** Minimal DataForSEO stand-in: accepts posts, reports every task ready, serves results by cid. */
 function stubApi(resultsByCid: Record<string, { items: ApiReview[]; total: number }>) {
   const posted: Array<{ id: string; cid: string; depth: number; tag: string }> = [];
-  let counter = 0;
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith('/task_post')) {
       const body = JSON.parse(String(init?.body)) as Array<{ cid: string; depth: number; tag: string }>;
       const tasks = body.map((task) => {
-        const id = `task-${++counter}`;
+        const id = `task-${++taskCounter}`; // unique across tests: task IDs are primary keys in the shared test DB
         posted.push({ id, cid: task.cid, depth: task.depth, tag: task.tag });
         return { id, status_code: 20100, cost: Math.ceil(task.depth / 10) * 0.00075, data: { tag: task.tag } };
       });
@@ -155,5 +155,55 @@ describe('review task lifecycle', () => {
     deleteBenchmark(benchmark.id, projectId);
     expect(getBenchmarkListings(benchmark.id, projectId)).toHaveLength(0);
     expect(getTasks(benchmark.id, 10, projectId).every((t) => t.status === 'error')).toBe(true);
+  });
+});
+
+describe('bell notifications', () => {
+  it('shows an analysis while it fetches, announces it once ready, and stops once it has been opened', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const projectId = getActiveProject().id;
+      const start = Date.UTC(2026, 9, 1, 10);
+      vi.setSystemTime(start);
+      const { benchmark, listings } = createBenchmark(
+        { name: 'Bell check', keyword: 'bell', center: '45.76,4.83', radiusKm: 2, language: 'French', timeZone: 'UTC' },
+        [{ cid: 'bell-a', title: 'Bell A', lat: 45.76, lng: 4.83 }], projectId,
+      );
+      markAnalysisSeen(benchmark.id, projectId); // what opening the analysis page does
+      const mine = (activity: ReturnType<typeof getAnalysisActivity>) => ({
+        running: activity.running.filter((a) => a.id === benchmark.id),
+        finished: activity.finished.filter((a) => a.id === benchmark.id),
+      });
+
+      // Reviews spread over 5 months, so the first fetch already covers the 3-month window.
+      stubApi({ 'bell-a': { items: apiReviews('bell', 5, 30, start), total: 5 } });
+      expect(mine(getAnalysisActivity(projectId))).toEqual({ running: [], finished: [] });
+
+      await postReviewTasks(projectId, credentials, benchmark, backfillRequests(listings));
+      expect(mine(getAnalysisActivity(projectId)).running).toEqual([expect.objectContaining({ id: benchmark.id, pending: 1 })]);
+
+      // The fetch completes while the user is elsewhere: the feed collects it, so the bell announces it.
+      vi.setSystemTime(start + 60_000);
+      await collectReviewTasks(projectId, credentials, null, Date.now());
+      let activity = mine(getAnalysisActivity(projectId));
+      expect(activity.running).toEqual([]);
+      expect(activity.finished).toEqual([expect.objectContaining({ id: benchmark.id, failed: 0 })]);
+
+      // Opening the analysis clears the notification.
+      vi.setSystemTime(start + 120_000);
+      markAnalysisSeen(benchmark.id, projectId);
+      expect(mine(getAnalysisActivity(projectId)).finished).toEqual([]);
+
+      // A later refresh that completes is announced again.
+      vi.setSystemTime(start + 2 * 3_600_000);
+      await postReviewTasks(projectId, credentials, benchmark, backfillRequests(listings));
+      expect(mine(getAnalysisActivity(projectId)).running).toHaveLength(1);
+      vi.setSystemTime(start + 2 * 3_600_000 + 60_000);
+      await collectReviewTasks(projectId, credentials, null, Date.now());
+      activity = mine(getAnalysisActivity(projectId));
+      expect(activity.finished).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

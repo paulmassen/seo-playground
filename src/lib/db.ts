@@ -417,7 +417,8 @@ function initSchema(db: Database.Database) {
       cost REAL,
       created_at INTEGER NOT NULL,
       completed_at INTEGER,
-      error_message TEXT
+      error_message TEXT,
+      ready_seen_at INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS rank_tracker_schedules (
@@ -886,6 +887,14 @@ function initSchema(db: Database.Database) {
   addColumnIfMissing(db, 'reviews_tasks', 'ADD COLUMN meta TEXT');
   addColumnIfMissing(db, 'rank_checks', 'ADD COLUMN ai_overview INTEGER');
   addColumnIfMissing(db, 'rank_checks', 'ADD COLUMN top_results TEXT');
+  // Existing completed checks predate bell notifications: mark only those migration rows as seen.
+  const rankTaskColumns = db.prepare('PRAGMA table_info(rank_tasks)').all() as Array<{ name: string }>;
+  if (!rankTaskColumns.some((column) => column.name === 'ready_seen_at')) {
+    db.transaction(() => {
+      db.exec('ALTER TABLE rank_tasks ADD COLUMN ready_seen_at INTEGER');
+      db.prepare("UPDATE rank_tasks SET ready_seen_at = completed_at WHERE status IN ('done', 'failed')").run();
+    })();
+  }
   addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN keyword TEXT');
   addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN technology TEXT');
   addColumnIfMissing(db, 'hist_rank_searches', `ADD COLUMN date_from TEXT NOT NULL DEFAULT ''`);
@@ -1578,6 +1587,52 @@ export function getPendingRankTasks(): PendingRankTask[] {
 
 export function getPendingRankTasksForProject(projectId: string): PendingRankTask[] {
   return pendingRankTasksFromDb(getDbForProject(projectId));
+}
+
+export interface RankTaskActivityItem {
+  taskId: string;
+  keyword: string;
+  domain: string;
+  status: 'posting' | 'pending' | 'done' | 'failed';
+  finishedAt: number | null;
+}
+
+export interface RankTaskActivity {
+  running: RankTaskActivityItem[];
+  finished: RankTaskActivityItem[];
+}
+
+/** Active Rank Tracker requests plus completed requests not yet opened from the bell. */
+export function getRankTaskActivity(projectId?: string): RankTaskActivity {
+  const db = projectId ? getDbForProject(projectId) : getDb();
+  const rows = db.prepare(`
+    SELECT rank_tasks.task_id, rank_tasks.status, rank_tasks.completed_at, tracked_keywords.keyword, tracked_keywords.domain
+    FROM rank_tasks
+    JOIN tracked_keywords ON tracked_keywords.id = rank_tasks.keyword_id
+    WHERE rank_tasks.status IN ('posting', 'pending')
+       OR (rank_tasks.status IN ('done', 'failed') AND rank_tasks.completed_at > COALESCE(rank_tasks.ready_seen_at, 0))
+    ORDER BY COALESCE(rank_tasks.completed_at, rank_tasks.created_at) DESC
+  `).all() as Array<{ task_id: string; status: RankTaskActivityItem['status']; completed_at: number | null; keyword: string; domain: string }>;
+  const items = rows.map((row) => ({
+    taskId: row.task_id,
+    keyword: row.keyword,
+    domain: row.domain,
+    status: row.status,
+    finishedAt: row.completed_at,
+  }));
+  return {
+    running: items.filter((item) => item.status === 'posting' || item.status === 'pending'),
+    finished: items.filter((item) => item.status === 'done' || item.status === 'failed'),
+  };
+}
+
+/** Clears one specific Rank Tracker completion after the user opens it from the notification bell. */
+export function markRankTaskSeen(taskId: string, projectId?: string): void {
+  const db = projectId ? getDbForProject(projectId) : getDb();
+  db.prepare(`
+    UPDATE rank_tasks SET ready_seen_at = ?
+    WHERE task_id = ? AND status IN ('done', 'failed')
+  `).run(Date.now(), taskId);
 }
 
 export function completeRankTaskForProject(

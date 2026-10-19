@@ -5,7 +5,7 @@ import { SIDEBAR_COLLAPSED_COOKIE, SIDEBAR_FAVORITES_COOKIE, parseCollapsedSecti
 import BalanceBadge from '@/components/BalanceBadge';
 import ThemeToggle from '@/components/ThemeToggle';
 import UpdateBanner from '@/components/UpdateBanner';
-import GridTaskCenter from '@/components/GridTaskCenter';
+import TaskCenter from '@/components/TaskCenter';
 import ProjectSync from '@/components/ProjectSync';
 import AccountMenu from '@/components/AccountMenu';
 import { getSession } from '@/lib/auth';
@@ -33,7 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <UpdateBanner />
         <header className="h-14 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-end px-6 shrink-0 gap-3">
-          <GridTaskCenter />
+          <TaskCenter />
           <ThemeToggle />
           <BalanceBadge />
           {accountEmail && <AccountMenu email={accountEmail} />}

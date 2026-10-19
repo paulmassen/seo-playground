@@ -107,6 +107,15 @@ function ensureSchema(db: Database.Database): void {
       if (!(error instanceof Error && /duplicate column name/i.test(error.message))) throw error;
     }
   }
+  // Last time the user opened each analysis; the bell announces a completion only after it.
+  // Analyses that already exist count as seen, so upgrading does not announce them all at once.
+  const columns = db.prepare('PRAGMA table_info(rv_benchmarks)').all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === 'ready_seen_at')) {
+    db.transaction(() => {
+      db.exec('ALTER TABLE rv_benchmarks ADD COLUMN ready_seen_at INTEGER');
+      db.prepare('UPDATE rv_benchmarks SET ready_seen_at = ?').run(Date.now());
+    })();
+  }
   initialised.add(db);
 }
 
@@ -274,6 +283,40 @@ export function listBenchmarks(projectId?: string): BenchmarkSummary[] {
 
 export function touchBenchmark(id: string, projectId?: string): void {
   rvDb(projectId).prepare('UPDATE rv_benchmarks SET updated_at = ? WHERE id = ?').run(Date.now(), id);
+}
+
+/** Records that the user has seen the analysis, so its completion is no longer announced by the bell. */
+export function markAnalysisSeen(id: string, projectId?: string): void {
+  rvDb(projectId).prepare('UPDATE rv_benchmarks SET ready_seen_at = ? WHERE id = ?').run(Date.now(), id);
+}
+
+export interface AnalysisRunning { id: string; name: string; keyword: string; pending: number }
+export interface AnalysisFinished { id: string; name: string; keyword: string; finishedAt: number; failed: number }
+export interface AnalysisActivity { running: AnalysisRunning[]; finished: AnalysisFinished[] }
+
+/**
+ * Bell feed. `running`: analyses with fetches in flight. `finished`: analyses with no fetch left in flight
+ * whose last fetch completed after the user last opened them (`failed` counts the fetches that errored).
+ */
+export function getAnalysisActivity(projectId?: string): AnalysisActivity {
+  const rows = rvDb(projectId).prepare(`
+    SELECT b.id, b.name, b.keyword, b.ready_seen_at,
+      (SELECT COUNT(*) FROM rv_tasks t WHERE t.benchmark_id = b.id AND t.status IN ('posting', 'pending')) AS active_tasks,
+      (SELECT MAX(t.completed_at) FROM rv_tasks t WHERE t.benchmark_id = b.id AND t.status IN ('ready', 'error')) AS finished_at,
+      (SELECT COUNT(*) FROM rv_tasks t WHERE t.benchmark_id = b.id AND t.status = 'error' AND t.completed_at > COALESCE(b.ready_seen_at, 0)) AS failed
+    FROM rv_benchmarks b`).all() as Array<{
+    id: string; name: string; keyword: string; ready_seen_at: number | null; active_tasks: number; finished_at: number | null; failed: number;
+  }>;
+  const running: AnalysisRunning[] = [];
+  const finished: AnalysisFinished[] = [];
+  for (const r of rows) {
+    if (r.active_tasks > 0) {
+      running.push({ id: r.id, name: r.name, keyword: r.keyword, pending: r.active_tasks });
+    } else if (r.finished_at !== null && r.finished_at > (r.ready_seen_at ?? 0)) {
+      finished.push({ id: r.id, name: r.name, keyword: r.keyword, finishedAt: r.finished_at, failed: r.failed });
+    }
+  }
+  return { running, finished };
 }
 
 export function deleteBenchmark(id: string, projectId?: string): void {

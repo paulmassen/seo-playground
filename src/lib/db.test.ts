@@ -22,6 +22,8 @@ import {
   getRankTrackerSchedule, saveRankTrackerSchedule, deleteRankTrackerSchedule,
   getHistRankHistory, saveHistRankSearch,
   addTrackedKeyword, saveRankCheck, getRankTopResultsHistory,
+  reserveRankTasksForProject, confirmRankTaskReservationForProject, completeRankTaskForProject,
+  getRankTaskActivity, markRankTaskSeen,
 } from './db';
 import { DEFAULT_GRID_LAYOUT, normalizeGridLayout } from './grid-layout';
 
@@ -274,6 +276,26 @@ describe('Rank Tracker monitoring', () => {
     expect(getRankTrackerSchedule()).toMatchObject({ timeOfDay: '07:45', timeZone: 'Europe/Paris' });
     deleteRankTrackerSchedule();
     expect(getRankTrackerSchedule()).toBeNull();
+  });
+});
+
+describe('Rank Tracker bell activity', () => {
+  it('shows a rank task while pending, announces completion once, and clears it when opened', () => {
+    const projectId = getActiveProject().id;
+    const keywordId = addTrackedKeyword('bell rank keyword', 'bell-rank.example', 'France', 'French');
+    const [reservation] = reserveRankTasksForProject(projectId, [keywordId]);
+    if (!reservation) throw new Error('Expected a Rank Tracker task reservation.');
+    expect(getRankTaskActivity(projectId).running).toEqual([expect.objectContaining({ keyword: 'bell rank keyword', status: 'posting' })]);
+
+    const taskId = 'rank-bell-task';
+    expect(confirmRankTaskReservationForProject(projectId, reservation.reservationId, taskId, 0.01)).toBe(true);
+    expect(getRankTaskActivity(projectId).running).toEqual([expect.objectContaining({ taskId, status: 'pending' })]);
+
+    completeRankTaskForProject(projectId, taskId, { position: 3, url: null, title: null, aiOverview: false, topResults: null }, 0.01);
+    expect(getRankTaskActivity(projectId).finished).toEqual([expect.objectContaining({ taskId, status: 'done', domain: 'bell-rank.example' })]);
+
+    markRankTaskSeen(taskId, projectId);
+    expect(getRankTaskActivity(projectId).finished).toEqual([]);
   });
 });
 
