@@ -26,10 +26,13 @@ export function computeGridSummary(results: GridPoint[]): GridSummary {
   return { totalPoints, foundCount: ranked.length, avgRank, top3Count, top10Count, ato };
 }
 
-/** Groups a competitor listing by domain (preferred) or name, so the same business is counted once. */
+/**
+ * Identifies a competitor listing by its Google CID, falling back to the name for older snapshots without one.
+ * Never the domain: a business with several GBP locations shares one website, and those listings are distinct competitors.
+ */
 export function competitorKey(item: GridLocalItem): string {
-  const domain = item.domain?.trim().toLowerCase().replace(/^www\./, '');
-  return domain || item.title.trim().toLowerCase();
+  const cid = item.cid?.trim();
+  return cid ? `cid:${cid}` : item.title.trim().toLowerCase();
 }
 
 export interface CompetitorSummary {
@@ -55,10 +58,13 @@ export function computeCompetitors(results: GridPoint[]): CompetitorSummary[] {
   }>();
 
   for (const point of results) {
+    const seenAtPoint = new Set<string>();
     for (const item of point.items ?? []) {
       if (item.is_target) continue;
       const key = competitorKey(item);
-      if (!key) continue;
+      // A listing counts once per grid point, so presence can never exceed 100%.
+      if (!key || seenAtPoint.has(key)) continue;
+      seenAtPoint.add(key);
       let entry = byKey.get(key);
       if (!entry) {
         entry = { name: item.title, domain: item.domain, cid: item.cid, ranks: [], ratings: [] };
