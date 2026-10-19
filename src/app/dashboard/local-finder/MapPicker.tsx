@@ -337,7 +337,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
         <p className="text-[11px] text-slate-400 -mt-1">
           {gridSize}×{gridSize} {gridLayout.shape === 'square' ? 'grid' : gridLayout.shape}
           {gridLayout.rotationDeg !== 0 ? ` · ${gridLayout.rotationDeg}° rotation` : ''}
-          {' · '}{distanceUnit === 'km' && spacingKm < 1 ? `${spacingKm * 1000} m` : formatDistance(spacingKm, distanceUnit)} spacing · {gridPointCount(gridSize, gridLayout)} points
+          {' · '}{formatDistance(spacingKm, distanceUnit)} spacing · {gridPointCount(gridSize, gridLayout)} points
           {onToggleCell ? ' · click a point to skip it' : ''}
         </p>
       )}

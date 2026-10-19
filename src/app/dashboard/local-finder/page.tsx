@@ -4,7 +4,9 @@ import {
 } from '@/lib/db';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
+import { getGridPreferences } from '@/lib/grid-preferences-server';
 import LocalFinderForm from './LocalFinderForm';
+import { GridPreferencesProvider } from './GridPreferences';
 import { type LocalPackItem } from './grid-api';
 
 interface Rating {
@@ -79,6 +81,7 @@ async function LocalFinderPage({ searchParams }: { searchParams: Promise<SearchP
   const defaultLocation = getSetting('default_location') ?? 'France';
   const defaultLanguage = getSetting('default_language') ?? 'English';
   const defaultCoordinates = getSetting('default_coordinates') ?? '';
+  const gridPreferences = getGridPreferences();
 
   let items: LocalPackItem[] = [];
   let cost: number | undefined;
@@ -156,7 +159,9 @@ async function LocalFinderPage({ searchParams }: { searchParams: Promise<SearchP
         <p className="text-sm text-slate-400 mt-1">Google local pack results for any keyword and location.</p>
       </div>
 
-      <LocalFinderForm defaults={formDefaults} />
+      <GridPreferencesProvider value={gridPreferences}>
+        <LocalFinderForm defaults={formDefaults} />
+      </GridPreferencesProvider>
 
       {error && <div className="bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 text-sm rounded-xl px-4 py-3">{error}</div>}
 
