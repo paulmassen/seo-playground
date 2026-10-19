@@ -2,7 +2,7 @@
 
 import type { BrandStyle } from '@/lib/brand';
 
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { GridPoint } from '@/lib/db';
 import { computeCompetitors, computeGridSummary, computeRingStats, type CompetitorSummary } from './grid-insights';
 import GridPdfExportButton from './GridPdfExportButton';
@@ -47,6 +47,15 @@ function formatSnapshotDate(ts: number) {
 
 export default function GridResults({ results, gridSize, layout = DEFAULT_GRID_LAYOUT, spacingKm, keyword, target, cost, language, searchedAt, snapshotDate, brandName, brandLogoUrl, brandColor, brandFooter, brandStyle }: Props) {
   const [highlight, setHighlight] = useState<CompetitorSummary | null>(null);
+  const mapCardRef = useRef<HTMLDivElement>(null);
+
+  /** Shows a competitor (or the target, with null) on the map; from the table below, also brings the map into view. */
+  function showOnMap(competitor: CompetitorSummary | null, reveal = false) {
+    setHighlight(competitor);
+    if (!reveal || !mapCardRef.current) return;
+    const { top, bottom } = mapCardRef.current.getBoundingClientRect();
+    if (top < 0 || bottom > window.innerHeight) mapCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
   const { distanceUnit, pinStyle } = useGridPreferences();
   const swatchShape = pinStyle === 'square' ? 'rounded-sm' : 'rounded-full';
 
@@ -97,6 +106,123 @@ export default function GridResults({ results, gridSize, layout = DEFAULT_GRID_L
         </div>
       </div>
 
+      {/* Map card */}
+      <div ref={mapCardRef} className="bg-white border border-slate-200 rounded-2xl p-5 scroll-mt-20">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <p className="text-sm font-black text-slate-900">
+              {highlight ? highlight.name : keyword}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {highlight ? (
+                <>Competitor · avg #{highlight.avgRank} · {highlight.appearances}/{highlight.totalPoints} points</>
+              ) : (
+                <>Target: <span className="font-bold text-slate-600">{target}</span></>
+              )}
+              {' · '}{describeGridLayout(gridSize, layout)}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <GridPdfExportButton
+              results={results}
+              gridSize={gridSize}
+              layout={layout}
+              spacingKm={spacingKm}
+              keyword={keyword}
+              target={target}
+              language={language}
+              searchedAt={searchedAt}
+              brandName={brandName}
+              brandLogoUrl={brandLogoUrl}
+              brandColor={brandColor}
+              brandFooter={brandFooter} brandStyle={brandStyle}
+            />
+            {cost !== undefined && (
+              <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>
+            )}
+            {/* The "You" chip above the map switches back to the target. */}
+            {!highlight && (
+              <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                Click a pin for details
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Mini legend */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {legend.map((item) => (
+            <div key={item.label} className="flex items-center gap-1.5">
+              <div className={`w-3 h-3 ${swatchShape}`} style={{ backgroundColor: item.color }} />
+              <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-200">
+            <div className={`w-3 h-3 ${swatchShape} border-2 border-dashed border-slate-400`} />
+            <span className="text-[10px] font-bold text-slate-500">Center</span>
+          </div>
+        </div>
+
+        {/* Competitor switcher: sits on the map so switching never requires scrolling. */}
+        {topCompetitors.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-3" role="radiogroup" aria-label="Business shown on the map">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Show on map</span>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={!highlight}
+              onClick={() => showOnMap(null)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                !highlight
+                  ? 'border-emerald-600 bg-emerald-600 text-white'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400'
+              }`}
+            >
+              You <span className="tabular-nums opacity-80">{ato}%</span>
+            </button>
+            {topCompetitors.map((c, i) => {
+              const isActive = highlight?.key === c.key;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  onClick={() => showOnMap(isActive ? null : c)}
+                  title={`${c.name} · ${c.appearances}/${c.totalPoints} points · avg #${c.avgRank}`}
+                  className={`inline-flex max-w-[16rem] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                    isActive
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'
+                  }`}
+                >
+                  <span className={isActive ? 'text-blue-100' : 'text-slate-400'}>#{i + 1}</span>
+                  <span className="truncate">{c.name}</span>
+                  <span className="tabular-nums opacity-80">{c.visibilityScore}%</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Map */}
+        <Suspense fallback={
+          <div className="w-full rounded-xl bg-slate-100 animate-pulse flex items-center justify-center" style={{ height: 520 }}>
+            <p className="text-sm text-slate-400 font-medium">Loading map…</p>
+          </div>
+        }>
+          <GridMap
+            key={highlight?.key ?? 'target'}
+            points={results}
+            gridSize={gridSize}
+            target={target}
+            highlightKey={highlight?.key}
+            highlightName={highlight?.name}
+          />
+        </Suspense>
+      </div>
+
       {/* Competitive landscape */}
       {topCompetitors.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
@@ -144,7 +270,7 @@ export default function GridResults({ results, gridSize, layout = DEFAULT_GRID_L
                   <span className="text-xs font-black text-slate-600 dark:text-slate-300 tabular-nums w-10 text-right">{c.visibilityScore}%</span>
                   <button
                     type="button"
-                    onClick={() => setHighlight(isActive ? null : c)}
+                    onClick={() => showOnMap(isActive ? null : c, true)}
                     className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg shrink-0 transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white'
@@ -159,88 +285,6 @@ export default function GridResults({ results, gridSize, layout = DEFAULT_GRID_L
           </div>
         </div>
       )}
-
-      {/* Map card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div>
-            <p className="text-sm font-black text-slate-900">
-              {highlight ? highlight.name : keyword}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {highlight ? (
-                <>Competitor · avg #{highlight.avgRank} · {highlight.appearances}/{highlight.totalPoints} points</>
-              ) : (
-                <>Target: <span className="font-bold text-slate-600">{target}</span></>
-              )}
-              {' · '}{describeGridLayout(gridSize, layout)}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <GridPdfExportButton
-              results={results}
-              gridSize={gridSize}
-              layout={layout}
-              spacingKm={spacingKm}
-              keyword={keyword}
-              target={target}
-              language={language}
-              searchedAt={searchedAt}
-              brandName={brandName}
-              brandLogoUrl={brandLogoUrl}
-              brandColor={brandColor}
-              brandFooter={brandFooter} brandStyle={brandStyle}
-            />
-            {cost !== undefined && (
-              <span className="text-[10px] font-mono text-slate-400">cost: ${cost.toFixed(4)}</span>
-            )}
-            {highlight ? (
-              <button
-                type="button"
-                onClick={() => setHighlight(null)}
-                className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                ← Back to target
-              </button>
-            ) : (
-              <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-                Click a pin for details
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Mini legend */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {legend.map((item) => (
-            <div key={item.label} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 ${swatchShape}`} style={{ backgroundColor: item.color }} />
-              <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-200">
-            <div className={`w-3 h-3 ${swatchShape} border-2 border-dashed border-slate-400`} />
-            <span className="text-[10px] font-bold text-slate-500">Center</span>
-          </div>
-        </div>
-
-        {/* Map */}
-        <Suspense fallback={
-          <div className="w-full rounded-xl bg-slate-100 animate-pulse flex items-center justify-center" style={{ height: 520 }}>
-            <p className="text-sm text-slate-400 font-medium">Loading map…</p>
-          </div>
-        }>
-          <GridMap
-            key={highlight?.key ?? 'target'}
-            points={results}
-            gridSize={gridSize}
-            target={target}
-            highlightKey={highlight?.key}
-            highlightName={highlight?.name}
-          />
-        </Suspense>
-      </div>
 
       {/* Visibility by distance from center */}
       {ringStats.length > 1 && (

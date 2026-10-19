@@ -3,12 +3,14 @@ import { redirect } from 'next/navigation';
 import { getBrandSettings } from '@/lib/brand-server';
 import { getGridPreferences } from '@/lib/grid-preferences-server';
 import { unitToKm } from '@/lib/grid-preferences';
-import { DEFAULT_GRID_LAYOUT, gridLayoutFromParams, gridPointCount, type GridLayout } from '@/lib/grid-layout';
+import { DEFAULT_GRID_LAYOUT, gridLayoutFromParams, gridLayoutParams, gridPointCount, type GridLayout } from '@/lib/grid-layout';
 import {
   getCurrentProject, getCredentials, getSetting, getGridHistory, getGridEntry, saveGridSearch,
   saveGridSearchPending, getGridResults, getGridSeriesHistory, getGridSchedule, gridSeriesId, type GridSearchEntry, type GridPoint, type GridQueueMode,
 } from '@/lib/db';
 import LocalFinderForm from '../local-finder/LocalFinderForm';
+import HistorySidebar from '@/components/HistorySidebar';
+import DeleteMonitorButton from '../local-finder/DeleteMonitorButton';
 import GridPending from '../local-finder/GridPending';
 import { GridPreferencesProvider } from '../local-finder/GridPreferences';
 import GridTimeline from '../local-finder/GridTimeline';
@@ -41,6 +43,26 @@ function formatDate(ts: number) {
 function gridBadge(entry: { grid_size: number; layout?: GridLayout }) {
   const shape = entry.layout?.shape ?? 'square';
   return `${entry.grid_size}×${entry.grid_size}${shape === 'square' ? '' : ` · ${shape}`}`;
+}
+
+/** Short form for the narrow monitors sidebar, e.g. "18 Oct, 10:06". */
+function formatShortDate(ts: number) {
+  return new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function gridRerunUrl(entry: { keyword: string; center: string; grid_size: number; spacing_km: number; target: string; language: string; queue_mode: string; layout?: GridLayout }) {
+  const p = new URLSearchParams({
+    ...gridLayoutParams(entry.layout ?? DEFAULT_GRID_LAYOUT),
+    keyword: entry.keyword,
+    location_coordinate: entry.center,
+    grid_size: String(entry.grid_size),
+    spacing_km: String(entry.spacing_km),
+    grid_target: entry.target,
+    language: entry.language,
+    queue_mode: entry.queue_mode,
+    mode: 'grid',
+  });
+  return `/dashboard/geo-grid?${p.toString()}`;
 }
 
 async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -213,6 +235,49 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
       : gridEntry?.layout ?? DEFAULT_GRID_LAYOUT,
   };
 
+  // Compact rows for the narrow sidebar shown next to an open monitor.
+  const monitorItems = latestBySeries.map((entry) => {
+    const isActive = entry.series_id === gridEntry?.series_id;
+    const isPending = entry.status === 'pending';
+    return (
+      <div key={entry.id} className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+        <a href={`/dashboard/geo-grid?grid_history_id=${entry.id}#results`} className="block min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className={`text-[13px] font-bold truncate ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'}`}>
+              {entry.keyword}
+            </p>
+            <span className="text-[9px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">{gridBadge(entry)}</span>
+            {isPending && (
+              <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1 py-0.5 rounded shrink-0">Pending</span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-0.5 truncate">{entry.target}</p>
+          {entry.summary && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${entry.summary.ato}%` }} />
+              </div>
+              <span className="text-[10px] font-black text-emerald-600 tabular-nums shrink-0">{entry.summary.ato}%</span>
+            </div>
+          )}
+        </a>
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <span className="text-[10px] text-slate-400 tabular-nums" title={`Last run ${formatDate(entry.ts)}`}>{formatShortDate(entry.ts)}</span>
+          <div className="flex items-center gap-2.5">
+            <DeleteMonitorButton runId={entry.id} compact />
+            <a
+              href={gridRerunUrl(entry)}
+              className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-800 transition-colors"
+              title="Run this monitor now"
+            >
+              Run ↻
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  });
+
   return (
     <GridPreferencesProvider value={gridPreferences}>
     <div className="space-y-6">
@@ -221,7 +286,8 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Geo-grid monitors</h1>
           <p className="text-sm text-slate-400 mt-1">Track a keyword and target domain across a location, then revisit its map over time.</p>
         </div>
-        {(gridEntry || gridError) && latestBySeries.length > 0 && (
+        {/* An open monitor has the sidebar list; an error page has no other way back. */}
+        {gridError && latestBySeries.length > 0 && (
           <a href="/dashboard/geo-grid" className="text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:text-blue-600">
             ← All monitors ({latestBySeries.length})
           </a>
@@ -269,40 +335,46 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
           </section>
         )}
 
-        <div id="results">
-          {gridError && (
-            <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{gridError}</div>
-          )}
-          {gridPending && gridEntry && (
-            <GridPending
-              searchId={gridPending.id}
-              projectId={getCurrentProject().id}
-              totalPoints={gridPending.totalPoints}
-              queueMode={gridPending.queueMode}
-              keyword={gridEntry.keyword}
-              target={gridEntry.target}
-              gridSize={gridEntry.grid_size}
-              layout={gridEntry.layout}
-              startedAt={gridEntry.ts}
-            />
-          )}
-          {gridResults && gridEntry && (
-            <>
-              <GridTimeline
-                entry={gridEntry}
-                results={gridResults}
-                previousResults={previousResults}
-                snapshots={mapSnapshots}
-                schedule={gridSchedule}
-                brandName={brandName}
-                brandLogoUrl={brandLogoUrl}
-                brandColor={brand.color}
-                brandFooter={brand.footer}
-                brandStyle={brand}
-                trend={trend}
-                distanceUnit={distanceUnit}
+        {/* The creation form above keeps the full width; the monitors list only sits next to an open monitor. */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div id="results" className="flex-1 min-w-0 w-full">
+            {gridError && (
+              <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{gridError}</div>
+            )}
+            {gridPending && gridEntry && (
+              <GridPending
+                searchId={gridPending.id}
+                projectId={getCurrentProject().id}
+                totalPoints={gridPending.totalPoints}
+                queueMode={gridPending.queueMode}
+                keyword={gridEntry.keyword}
+                target={gridEntry.target}
+                gridSize={gridEntry.grid_size}
+                layout={gridEntry.layout}
+                startedAt={gridEntry.ts}
               />
-            </>
+            )}
+            {gridResults && gridEntry && (
+              <>
+                <GridTimeline
+                  entry={gridEntry}
+                  results={gridResults}
+                  previousResults={previousResults}
+                  snapshots={mapSnapshots}
+                  schedule={gridSchedule}
+                  brandName={brandName}
+                  brandLogoUrl={brandLogoUrl}
+                  brandColor={brand.color}
+                  brandFooter={brand.footer}
+                  brandStyle={brand}
+                  trend={trend}
+                  distanceUnit={distanceUnit}
+                />
+              </>
+            )}
+          </div>
+          {gridEntry && latestBySeries.length > 0 && (
+            <HistorySidebar title="Monitors" items={monitorItems} compact />
           )}
         </div>
       </div>

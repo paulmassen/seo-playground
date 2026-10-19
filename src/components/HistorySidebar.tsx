@@ -8,9 +8,11 @@ interface HistorySidebarProps {
   items: React.ReactNode[];
   /** How many entries to show per page before paginating. */
   perPage?: number;
+  /** Narrower column for pages whose main content needs the width. */
+  compact?: boolean;
 }
 
-export default function HistorySidebar({ title, items, perPage = 8 }: HistorySidebarProps) {
+export default function HistorySidebar({ title, items, perPage = 8, compact = false }: HistorySidebarProps) {
   const [page, setPage] = useState(0);
 
   const pageCount = Math.max(1, Math.ceil(items.length / perPage));
@@ -19,9 +21,9 @@ export default function HistorySidebar({ title, items, perPage = 8 }: HistorySid
   const visible = items.slice(start, start + perPage);
 
   return (
-    <aside className="w-full lg:w-80 shrink-0 lg:sticky lg:top-0 lg:self-start">
+    <aside className={`w-full ${compact ? 'lg:w-64' : 'lg:w-80'} shrink-0 lg:sticky lg:top-0 lg:self-start`}>
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className={`${compact ? 'px-4 py-3' : 'px-5 py-4'} border-b border-slate-100 dark:border-slate-800 flex items-center justify-between`}>
           <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">{title}</h2>
           <span className="text-[11px] tabular-nums text-slate-400">{items.length}</span>
         </div>
