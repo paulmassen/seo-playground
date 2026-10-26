@@ -450,7 +450,7 @@ async function DashboardPage() {
         <Fact label="Best local visibility" href={bestMonitor ? `/dashboard/geo-grid?grid_history_id=${encodeURIComponent(bestMonitor.latest.id)}#results` : '/dashboard/geo-grid'}
           value={bestMonitor ? `${bestMonitor.latest.summary!.ato}%` : '—'}
           detail={bestMonitor ? bestMonitor.latest.keyword : 'No Geo-grid monitor'} />
-        <Fact label="Spend, last 30 days" href="/dashboard/spending?preset=30d"
+        <Fact label="Spend, last 30 days" href={`/dashboard/spending?preset=30d&project=${encodeURIComponent(project.id)}`}
           value={hasUnknown ? `~${formatUsd(spend.estimatedCost)}` : formatUsd(spend.knownCost)}
           detail={spend.calls > 0 ? `${plural(spend.calls, 'call')}${hasUnknown ? ', partly estimated' : ''}` : 'No calls in 30 days'} />
         <Fact label="Saved results" href="#recent-results"

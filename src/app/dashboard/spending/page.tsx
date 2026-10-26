@@ -1,9 +1,9 @@
-import { withProjectScope } from '@/lib/db';
+import { withProjectScope, getCurrentProject, runInProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { CircleHelp, Info } from 'lucide-react';
-import { getSpendByTool, getSpendByDay, getFirstSpendTs } from '@/lib/db';
+import { getSpendAcrossProjects, getSpendByDay, getFirstSpendTs, getProjects } from '@/lib/db';
 import {
   SPEND_PRESETS, resolveSpendRange, bucketSpend, totalSpend, estimateToolCost, formatUsd,
   type SpendBucket,
@@ -15,6 +15,8 @@ interface SearchParams {
   from?: string;
   to?: string;
   preset?: string;
+  /** A project id to narrow the page to; absent means every project. */
+  project?: string;
 }
 
 function formatDay(day: string) {
@@ -94,12 +96,53 @@ function SpendChart({ buckets, unit }: { buckets: SpendBucket[]; unit: 'day' | '
 
 async function SpendingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
-  const firstTs = getFirstSpendTs();
+  const projects = getProjects();
+  const current = getCurrentProject();
+  const selected = projects.find((p) => p.id === params.project) ?? null;
+  // A single project's figures come from its own data store; nothing else changes.
+  const inScope = <T,>(fn: () => T): T => (selected ? runInProjectScope(selected.id, fn) : fn());
+
+  const firstTs = inScope(() => getFirstSpendTs({ allProjects: !selected }));
   const range = resolveSpendRange(params, new Date(), firstTs);
-  const tools = getSpendByTool(range.fromMs, range.toMs);
-  const { unit, buckets } = bucketSpend(getSpendByDay(range.fromMs, range.toMs), range.from, range.to);
+  const spend = getSpendAcrossProjects(range.fromMs, range.toMs);
+  const tools = selected ? spend.byProject.find((p) => p.project.id === selected.id)?.tools ?? [] : spend.byTool;
+  const daily = inScope(() => getSpendByDay(range.fromMs, range.toMs, { allProjects: !selected }));
+  const { unit, buckets } = bucketSpend(daily, range.from, range.to);
   const totals = totalSpend(tools);
   const hasUnknown = totals.unknownCalls > 0;
+
+  const projectRows = spend.byProject
+    .map((p) => ({ project: p.project, totals: totalSpend(p.tools) }))
+    .filter((p) => p.totals.calls > 0)
+    .sort((a, b) => b.totals.knownCost - a.totals.knownCost || b.totals.calls - a.totals.calls);
+  const idleProjects = projects.length - projectRows.length;
+
+  // Every link keeps the date range and swaps only what it changes.
+  const rangeQuery: Record<string, string> = range.preset ? { preset: range.preset } : { from: range.from, to: range.to };
+  const spendHref = (q: { project?: string | null; preset?: string }) => {
+    const query = new URLSearchParams(q.preset ? { preset: q.preset } : rangeQuery);
+    const project = q.project === undefined ? selected?.id : q.project;
+    if (project) query.set('project', project);
+    return `/dashboard/spending?${query}`;
+  };
+  const scopeLabel = selected ? selected.name : 'all-projects';
+
+  const projectTableRows = projectRows.map(({ project, totals: t }) => ({
+    project: project.name,
+    domain: project.domain,
+    calls: t.calls,
+    known_cost: Number(t.knownCost.toFixed(6)),
+    unknown_cost_calls: t.unknownCalls,
+    estimated_total: Number(t.estimatedCost.toFixed(6)),
+  }));
+  const projectColumns = [
+    { key: 'project', label: 'Project' },
+    { key: 'domain', label: 'Domain' },
+    { key: 'calls', label: 'Calls' },
+    { key: 'known_cost', label: 'Known cost ($)' },
+    { key: 'unknown_cost_calls', label: 'Unknown-cost calls' },
+    { key: 'estimated_total', label: 'Estimated total ($)' },
+  ];
 
   const tableRows = tools.map((t) => {
     const est = estimateToolCost(t);
@@ -131,17 +174,31 @@ async function SpendingPage({ searchParams }: { searchParams: Promise<SearchPara
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Spending</h1>
-        <p className="text-sm text-slate-400 mt-1">What your DataForSEO calls cost, by tool, based on the cost saved with each search.</p>
+        <p className="text-sm text-slate-400 mt-1">
+          What your DataForSEO calls cost, by {selected ? 'tool' : 'project and tool'}, based on the cost saved with each search.
+        </p>
       </div>
+
+      {/* Scope: every project (the account balance view), or a single one */}
+      {projects.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={spendHref({ project: null })} className={pill(!selected)}>All projects</Link>
+          <Link href={spendHref({ project: current.id })} className={pill(selected?.id === current.id)}>{current.name}</Link>
+          {selected && selected.id !== current.id && (
+            <span className={pill(true)}>{selected.name}</span>
+          )}
+        </div>
+      )}
 
       {/* Date range: presets first, custom range after */}
       <div className="flex flex-wrap items-center gap-2">
         {SPEND_PRESETS.map((p) => (
-          <Link key={p.key} href={`/dashboard/spending?preset=${p.key}`} className={pill(range.preset === p.key)}>
+          <Link key={p.key} href={spendHref({ preset: p.key })} className={pill(range.preset === p.key)}>
             {p.label}
           </Link>
         ))}
         <form method="get" action="/dashboard/spending" className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {selected && <input type="hidden" name="project" value={selected.id} />}
           <label className="sr-only" htmlFor="spend-from">From</label>
           <input id="spend-from" type="date" name="from" defaultValue={range.from} required className={dateInput} />
           <span className="text-xs text-slate-400">to</span>
@@ -204,7 +261,7 @@ async function SpendingPage({ searchParams }: { searchParams: Promise<SearchPara
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm px-6 py-12 text-center">
           <p className="text-sm text-slate-500 dark:text-slate-400">No DataForSEO calls recorded between {formatDay(range.from)} and {formatDay(range.to)}.</p>
           {firstTs !== null && range.preset !== 'all' && (
-            <Link href="/dashboard/spending?preset=all" className="inline-block mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+            <Link href={spendHref({ preset: 'all' })} className="inline-block mt-3 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
               Show all time
             </Link>
           )}
@@ -216,12 +273,78 @@ async function SpendingPage({ searchParams }: { searchParams: Promise<SearchPara
             <SpendChart buckets={buckets} unit={unit} />
           </div>
 
+          {!selected && projects.length > 1 && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">By project</h2>
+                <div className="flex items-center gap-2">
+                  <CopyMarkdownButton data={projectTableRows} columns={projectColumns} />
+                  <ExportCSVButton data={projectTableRows} columns={projectColumns} filename={`spending-by-project-${range.from}-to-${range.to}.csv`} />
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                      <th className="text-left px-6 py-3">Project</th>
+                      <th className="text-right px-4 py-3">Calls</th>
+                      <th className="text-right px-4 py-3">Known cost</th>
+                      <th className="text-left px-4 py-3 w-40">Share</th>
+                      <th className="text-right px-4 py-3">Unknown cost</th>
+                      <th className="text-right px-6 py-3">Estimated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {projectRows.map(({ project, totals: t }) => {
+                      const share = totals.knownCost > 0 ? (t.knownCost / totals.knownCost) * 100 : 0;
+                      return (
+                        <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <Link href={spendHref({ project: project.id })} className="font-medium text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                              {project.name}
+                            </Link>
+                            <span className="ml-2 text-xs text-slate-400">{project.domain}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-300">{t.calls.toLocaleString('en-US')}</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                            {t.unknownCalls === t.calls ? <span className="font-normal text-slate-400">unknown</span> : formatUsd(t.knownCost)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                <div className="h-full rounded-full bg-blue-500 dark:bg-blue-400" style={{ width: `${share}%` }} />
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-400 w-9 text-right">{share.toFixed(share > 0 && share < 1 ? 1 : 0)}%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-400">
+                            {t.unknownCalls > 0
+                              ? <span className="text-amber-600 dark:text-amber-400">{t.unknownCalls} call{t.unknownCalls !== 1 ? 's' : ''}</span>
+                              : '—'}
+                          </td>
+                          <td className="px-6 py-3 text-right font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                            {t.unknownCalls === 0 ? '—' : `~${formatUsd(t.estimatedCost)}`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {idleProjects > 0 && (
+                <p className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+                  {idleProjects} other project{idleProjects !== 1 ? 's' : ''} made no calls in this range.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">By tool</h2>
+              <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">By tool{selected && projects.length > 1 ? ` · ${selected.name}` : ''}</h2>
               <div className="flex items-center gap-2">
                 <CopyMarkdownButton data={tableRows} columns={columns} />
-                <ExportCSVButton data={tableRows} columns={columns} filename={`spending-${range.from}-to-${range.to}.csv`} />
+                <ExportCSVButton data={tableRows} columns={columns} filename={`spending-${scopeLabel.replace(/[^a-z0-9-]+/gi, '-').toLowerCase()}-${range.from}-to-${range.to}.csv`} />
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -290,7 +413,10 @@ async function SpendingPage({ searchParams }: { searchParams: Promise<SearchPara
             and deleted rank-tracked keywords. When the same search is fetched again, or a keyword is rank-checked twice on the same day,
             only the latest cost is kept.
           </p>
-          <p>Days follow this server&apos;s local time zone.</p>
+          <p>
+            Calls with an unknown cost are estimated at their tool&apos;s average across all projects.
+            Days follow this server&apos;s local time zone.
+          </p>
         </div>
       </div>
     </div>

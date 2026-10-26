@@ -16,7 +16,7 @@ import {
   getAiOptimizationHistory, saveAiOptimizationSearch, getAiOptimizationResults, type AiOptimizationEntry,
   getWebMentionsHistory, saveWebMentionsSearch, getWebMentionsItems, getWebMentionsSummary, type WebMentionsEntry,
   getSerpHistory, saveSerpSearch,
-  getSpendByTool, getSpendByDay, getFirstSpendTs,
+  getSpendByTool, getSpendByDay, getFirstSpendTs, getSpendAcrossProjects,
   gridSeriesId, getGridSeriesHistory, getGridSchedule, saveGridSchedule, saveGridSearch, deleteGridSchedule, deleteGridSeries, type GridSearchEntry,
   claimDueGridSchedules, retryClaimedGridSchedule,
   getRankTrackerSchedule, saveRankTrackerSchedule, deleteRankTrackerSchedule,
@@ -165,6 +165,37 @@ describe('spending aggregates', () => {
 
   it('finds the oldest recorded call', () => {
     expect(getFirstSpendTs()).not.toBeNull();
+  });
+
+  it('splits spend by project and sums every project by tool and day', () => {
+    const home = getActiveProject();
+    const other = createProject({
+      name: 'Spend Project', domain: 'spend-project.example', defaultLocation: '',
+      defaultLanguage: '', defaultCoordinates: '', rankTrackerDepth: '100',
+    });
+    setActiveProject(other.id);
+    saveSerpSearch({ ...serp, id: 'spend-other-1', ts: day(1, 9), cost: 0.01 }, [{}]);
+    saveSerpSearch({ ...serp, id: 'spend-other-2', ts: day(2, 9) }, [{}]); // unknown cost
+    setActiveProject(home.id);
+
+    const { byProject, byTool } = getSpendAcrossProjects(from, to);
+    const serpOf = (id: string) => byProject.find((p) => p.project.id === id)!.tools.find((t) => t.tool === 'SERP Checker')!;
+    expect(serpOf(home.id)).toMatchObject({ calls: 3, unknownCalls: 1 });
+    expect(serpOf(other.id)).toMatchObject({ calls: 2, unknownCalls: 1 });
+    expect(serpOf(other.id).knownCost).toBeCloseTo(0.01);
+
+    const all = byTool.find((t) => t.tool === 'SERP Checker')!;
+    expect(all).toMatchObject({ calls: 5, unknownCalls: 2 });
+    expect(all.knownCost).toBeCloseTo(0.016);
+    // Unknown calls are priced at the cross-project average, the same for every project.
+    expect(serpOf(other.id).avgKnownCost).toBeCloseTo(all.avgKnownCost!);
+
+    const days = getSpendByDay(from, to, { allProjects: true });
+    expect(days.map((d) => [d.day, d.calls, d.unknownCalls])).toEqual([['2030-01-01', 2, 0], ['2030-01-02', 3, 2]]);
+    // The current-project view is unchanged.
+    expect(getSpendByDay(from, to).map((d) => d.calls)).toEqual([1, 2]);
+
+    deleteProject(other.id);
   });
 });
 

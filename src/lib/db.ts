@@ -3218,9 +3218,11 @@ function spendSources(db: Database.Database) {
   });
 }
 
-export function getSpendByTool(fromMs: number, toMs: number): ToolSpend[] {
-  const db = getDb();
-  const byTool = new Map<string, ToolSpend & { allKnownCost: number; allKnownCalls: number }>();
+/** Per-tool spend in range, plus all-time known totals used to price unknown-cost calls. */
+type RawToolSpend = Omit<ToolSpend, 'avgKnownCost'> & { allKnownCost: number; allKnownCalls: number };
+
+function rawSpendByTool(db: Database.Database, fromMs: number, toMs: number): Map<string, RawToolSpend> {
+  const byTool = new Map<string, RawToolSpend>();
   for (const s of spendSources(db)) {
     const ts = s.tsColumn ?? 'ts';
     const r = db.prepare(`
@@ -3232,7 +3234,7 @@ export function getSpendByTool(fromMs: number, toMs: number): ToolSpend[] {
         COUNT(cost) AS all_known_calls
       FROM ${s.table}
     `).get({ from: fromMs, to: toMs }) as { calls: number | null; known_cost: number | null; unknown_calls: number | null; all_known_cost: number; all_known_calls: number };
-    const acc = byTool.get(s.tool) ?? { tool: s.tool, href: s.href, calls: 0, knownCost: 0, unknownCalls: 0, avgKnownCost: null, allKnownCost: 0, allKnownCalls: 0 };
+    const acc = byTool.get(s.tool) ?? { tool: s.tool, href: s.href, calls: 0, knownCost: 0, unknownCalls: 0, allKnownCost: 0, allKnownCalls: 0 };
     acc.calls += r.calls ?? 0;
     acc.knownCost += r.known_cost ?? 0;
     acc.unknownCalls += r.unknown_calls ?? 0;
@@ -3240,14 +3242,63 @@ export function getSpendByTool(fromMs: number, toMs: number): ToolSpend[] {
     acc.allKnownCalls += r.all_known_calls;
     byTool.set(s.tool, acc);
   }
-  return [...byTool.values()]
+  return byTool;
+}
+
+function mergeRawSpend(maps: Array<Map<string, RawToolSpend>>): Map<string, RawToolSpend> {
+  const merged = new Map<string, RawToolSpend>();
+  for (const map of maps) {
+    for (const t of map.values()) {
+      const acc = merged.get(t.tool) ?? { ...t, calls: 0, knownCost: 0, unknownCalls: 0, allKnownCost: 0, allKnownCalls: 0 };
+      acc.calls += t.calls;
+      acc.knownCost += t.knownCost;
+      acc.unknownCalls += t.unknownCalls;
+      acc.allKnownCost += t.allKnownCost;
+      acc.allKnownCalls += t.allKnownCalls;
+      merged.set(t.tool, acc);
+    }
+  }
+  return merged;
+}
+
+/** `averages` prices unknown calls; defaults to each tool's own all-time average. */
+function finishToolSpend(raw: Map<string, RawToolSpend>, averages: Map<string, RawToolSpend> = raw): ToolSpend[] {
+  return [...raw.values()]
     .filter((t) => t.calls > 0)
-    .map(({ allKnownCost, allKnownCalls, ...t }) => ({ ...t, avgKnownCost: allKnownCalls > 0 ? allKnownCost / allKnownCalls : null }))
+    .map((t) => {
+      const avg = averages.get(t.tool);
+      return {
+        tool: t.tool, href: t.href, calls: t.calls, knownCost: t.knownCost, unknownCalls: t.unknownCalls,
+        avgKnownCost: avg && avg.allKnownCalls > 0 ? avg.allKnownCost / avg.allKnownCalls : null,
+      };
+    })
     .sort((a, b) => b.knownCost - a.knownCost || b.calls - a.calls);
 }
 
-export function getSpendByDay(fromMs: number, toMs: number): DailySpend[] {
-  const db = getDb();
+/** Spend of the current project, by tool. */
+export function getSpendByTool(fromMs: number, toMs: number): ToolSpend[] {
+  return finishToolSpend(rawSpendByTool(getDb(), fromMs, toMs));
+}
+
+export interface ProjectSpend {
+  project: Project;
+  tools: ToolSpend[];
+}
+
+/**
+ * Spend of every project, by project and by tool. Unknown-cost calls are priced at the tool's
+ * average across all projects, so a project's estimate doesn't hinge on its own few known calls.
+ */
+export function getSpendAcrossProjects(fromMs: number, toMs: number): { byProject: ProjectSpend[]; byTool: ToolSpend[] } {
+  const raws = getProjects().map((project) => ({ project, raw: rawSpendByTool(getDbForProject(project.id), fromMs, toMs) }));
+  const merged = mergeRawSpend(raws.map((r) => r.raw));
+  return {
+    byProject: raws.map(({ project, raw }) => ({ project, tools: finishToolSpend(raw, merged) })),
+    byTool: finishToolSpend(merged),
+  };
+}
+
+function spendByDayFromDb(db: Database.Database, fromMs: number, toMs: number): DailySpend[] {
   const sources = spendSources(db);
   if (sources.length === 0) return [];
   const union = sources
@@ -3261,12 +3312,33 @@ export function getSpendByDay(fromMs: number, toMs: number): DailySpend[] {
   return rows.map((r) => ({ day: r.day, calls: r.calls, knownCost: r.known_cost, unknownCalls: r.unknown_calls }));
 }
 
-/** Timestamp of the oldest recorded call across all tools, or null if nothing was ever recorded. */
-export function getFirstSpendTs(): number | null {
-  const db = getDb();
+/** Daily spend of the current project, or of every project with `allProjects`. */
+export function getSpendByDay(fromMs: number, toMs: number, opts: { allProjects?: boolean } = {}): DailySpend[] {
+  if (!opts.allProjects) return spendByDayFromDb(getDb(), fromMs, toMs);
+  const byDay = new Map<string, DailySpend>();
+  for (const project of getProjects()) {
+    for (const d of spendByDayFromDb(getDbForProject(project.id), fromMs, toMs)) {
+      const acc = byDay.get(d.day) ?? { day: d.day, calls: 0, knownCost: 0, unknownCalls: 0 };
+      acc.calls += d.calls;
+      acc.knownCost += d.knownCost;
+      acc.unknownCalls += d.unknownCalls;
+      byDay.set(d.day, acc);
+    }
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+function firstSpendTsFromDb(db: Database.Database): number | null {
   const sources = spendSources(db);
   if (sources.length === 0) return null;
   const union = sources.map((s) => `SELECT MIN(${s.tsColumn ?? 'ts'}) AS ts FROM ${s.table}`).join(' UNION ALL ');
   const row = db.prepare(`SELECT MIN(ts) AS ts FROM (${union})`).get() as { ts: number | null };
   return row.ts;
+}
+
+/** Timestamp of the oldest recorded call (current project, or every project), or null if nothing was ever recorded. */
+export function getFirstSpendTs(opts: { allProjects?: boolean } = {}): number | null {
+  if (!opts.allProjects) return firstSpendTsFromDb(getDb());
+  const all = getProjects().map((p) => firstSpendTsFromDb(getDbForProject(p.id))).filter((ts): ts is number => ts !== null);
+  return all.length > 0 ? Math.min(...all) : null;
 }
