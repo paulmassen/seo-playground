@@ -7,7 +7,7 @@ import {
   History, Copy, BarChart3, BookOpen, Server, Bot, Radar, Eye, Waypoints, Megaphone, Wallet, CalendarCheck, Unlink, Trophy,
 } from 'lucide-react';
 
-// Single source of truth for the tool list: the Sidebar and the Dashboard home both render from it.
+// Single source of truth for the tool list: the Sidebar renders from it.
 
 export interface NavItem {
   name: string;
@@ -34,7 +34,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Overview',
     color: 'blue',
     items: [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, desc: 'All tools at a glance', exact: true },
+      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, desc: 'Key figures for the current project', exact: true },
       { name: 'Rank Tracker', href: '/dashboard/rank-tracker', icon: Activity, desc: 'Track keyword positions over time' },
     ],
   },
