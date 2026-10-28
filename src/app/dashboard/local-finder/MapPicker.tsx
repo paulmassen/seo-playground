@@ -12,6 +12,8 @@ export interface BusinessResult {
   cid: string;
   domain: string;
   category: string;
+  /** Secondary GBP categories (empty when Google shows none). */
+  additionalCategories?: string[];
   rating: number | null;
   reviews: number | null;
 }

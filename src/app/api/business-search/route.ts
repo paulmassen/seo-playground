@@ -23,6 +23,7 @@ interface MapsItem {
   cid?: string;
   domain?: string;
   category?: string;
+  additional_categories?: string[] | null;
   rating?: { value?: number; votes_count?: number };
 }
 
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
         cid: String(item.cid),
         domain: item.domain ?? '',
         category: item.category ?? '',
+        additionalCategories: (item.additional_categories ?? []).filter((label): label is string => typeof label === 'string' && label.trim() !== ''),
         rating: item.rating?.value ?? null,
         reviews: item.rating?.votes_count ?? null,
       }));

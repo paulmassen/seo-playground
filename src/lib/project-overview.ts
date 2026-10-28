@@ -126,6 +126,7 @@ const q = (path: string, param = 'history_id') => (id: string) => `${path}?${par
 const HISTORY_SOURCES: HistorySource[] = [
   { table: 'serp_searches', tool: 'SERP Checker', label: 'keyword', href: q('/dashboard/serp') },
   { table: 'lf_searches', tool: 'Local Finder', label: 'keyword', href: q('/dashboard/local-finder') },
+  { table: 'gbp_category_audits', tool: 'GBP Category Audit', label: "keyword || ' · ' || area", href: q('/dashboard/gbp-categories') },
   { table: 'kw_overview_searches', tool: 'Keyword Overview', label: 'keywords', href: q('/dashboard/keyword-overview') },
   { table: 'keyword_ideas_searches', tool: 'Keyword Ideas', label: 'keyword', href: q('/dashboard/keyword-ideas') },
   { table: 'related_kw_searches', tool: 'Related Keywords', label: 'keyword', href: q('/dashboard/related-keywords') },

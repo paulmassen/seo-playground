@@ -831,6 +831,17 @@ function initSchema(db: Database.Database) {
       items TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS gbp_category_audits (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      keyword TEXT NOT NULL,
+      area TEXT NOT NULL,
+      result_count INTEGER NOT NULL,
+      cost REAL,
+      params TEXT NOT NULL,
+      items TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS web_mentions_searches (
       id TEXT PRIMARY KEY,
       ts INTEGER NOT NULL,
@@ -3136,6 +3147,48 @@ export function getWebMentionsSummary<T>(id: string): T | null {
   if (!row) return null; try { return JSON.parse(row.summary) as T; } catch { return null; }
 }
 
+// ─── GBP Category Audit (one Google Maps SERP per audit) ────
+
+export interface CategoryAuditEntry {
+  id: string;
+  ts: number;
+  keyword: string;
+  /** Human label of the searched area, e.g. "5 km around 48.85, 2.35". */
+  area: string;
+  count: number;
+  cost?: number;
+  /** URL params that reproduce the audit (keyword, center, radius, language, depth, target…). */
+  params: Record<string, string>;
+}
+
+export function getCategoryAuditHistory(): CategoryAuditEntry[] {
+  const rows = getDb()
+    .prepare('SELECT id, ts, keyword, area, result_count, cost, params FROM gbp_category_audits ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; keyword: string; area: string; result_count: number; cost: number | null; params: string }>;
+  return rows.map((r) => ({
+    id: r.id, ts: r.ts, keyword: r.keyword, area: r.area,
+    count: r.result_count, cost: r.cost ?? undefined, params: JSON.parse(r.params),
+  }));
+}
+
+export function getCategoryAuditEntry(id: string): CategoryAuditEntry | null {
+  const r = getDb().prepare('SELECT id, ts, keyword, area, result_count, cost, params FROM gbp_category_audits WHERE id = ?')
+    .get(id) as { id: string; ts: number; keyword: string; area: string; result_count: number; cost: number | null; params: string } | undefined;
+  return r ? { id: r.id, ts: r.ts, keyword: r.keyword, area: r.area, count: r.result_count, cost: r.cost ?? undefined, params: JSON.parse(r.params) } : null;
+}
+
+export function saveCategoryAudit<T>(entry: CategoryAuditEntry, items: T[]): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO gbp_category_audits (id, ts, keyword, area, result_count, cost, params, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.keyword, entry.area, entry.count, entry.cost ?? null, JSON.stringify(entry.params), JSON.stringify(items));
+}
+
+export function getCategoryAuditItems<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT items FROM gbp_category_audits WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null;
+  try { return JSON.parse(row.items) as T[]; } catch { return null; }
+}
+
 // --- Spending (aggregates the `cost` recorded by every tool) ---
 
 // Every table that records what a DataForSEO call cost, mapped to the tool the user sees.
@@ -3174,6 +3227,7 @@ export const SPEND_SOURCES: Array<{ table: string; tool: string; href: string | 
   { table: 'serp_searches', tool: 'SERP Checker', href: '/dashboard/serp' },
   { table: 'lf_searches', tool: 'Local Finder', href: '/dashboard/local-finder' },
   { table: 'grid_searches', tool: 'Geo-Grid Ranking', href: '/dashboard/geo-grid' },
+  { table: 'gbp_category_audits', tool: 'GBP Category Audit', href: '/dashboard/gbp-categories' },
   { table: 'ai_optimization_searches', tool: 'AI Optimization', href: '/dashboard/ai-optimization' },
   { table: 'ai_visibility_searches', tool: 'AI Visibility', href: '/dashboard/ai-visibility' },
   { table: 'llm_response_searches', tool: 'AI Prompt Test', href: '/dashboard/llm-responses' },
