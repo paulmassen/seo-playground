@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Top 10 or Top 20 results per Geo-grid point** — choose how many Local Finder results each point checks. DataForSEO bills Standard and Priority per 10 results, so Top 10 (the new default) costs half as much. The depth belongs to the monitor: scheduled and repeat runs keep it, so snapshots stay comparable. Existing monitors keep checking the top 20.
+- **Competitor address on the Geo-grid map** — with a competitor selected, "Show address" looks up its Google listing (one Business Info call, Priority queue, about $0.003) and pins it above the grid. The lookup only runs on click, is stored per project so it is free to show again, and appears in Spending.
+- **Coverage, ARP and SoLV** — Geo-grid results, the competitor table and the PDF report show Coverage (share of points where the business appears), ARP (average rank where found) and SoLV (share of all points in the top 3), for you and every competitor.
+- **13×13 and 15×15 Geo-grids, finer spacing** — grids up to 225 points, and spacing from 100 m to 20 km (0.05 to 15 mi).
+- **Schedules in the grid's own time zone** — scheduled Geo-grid runs use the time zone of the grid center.
+
+### Changed
+- **Geo-grid runs only start from an explicit confirmation** — refreshing a page, going back or opening an old link no longer starts a paid run. "Run again" shows the API mode and price before anything is billed.
+
+### Fixed
+- **Geo-grid cost estimates** — Standard and Priority estimates were half the real price for 20 results per point. They now match DataForSEO pricing and the costs recorded on past runs.
+- **Sponsored listings counted as rankings** — paid Local Finder listings are no longer counted as positions, and organic listings are renumbered without a gap. Applies to new runs; older snapshots did not store which listings were ads.
+
 ---
 
 ## [0.6.3] — 2026-10-19
