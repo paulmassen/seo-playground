@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, lazy, Suspense } from 'react';
+import { useActionState, useMemo, useState, lazy, Suspense } from 'react';
 import { LANGUAGES } from '@/lib/geo-options';
 import { formatBusinessTarget } from '@/lib/grid-target';
 import { formatDistance, spacingOptions, type DistanceUnit } from '@/lib/grid-preferences';
@@ -9,6 +9,8 @@ import {
   normalizeRotation, type GridLayout, type GridShape,
 } from '@/lib/grid-layout';
 import { useGridPreferences } from './GridPreferences';
+import { DEFAULT_GRID_DEPTH, GRID_DEPTHS, GRID_QUEUE_MODES, estimateGridCost, formatUsd, parseGridDepth, type GridDepth } from '@/lib/grid-pricing';
+import { createGridMonitor, type GridRunState } from '../geo-grid/actions';
 
 const MapPicker = lazy(() => import('./MapPicker'));
 
@@ -34,21 +36,15 @@ interface Props {
   };
 }
 
-// DataForSEO Local Finder SERP API pricing (checked against their pricing page — they revise this periodically).
 type QueueMode = 'live' | 'priority' | 'standard';
-
-const QUEUE_MODES: { value: QueueMode; label: string; costPerPoint: number; wait: string }[] = [
-  { value: 'live', label: 'Live', costPerPoint: 0.002, wait: 'Blocks the page' },
-  { value: 'priority', label: 'Priority', costPerPoint: 0.0012, wait: '~1 min avg, background' },
-  { value: 'standard', label: 'Standard', costPerPoint: 0.0006, wait: '5–45 min, background' },
-];
+const QUEUE_MODES = GRID_QUEUE_MODES;
 
 // Live requests are throttled to 6 in flight; each point currently takes ~8-10s on DataForSEO's side.
 const LIVE_SECONDS_PER_BATCH = 9;
 const LIVE_CONCURRENCY = 6;
 
 function formatCost(n: number) {
-  return `$${n.toFixed(4)}`;
+  return `≈${formatUsd(n)}`;
 }
 
 function formatLiveDuration(totalPoints: number) {
@@ -110,16 +106,16 @@ function GridPreview({ size, spacingKm, unit, layout, onToggle, onResetSkipped }
           })}
         </div>
       </div>
-      <p className="text-[10px] text-slate-400 font-medium text-center">
+      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium text-center">
         {pointCount} points · {formatDistance(spacingKm, unit)} spacing · ~{formatDistance((size - 1) * spacingKm, unit, 1)} coverage
         {layout.excluded.length > 0 && (
           <>
             {' · '}{layout.excluded.length} skipped{' '}
-            <button type="button" onClick={onResetSkipped} className="font-black uppercase tracking-widest text-blue-600 hover:text-blue-800">Reset</button>
+            <button type="button" onClick={onResetSkipped} className="font-bold text-blue-700 underline-offset-2 hover:underline">Reset</button>
           </>
         )}
       </p>
-      <p className="text-[10px] text-slate-400 -mt-2">Click a point here or on the map to skip it — skipped points are not billed.</p>
+      <p className="text-xs text-slate-600 dark:text-slate-400 -mt-2">Click a point here or on the map to skip it. Skipped points are not billed.</p>
     </div>
   );
 }
@@ -130,9 +126,13 @@ export default function LocalFinderForm({ defaults }: Props) {
   const [device, setDevice] = useState(defaults.device || 'desktop');
   const [coordinate, setCoordinate] = useState(defaults.locationCoordinate || defaults.defaultCenter);
   const [isLoading, setIsLoading] = useState(false);
+  const [runState, createAction, isCreating] = useActionState<GridRunState, FormData>(createGridMonitor, null);
   const [gridSize, setGridSize] = useState(parseInt(defaults.gridSize ?? '5', 10));
   const [spacingKm, setSpacingKm] = useState(parseFloat(defaults.spacingKm ?? '1'));
-  const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'live');
+  // Standard is the cheapest mode and the one scheduled runs use; Live stays one explicit click away.
+  const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'standard');
+  // Fixed at creation like the layout, so every snapshot of a monitor is measured on the same results.
+  const [gridDepth, setGridDepth] = useState<GridDepth>(parseGridDepth(defaults.depth, DEFAULT_GRID_DEPTH));
   const [language, setLanguage] = useState(defaults.language || 'English');
   const [gridTarget, setGridTarget] = useState(defaults.gridTarget ?? '');
   const initialLayout = defaults.gridLayout ?? DEFAULT_GRID_LAYOUT;
@@ -161,31 +161,36 @@ export default function LocalFinderForm({ defaults }: Props) {
   const defaultOs = osOptions.some((o) => o.value === defaults.os) ? defaults.os : osOptions[0].value;
 
   return (
-    <form method="GET" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4" onSubmit={() => setIsLoading(true)}>
+    <form
+      {...(isGrid ? { action: createAction } : { method: 'GET', onSubmit: () => setIsLoading(true) })}
+      className={isGrid ? 'space-y-4' : 'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4'}
+    >
       {/* Grid mode: location on the left, grid settings on the right, so the map preview stays in view while shaping the grid. */}
       <div className={isGrid ? 'grid gap-x-8 gap-y-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:items-start' : 'space-y-4'}>
         <div className="space-y-4">
           {/* Keyword */}
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-              Keyword to monitor <span className="text-red-400">*</span>
+            <label htmlFor="lf-keyword" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              Keyword to monitor <span className="text-red-600" aria-hidden="true">*</span>
             </label>
             <input
+              id="lf-keyword"
               type="text"
               name="keyword"
               defaultValue={defaults.keyword}
               placeholder="e.g. plumber, italian restaurant, dentist…"
               required
-              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
+              className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
             />
           </div>
 
           {/* Language */}
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-              Language <span className="text-red-400">*</span>
+            <label htmlFor="lf-language" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              {isGrid ? 'Search results language' : 'Language'} <span className="text-red-600" aria-hidden="true">*</span>
             </label>
             <select
+              id="lf-language"
               name="language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
@@ -198,14 +203,14 @@ export default function LocalFinderForm({ defaults }: Props) {
           {/* Map */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400">
-                {isGrid ? 'Location to monitor (map)' : 'Location (map)'} <span className="text-red-400">*</span>
+              <label htmlFor="lf-coordinate" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                {isGrid ? 'Grid center' : 'Location (map)'} <span className="text-red-600" aria-hidden="true">*</span>
               </label>
               {coordinate && (
                 <button
                   type="button"
                   onClick={() => setCoordinate('')}
-                  className="text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 transition-colors"
+                  className="text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-red-700 transition-colors"
                 >
                   Clear
                 </button>
@@ -227,15 +232,18 @@ export default function LocalFinderForm({ defaults }: Props) {
                 />
               </Suspense>
               <input
+                id="lf-coordinate"
                 type="text"
                 name="location_coordinate"
+                inputMode="decimal"
+                autoComplete="off"
                 value={coordinate}
                 onChange={(e) => setCoordinate(e.target.value)}
                 placeholder="Click on the map to set a point — or type lat,lng"
-                className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-700 dark:text-slate-300 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
+                className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-700 dark:text-slate-300 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800"
               />
               {coordinate && (
-                <p className="text-[11px] text-blue-600">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
                   {isGrid ? 'Grid will be centered on this point.' : 'Coordinates active — search will be centered on this point.'}
                 </p>
               )}
@@ -245,19 +253,21 @@ export default function LocalFinderForm({ defaults }: Props) {
           {isGrid && (
             /* Target business */
             <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">
-                Target domain or business <span className="text-red-400">*</span>
+              <label htmlFor="lf-target" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Target domain or business <span className="text-red-600" aria-hidden="true">*</span>
               </label>
               <input
+                id="lf-target"
                 type="text"
                 name="grid_target"
+                aria-describedby="lf-target-hint"
                 value={gridTarget}
                 onChange={(e) => setGridTarget(e.target.value)}
                 placeholder="Pick a Google listing above, or enter a domain / business name"
                 required
-                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
+                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:bg-slate-800"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Picking a listing from the map search matches that exact Google listing. A domain matches with or without https:// and www; a name matches partially.</p>
+              <p id="lf-target-hint" className="text-xs text-slate-600 dark:text-slate-400 mt-1">Picking a listing from the map search matches that exact Google listing. A domain matches with or without https:// and www; a name matches partially.</p>
             </div>
           )}
         </div>
@@ -268,8 +278,9 @@ export default function LocalFinderForm({ defaults }: Props) {
             {/* Grid size + spacing */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid size</label>
+                <label htmlFor="lf-grid-size" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Grid size</label>
                 <select
+                  id="lf-grid-size"
                   name="grid_size"
                   value={gridSize}
                   onChange={(e) => {
@@ -287,9 +298,10 @@ export default function LocalFinderForm({ defaults }: Props) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Spacing ({distanceUnit})</label>
+                <label htmlFor="lf-spacing" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Spacing ({distanceUnit})</label>
                 {/* Values are always kilometres; only the labels follow the Settings distance unit. */}
                 <select
+                  id="lf-spacing"
                   name="spacing_km"
                   value={spacingKm}
                   onChange={(e) => setSpacingKm(parseFloat(e.target.value))}
@@ -300,68 +312,77 @@ export default function LocalFinderForm({ defaults }: Props) {
               </div>
             </div>
 
-            {/* Grid shape + rotation */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-1.5">Grid shape</label>
-                <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Grid shape">
-                  {GRID_SHAPES.map((option) => {
-                    const active = gridShape === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => {
-                          setGridShape(option.value);
-                          setExcludedCells([]);
-                        }}
-                        className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-black transition-all ${
-                          active
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-                        }`}
-                      >
-                        <ShapeIcon shape={option.value} />
-                        {option.label}
-                      </button>
-                    );
-                  })}
+            {/* Grid shape + rotation: most monitors keep the square default, so it starts folded. */}
+            <details className="group rounded-xl border border-slate-200 dark:border-slate-700" open={gridShape !== 'square' || rotationDeg !== 0}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-bold text-slate-700 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                <span>Shape and rotation</span>
+                <span className="font-normal text-slate-600 dark:text-slate-400">
+                  {GRID_SHAPES.find((option) => option.value === gridShape)?.label}{rotationDeg !== 0 ? `, ${rotationDeg}°` : ''}
+                </span>
+              </summary>
+              <div className="grid grid-cols-1 gap-4 border-t border-slate-200 px-4 py-4 dark:border-slate-700 sm:grid-cols-2 xl:grid-cols-1">
+                <div>
+                  <p id="lf-shape-label" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Grid shape</p>
+                  <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="lf-shape-label">
+                    {GRID_SHAPES.map((option) => {
+                      const active = gridShape === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => {
+                            setGridShape(option.value);
+                            setExcludedCells([]);
+                          }}
+                          className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 ${
+                            active
+                              ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                          }`}
+                        >
+                          <ShapeIcon shape={option.value} />
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="grid-rotation" className="block text-xs font-bold text-slate-700 dark:text-slate-300">Rotation</label>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs font-bold tabular-nums text-slate-800 dark:text-slate-200">{rotationDeg}°</span>
+                      {rotationDeg !== 0 && (
+                        <button type="button" onClick={() => setRotationDeg(0)} className="text-xs font-bold text-blue-700 hover:underline dark:text-blue-300">
+                          Reset
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  <input
+                    id="grid-rotation"
+                    type="range"
+                    min={-45}
+                    max={44}
+                    step={1}
+                    value={rotationDeg}
+                    onChange={(e) => setRotationDeg(normalizeRotation(Number(e.target.value)))}
+                    aria-describedby="grid-rotation-hint"
+                    className="w-full accent-blue-600 mt-2"
+                  />
+                  <p id="grid-rotation-hint" className="text-xs text-slate-600 dark:text-slate-400 mt-1">Align the grid with the street layout or coastline.</p>
                 </div>
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="grid-rotation" className="block text-xs font-black uppercase tracking-widest text-slate-400">Rotation</label>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs font-black tabular-nums text-slate-700 dark:text-slate-200">{rotationDeg}°</span>
-                    {rotationDeg !== 0 && (
-                      <button type="button" onClick={() => setRotationDeg(0)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">
-                        Reset
-                      </button>
-                    )}
-                  </span>
-                </div>
-                <input
-                  id="grid-rotation"
-                  type="range"
-                  min={-45}
-                  max={44}
-                  step={1}
-                  value={rotationDeg}
-                  onChange={(e) => setRotationDeg(normalizeRotation(Number(e.target.value)))}
-                  className="w-full accent-blue-600 mt-2"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">Align the grid with the street layout or coastline.</p>
-              </div>
-            </div>
+            </details>
             {Object.entries(gridLayoutParams(gridLayout)).map(([name, value]) => (
               <input key={name} type="hidden" name={name} value={value} />
             ))}
 
             {/* Grid preview */}
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 text-center">Grid preview</p>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 text-center">Grid preview</p>
               <GridPreview
                 size={gridSize}
                 spacingKm={spacingKm}
@@ -372,44 +393,79 @@ export default function LocalFinderForm({ defaults }: Props) {
               />
             </div>
 
-            {/* Queue mode */}
-            <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">API mode</label>
-              <input type="hidden" name="queue_mode" value={queueMode} />
-              <div className="grid grid-cols-3 gap-2">
-                {QUEUE_MODES.map((mode) => {
-                  const active = queueMode === mode.value;
-                  const estCost = formatCost(pointCount * mode.costPerPoint);
+            {/* Results per point */}
+            <fieldset>
+              <legend className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Results checked per point</legend>
+              <input type="hidden" name="depth" value={gridDepth} />
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Results checked per point">
+                {GRID_DEPTHS.map((depth) => {
+                  const active = gridDepth === depth;
                   return (
                     <button
-                      key={mode.value}
+                      key={depth}
                       type="button"
-                      onClick={() => setQueueMode(mode.value)}
-                      className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setGridDepth(depth)}
+                      className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 ${
                         active
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                           : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      <span className={`text-xs font-black ${active ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                        {mode.label}
+                      <span className={`text-xs font-bold ${active ? 'text-blue-800 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'}`}>Top {depth}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">
+                        {depth === 10 ? 'Cheapest: the listings people actually see' : 'Also tracks ranks 11–20, twice the queue price'}
                       </span>
-                      <span className={`text-[10px] font-mono ${active ? 'text-blue-500' : 'text-slate-400'}`}>{estCost}</span>
-                      <span className="text-[10px] text-slate-400">{mode.wait}</span>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                DataForSEO bills Standard and Priority per 10 results. Kept for every snapshot of this monitor so they stay comparable.
+              </p>
+            </fieldset>
+
+            {/* Queue mode */}
+            <fieldset>
+              <legend className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">API mode</legend>
+              <input type="hidden" name="queue_mode" value={queueMode} />
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="API mode">
+                {QUEUE_MODES.map((mode) => {
+                  const active = queueMode === mode.value;
+                  const estCost = formatCost(estimateGridCost(pointCount, mode.value, gridDepth));
+                  return (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setQueueMode(mode.value)}
+                      className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-blue-600 ${
+                        active
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <span className={`text-xs font-bold ${active ? 'text-blue-800 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {mode.label}
+                      </span>
+                      <span className={`text-xs font-mono tabular-nums ${active ? 'text-blue-800 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>{estCost}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">{mode.wait}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
                 {queueMode === 'live' ? (
-                  <>Blocks the page for {formatLiveDuration(pointCount)} — DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
+                  <>Keep this page open for {formatLiveDuration(pointCount)}. DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
                 ) : queueMode === 'priority' ? (
-                  <>Tasks are queued with DataForSEO’s high-priority flag. The page will auto-refresh every 10 seconds until results are ready.</>
+                  <>Queued with DataForSEO’s high-priority flag. The page checks every 10 seconds; you can leave and come back.</>
                 ) : (
-                  <>Tasks are queued for standard background processing. The page will check every 30 seconds — or you can come back later.</>
+                  <>Queued for standard background processing. The page checks every 30 seconds; you can leave and come back.</>
                 )}
               </p>
-            </div>
+            </fieldset>
           </div>
         )}
       </div>
@@ -488,20 +544,34 @@ export default function LocalFinderForm({ defaults }: Props) {
         </>
       )}
 
+      {isGrid && runState?.error && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+          <p className="font-bold">The run did not start.</p>
+          <p className="mt-0.5">{runState.error}</p>
+          {runState.openId && (
+            <a href={`/dashboard/geo-grid?grid_history_id=${runState.openId}#results`} className="mt-1 inline-block font-bold underline">
+              Some points were already queued and billed: open them
+            </a>
+          )}
+        </div>
+      )}
+
       <button
         type="submit"
-        disabled={isLoading}
-        className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black uppercase tracking-widest text-xs py-3 rounded-xl hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        disabled={isLoading || isCreating}
+        className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-bold text-sm py-3 rounded-xl hover:bg-blue-700 dark:hover:bg-blue-200 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-70 disabled:cursor-wait"
       >
-        {isLoading ? (
+        {isLoading || isCreating ? (
           <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-            {isGrid ? 'Running grid…' : 'Searching…'}
+            {isGrid ? (queueMode === 'live' ? 'Running grid… keep this page open' : 'Queuing grid…') : 'Searching…'}
           </span>
-        ) : (isGrid ? 'Create monitor & run' : 'Search')}
+        ) : (isGrid
+          ? `Create monitor and run · ${pointCount} points · top ${gridDepth} · ${QUEUE_MODES.find((mode) => mode.value === queueMode)?.label} · ${formatCost(estimateGridCost(pointCount, queueMode, gridDepth))}`
+          : 'Search')}
       </button>
     </form>
   );

@@ -70,7 +70,7 @@ async function runPass(credentials: { login: string; pass: string }) {
       const result = await postGridTasksQueue(
         schedule.keyword, schedule.center, schedule.grid_size, schedule.spacing_km, schedule.language,
         credentials.login, credentials.pass, schedule.queue_mode === 'priority' ? 'priority' : 'standard',
-        schedule.layout,
+        schedule.layout, schedule.depth,
       );
       if (result.error) failed.push({ seriesId: schedule.series_id, error: result.error });
       if (result.taskPoints.length === 0) {
@@ -92,6 +92,7 @@ async function runPass(credentials: { login: string; pass: string }) {
         status: 'pending',
         queue_mode: schedule.queue_mode,
         layout: schedule.layout,
+        depth: schedule.depth,
         cost: result.cost,
       };
       saveGridSearchPendingForProject(schedule.projectId, entry, result.taskPoints);

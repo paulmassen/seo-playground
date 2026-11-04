@@ -1,63 +1,93 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
-import type { GridSchedule } from '@/lib/db';
+import type { GridQueueMode, GridSchedule } from '@/lib/db';
+import { LEGACY_GRID_DEPTH, estimateGridCost, formatUsd, type GridDepth } from '@/lib/grid-pricing';
+import PendingButton from '@/components/PendingButton';
 import { updateGridSchedule } from '../geo-grid/actions';
 
 const days = [
   ['Sunday', 0], ['Monday', 1], ['Tuesday', 2], ['Wednesday', 3], ['Thursday', 4], ['Friday', 5], ['Saturday', 6],
 ] as const;
 
-export default function GridScheduleControl({ runId, schedule }: { runId: string; schedule: GridSchedule | null }) {
+const fieldClass = 'w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:disabled:bg-slate-800';
+const labelClass = 'mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300';
+
+export default function GridScheduleControl({ runId, schedule, pointCount, depth = LEGACY_GRID_DEPTH, locationTimeZone }: { runId: string; schedule: GridSchedule | null; pointCount: number; depth?: GridDepth; locationTimeZone: string | null }) {
   const [frequency, setFrequency] = useState<'off' | 'daily' | 'weekly'>(schedule?.frequency ?? 'off');
-  const [timeZone, setTimeZone] = useState(schedule?.time_zone ?? 'UTC');
+  const [mode, setMode] = useState<GridQueueMode>(schedule?.queue_mode ?? 'standard');
+  const [timeZone, setTimeZone] = useState(locationTimeZone ?? schedule?.time_zone ?? 'UTC');
+  const id = useId();
 
   useEffect(() => {
-    if (!schedule) setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
-  }, [schedule]);
+    if (!locationTimeZone && !schedule) setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  }, [locationTimeZone, schedule]);
+
+  const perRun = estimateGridCost(pointCount, mode, depth);
+  const runsPerMonth = frequency === 'daily' ? 30 : frequency === 'weekly' ? 4.3 : 0;
 
   return (
-    <form action={updateGridSchedule} className="border-t border-slate-200 pt-4 dark:border-slate-800">
+    <form action={updateGridSchedule}>
       <input type="hidden" name="run_id" value={runId} />
       <input type="hidden" name="time_zone" value={timeZone} />
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex gap-2.5">
-          <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-            <CalendarClock className="h-3.5 w-3.5" />
-          </span>
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
           <div>
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-100">Automated checks</p>
-            <p className="mt-0.5 max-w-sm text-[11px] leading-relaxed text-slate-400">A scheduler adds a new snapshot to this timeline at the selected time.</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">Automatic snapshots</p>
+            <p className="mt-0.5 max-w-md text-xs text-slate-600 dark:text-slate-400">
+              Adds a snapshot to this timeline on a schedule, while the app’s background worker is running.
+            </p>
           </div>
         </div>
         {schedule && (
-          <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-400">
-            Next {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: schedule.time_zone }).format(new Date(schedule.next_run_at))}
-          </span>
+          <p className="shrink-0 text-xs tabular-nums text-slate-600 dark:text-slate-400">
+            Next run {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: schedule.time_zone }).format(new Date(schedule.next_run_at))} ({schedule.time_zone})
+          </p>
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <select name="frequency" value={frequency} onChange={(event) => setFrequency(event.target.value as 'off' | 'daily' | 'weekly')} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          <option value="off">Not scheduled</option>
-          <option value="daily">Every day</option>
-          <option value="weekly">Every week</option>
-        </select>
-        <input name="time_of_day" type="time" defaultValue={schedule?.time_of_day ?? '08:00'} disabled={frequency === 'off'} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" />
-        <select name="weekday" defaultValue={schedule?.weekday ?? 1} disabled={frequency !== 'weekly'} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          {days.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <select name="queue_mode" defaultValue={schedule?.queue_mode ?? 'standard'} disabled={frequency === 'off'} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          <option value="standard">Standard queue</option>
-          <option value="priority">Priority queue</option>
-        </select>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <label htmlFor={`${id}-frequency`} className={labelClass}>Repeat</label>
+          <select id={`${id}-frequency`} name="frequency" value={frequency} onChange={(event) => setFrequency(event.target.value as 'off' | 'daily' | 'weekly')} className={fieldClass}>
+            <option value="off">Not scheduled</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${id}-time`} className={labelClass}>Time</label>
+          <input id={`${id}-time`} name="time_of_day" type="time" defaultValue={schedule?.time_of_day ?? '08:00'} disabled={frequency === 'off'} className={fieldClass} />
+        </div>
+        <div>
+          <label htmlFor={`${id}-weekday`} className={labelClass}>Day</label>
+          <select id={`${id}-weekday`} name="weekday" defaultValue={schedule?.weekday ?? 1} disabled={frequency !== 'weekly'} className={fieldClass}>
+            {days.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${id}-mode`} className={labelClass}>API mode</label>
+          <select id={`${id}-mode`} name="queue_mode" value={mode} onChange={(event) => setMode(event.target.value as GridQueueMode)} disabled={frequency === 'off'} className={fieldClass}>
+            <option value="standard">Standard · ≈{formatUsd(estimateGridCost(pointCount, 'standard', depth))}</option>
+            <option value="priority">Priority · ≈{formatUsd(estimateGridCost(pointCount, 'priority', depth))}</option>
+          </select>
+        </div>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <p className="text-[10px] text-slate-400">{timeZone.replace(/_/g, ' ')} · Requires the configured cron endpoint.</p>
-        <button type="submit" className="text-[10px] font-black uppercase tracking-widest text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400">
-          {frequency === 'off' ? 'Save' : 'Save schedule'}
-        </button>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          {frequency !== 'off' && `≈${formatUsd(perRun)} per run, about ${formatUsd(perRun * runsPerMonth)} a month · `}
+          {locationTimeZone ? `Map location time: ${timeZone}.` : `Map time zone unavailable; using ${timeZone}.`}
+          {schedule && locationTimeZone && schedule.time_zone !== locationTimeZone && ' The existing schedule keeps its current time zone until you save.'}
+        </p>
+        <PendingButton
+          type="submit"
+          pendingChildren="Saving…"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 transition-colors hover:border-blue-500 hover:text-blue-800 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        >
+          {frequency === 'off' ? (schedule ? 'Turn off schedule' : 'Save') : 'Save schedule'}
+        </PendingButton>
       </div>
     </form>
   );

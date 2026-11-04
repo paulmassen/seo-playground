@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GridLocalItem, GridPoint } from '@/lib/db';
-import { competitorKey, computeCompetitors } from './grid-insights';
+import { competitorKey, computeCompetitors, computeGridSummary } from './grid-insights';
 
 const west: GridLocalItem = { rank_group: 2, title: 'Bond Vet - Upper West Side', domain: 'bondvet.com', url: 'https://bondvet.com/c/upper-west-side-animal-hospital', cid: '111', is_target: false };
 const east: GridLocalItem = { rank_group: 1, title: 'Bond Vet - Upper East Side', domain: 'bondvet.com', url: 'https://bondvet.com/c/east-86th-street-animal-hospital', cid: '222', is_target: false };
@@ -33,5 +33,33 @@ describe('computeCompetitors', () => {
     const [c] = computeCompetitors([point(0, dup), point(1, dup)]);
     expect(c.appearances).toBe(2);
     expect(c.visibilityScore).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('computeGridSummary', () => {
+  const ranked = (rank: number | null): GridPoint => ({ row: 0, col: 0, rank });
+
+  it('derives Coverage, ARP and SoLV over the whole grid', () => {
+    const summary = computeGridSummary([ranked(1), ranked(2), ranked(5), ranked(null)]);
+    expect(summary.coverage).toBe(75);
+    expect(summary.arp).toBe(2.7);
+    expect(summary.solv).toBe(50);
+  });
+
+  it('reports no ARP, rather than 0, when the target is never found', () => {
+    const summary = computeGridSummary([ranked(null), ranked(null)]);
+    expect(summary.arp).toBeNull();
+    expect(summary.coverage).toBe(0);
+    expect(summary.solv).toBe(0);
+  });
+});
+
+describe('competitor metrics', () => {
+  it('uses the same Coverage, ARP and SoLV definitions as the target', () => {
+    const results = [point(0, [east]), point(1, [{ ...east, rank_group: 5 }]), point(2, []), point(3, [])];
+    const [c] = computeCompetitors(results);
+    expect(c.coverage).toBe(50);
+    expect(c.arp).toBe(3);
+    expect(c.solv).toBe(25);
   });
 });

@@ -1,6 +1,8 @@
 import type { GridPoint, GridLocalItem, GridTaskPoint } from '@/lib/db';
 import { matchesGridTarget } from '@/lib/grid-target';
 import { DEFAULT_GRID_LAYOUT, generateGridCoords, gridLayoutKey, type GridLayout } from '@/lib/grid-layout';
+import { organicLocalPack } from '@/lib/grid-local-pack';
+import { LEGACY_GRID_DEPTH, type GridDepth } from '@/lib/grid-pricing';
 
 export interface LocalPackItem {
   type: string;
@@ -34,7 +36,7 @@ async function mapWithConcurrency<T, R>(
 }
 
 async function requestGridPoint(
-  keyword: string, lat: number, lng: number, language: string, auth: string,
+  keyword: string, lat: number, lng: number, language: string, auth: string, depth: GridDepth,
 ): Promise<{ items: LocalPackItem[]; cost: number; error?: string }> {
   let res: Response;
   try {
@@ -45,7 +47,7 @@ async function requestGridPoint(
         keyword,
         location_coordinate: `${lat.toFixed(6)},${lng.toFixed(6)}`,
         language_name: language,
-        depth: 20,
+        depth,
       }]),
       signal: AbortSignal.timeout(45_000),
     });
@@ -60,17 +62,17 @@ async function requestGridPoint(
   if (!task || task.status_code !== 20000) {
     return { items: [], cost: 0, error: task?.status_message ?? 'no task in response' };
   }
-  const items = (task.result?.[0]?.items ?? []).filter((i) => i.type === 'local_pack');
+  const items = organicLocalPack(task.result?.[0]?.items ?? []);
   return { items, cost: task.cost ?? 0 };
 }
 
 export async function fetchOneGridPoint(
-  keyword: string, lat: number, lng: number, language: string, auth: string,
+  keyword: string, lat: number, lng: number, language: string, auth: string, depth: GridDepth = LEGACY_GRID_DEPTH,
 ): Promise<{ items: LocalPackItem[]; cost: number }> {
-  let result = await requestGridPoint(keyword, lat, lng, language, auth);
+  let result = await requestGridPoint(keyword, lat, lng, language, auth, depth);
   if (result.error) {
     // Transient failures (timeouts, rate limiting) are common under concurrent load; retry once.
-    result = await requestGridPoint(keyword, lat, lng, language, auth);
+    result = await requestGridPoint(keyword, lat, lng, language, auth, depth);
   }
   return { items: result.items, cost: result.cost };
 }
@@ -78,6 +80,7 @@ export async function fetchOneGridPoint(
 export async function fetchGridSearch(
   keyword: string, center: string, gridSize: number, spacingKm: number,
   language: string, target: string, login: string, pass: string, layout: GridLayout = DEFAULT_GRID_LAYOUT,
+  depth: GridDepth = LEGACY_GRID_DEPTH,
 ): Promise<{ results: GridPoint[]; cost: number; error?: string }> {
   const parts = center.split(',').map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
@@ -90,7 +93,7 @@ export async function fetchGridSearch(
   const pointResults = await mapWithConcurrency(
     coords, 6,
     async ({ row, col, lat, lng }) => {
-      const { items: rawItems, cost } = await fetchOneGridPoint(keyword, lat, lng, language, auth);
+      const { items: rawItems, cost } = await fetchOneGridPoint(keyword, lat, lng, language, auth, depth);
 
       const isTarget = (item: LocalPackItem) => matchesGridTarget(target, item);
 
@@ -118,7 +121,7 @@ export async function fetchGridSearch(
 export async function postGridTasksQueue(
   keyword: string, center: string, gridSize: number, spacingKm: number,
   language: string, login: string, pass: string, priorityMode: 'priority' | 'standard' = 'standard',
-  layout: GridLayout = DEFAULT_GRID_LAYOUT,
+  layout: GridLayout = DEFAULT_GRID_LAYOUT, depth: GridDepth = LEGACY_GRID_DEPTH,
 ): Promise<{ taskPoints: GridTaskPoint[]; cost: number; error?: string }> {
   const parts = center.split(',').map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
@@ -140,7 +143,7 @@ export async function postGridTasksQueue(
       keyword,
       location_coordinate: `${lat.toFixed(6)},${lng.toFixed(6)}`,
       language_name: language,
-      depth: 20,
+      depth,
       priority,
     }));
     // On failure, still return the chunks already posted: those tasks are billed, and
@@ -174,10 +177,11 @@ export async function postGridTasksQueue(
 export function stableGridId(
   keyword: string, center: string, gridSize: number,
   spacingKm: number, target: string, queueMode: string, layout: GridLayout = DEFAULT_GRID_LAYOUT,
+  depth: GridDepth = LEGACY_GRID_DEPTH,
 ): string {
   const window = Math.floor(Date.now() / 60_000);
   const layoutKey = gridLayoutKey(layout);
-  const key = `${window}|${keyword}|${center}|${gridSize}|${spacingKm}|${target}|${queueMode}${layoutKey ? `|${layoutKey}` : ''}`;
+  const key = `${window}|${keyword}|${center}|${gridSize}|${spacingKm}|${target}|${queueMode}${layoutKey ? `|${layoutKey}` : ''}${depth === LEGACY_GRID_DEPTH ? '' : `|d${depth}`}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -24,6 +24,7 @@ import {
   addTrackedKeyword, saveRankCheck, getRankTopResultsHistory,
   reserveRankTasksForProject, confirmRankTaskReservationForProject, completeRankTaskForProject,
   getRankTaskActivity, markRankTaskSeen,
+  getBusinessLocationForProject, saveBusinessLocationPendingForProject, completeBusinessLocationForProject,
 } from './db';
 import { DEFAULT_GRID_LAYOUT, normalizeGridLayout } from './grid-layout';
 
@@ -259,6 +260,24 @@ describe('Geo-grid monitoring', () => {
     deleteGridSchedule(seriesId);
   });
 
+  it('schedules in local time across daylight saving transitions', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-03-07T17:00:00Z'));
+      const daily = saveGridSchedule({ ...base, frequency: 'daily', weekday: null, time_of_day: '12:00', time_zone: 'America/New_York' });
+      expect(new Date(daily.next_run_at).toISOString()).toBe('2026-03-08T16:00:00.000Z');
+      vi.setSystemTime(new Date('2026-03-07T17:00:00Z'));
+      const gap = saveGridSchedule({ ...base, frequency: 'daily', weekday: null, time_of_day: '02:30', time_zone: 'America/New_York' });
+      expect(new Date(gap.next_run_at).toISOString()).toBe('2026-03-08T07:30:00.000Z');
+      vi.setSystemTime(new Date('2026-10-31T17:00:00Z'));
+      const overlap = saveGridSchedule({ ...base, frequency: 'weekly', weekday: 0, time_of_day: '01:30', time_zone: 'America/New_York' });
+      expect(new Date(overlap.next_run_at).toISOString()).toBe('2026-11-01T05:30:00.000Z');
+    } finally {
+      deleteGridSchedule(seriesId);
+      vi.useRealTimers();
+    }
+  });
+
   it('persists and removes a daily schedule', () => {
     const saved = saveGridSchedule({ ...base, frequency: 'daily', weekday: null, time_of_day: '08:30', time_zone: 'Europe/Paris' });
     expect(saved.next_run_at).toBeGreaterThan(Date.now());
@@ -286,6 +305,32 @@ describe('Geo-grid monitoring', () => {
     const [claimed] = claimDueGridSchedules(schedule.next_run_at + 1).filter((item) => item.series_id === layoutSeries);
     expect(claimed.layout).toEqual(layout);
     deleteGridSeries(layoutSeries);
+  });
+
+  it('keeps depth 20 as the legacy series and stores the depth on runs and schedules', () => {
+    expect(gridSeriesId(base.keyword, base.center, base.grid_size, base.spacing_km, base.target, base.language, DEFAULT_GRID_LAYOUT, 20)).toBe(seriesId);
+    const top10Series = gridSeriesId(base.keyword, base.center, base.grid_size, base.spacing_km, base.target, base.language, DEFAULT_GRID_LAYOUT, 10);
+    expect(top10Series).not.toBe(seriesId);
+
+    saveGridSearch({ ...base, series_id: top10Series, id: 'grid-depth-run', ts: 30, depth: 10 }, [{ row: 0, col: 0, rank: 1 }]);
+    expect(getGridSeriesHistory(top10Series)[0].depth).toBe(10);
+    expect(getGridSeriesHistory(seriesId)[0].depth).toBe(20);
+
+    saveGridSchedule({ ...base, series_id: top10Series, depth: 10, frequency: 'daily', weekday: null, time_of_day: '08:30', time_zone: 'UTC' });
+    const schedule = getGridSchedule(top10Series)!;
+    expect(schedule.depth).toBe(10);
+    const [claimed] = claimDueGridSchedules(schedule.next_run_at + 1).filter((item) => item.series_id === top10Series);
+    expect(claimed.depth).toBe(10);
+    deleteGridSeries(top10Series);
+  });
+
+  it('adds Coverage and SoLV to the history summary', () => {
+    const summarySeries = gridSeriesId('summary', base.center, base.grid_size, base.spacing_km, base.target, base.language);
+    saveGridSearch({ ...base, series_id: summarySeries, id: 'grid-summary-run', ts: 40 }, [
+      { row: 0, col: 0, rank: 1 }, { row: 0, col: 1, rank: 8 }, { row: 1, col: 0, rank: null }, { row: 1, col: 1, rank: null },
+    ]);
+    expect(getGridSeriesHistory(summarySeries)[0].summary).toMatchObject({ coverage: 50, solv: 25, foundCount: 2 });
+    deleteGridSeries(summarySeries);
   });
 
   it('deletes a whole monitor: every snapshot and its schedule', () => {
@@ -356,5 +401,22 @@ describe('rank check top results', () => {
     expect(history).toHaveLength(1);
     expect(history[0].topResults).toEqual(top('a.com'));
     expect(history[0].position).toBe(2);
+  });
+});
+
+describe('Business locations', () => {
+  it('stores a lookup, completes it, and adds the cost of a retry after an error', () => {
+    const projectId = getActiveProject().id;
+    saveBusinessLocationPendingForProject(projectId, '123', 'task-a', 0.003);
+    expect(getBusinessLocationForProject(projectId, '123')).toMatchObject({ status: 'pending', taskId: 'task-a', cost: 0.003 });
+
+    completeBusinessLocationForProject(projectId, '123', { error: 'Not found' });
+    expect(getBusinessLocationForProject(projectId, '123')).toMatchObject({ status: 'error', error: 'Not found' });
+
+    saveBusinessLocationPendingForProject(projectId, '123', 'task-b', 0.003);
+    completeBusinessLocationForProject(projectId, '123', { lat: 48.85, lng: 2.35, address: '1 Rue Example' });
+    const location = getBusinessLocationForProject(projectId, '123')!;
+    expect(location).toMatchObject({ status: 'done', lat: 48.85, lng: 2.35, address: '1 Rue Example', error: null });
+    expect(location.cost).toBeCloseTo(0.006);
   });
 });

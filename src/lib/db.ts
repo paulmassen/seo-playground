@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { reconcileGridPoints } from './grid-target';
 import { DEFAULT_GRID_LAYOUT, gridLayoutKey, parseGridLayout, serializeGridLayout, type GridLayout } from './grid-layout';
+import { LEGACY_GRID_DEPTH, parseGridDepth, type GridDepth } from './grid-pricing';
 import type { RankTopResult } from './rank-serp';
 
 // Operation-local identity, never the mutable UI selection after an await.
@@ -510,6 +511,18 @@ function initSchema(db: Database.Database) {
       results TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS business_locations (
+      cid TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      task_id TEXT,
+      lat REAL,
+      lng REAL,
+      address TEXT,
+      error TEXT,
+      cost REAL
+    );
+
     CREATE TABLE IF NOT EXISTS grid_schedules (
       series_id TEXT PRIMARY KEY,
       keyword TEXT NOT NULL,
@@ -895,6 +908,9 @@ function initSchema(db: Database.Database) {
   // Shape, rotation and skipped points; NULL means the classic full square grid.
   addColumnIfMissing(db, 'grid_searches', 'ADD COLUMN grid_layout TEXT');
   addColumnIfMissing(db, 'grid_schedules', 'ADD COLUMN grid_layout TEXT');
+  // Local Finder results requested per point (10 or 20). NULL means 20, the only depth before it was configurable.
+  addColumnIfMissing(db, 'grid_searches', 'ADD COLUMN depth INTEGER');
+  addColumnIfMissing(db, 'grid_schedules', 'ADD COLUMN depth INTEGER');
   addColumnIfMissing(db, 'reviews_tasks', 'ADD COLUMN meta TEXT');
   addColumnIfMissing(db, 'rank_checks', 'ADD COLUMN ai_overview INTEGER');
   addColumnIfMissing(db, 'rank_checks', 'ADD COLUMN top_results TEXT');
@@ -1968,6 +1984,10 @@ export interface GridHistorySummary {
   avgRank: number | null;
   top3Count: number;
   ato: number;
+  /** % of points where the target is in the results (1 to the run's depth). */
+  coverage: number;
+  /** % of all points where the target is in the top 3 (Share of Local Voice). */
+  solv: number;
 }
 
 export interface GridSearchEntry {
@@ -1986,6 +2006,8 @@ export interface GridSearchEntry {
   queue_mode: GridQueueMode;
   /** Fixed at monitor creation. Always set on entries read from the database. */
   layout?: GridLayout;
+  /** Results requested per point. Always set on entries read from the database (20 for older runs). */
+  depth?: GridDepth;
   summary?: GridHistorySummary;
 }
 
@@ -2002,6 +2024,8 @@ export interface GridSchedule {
   queue_mode: GridQueueMode;
   /** Copied from the monitor so scheduled runs scan the same points. */
   layout?: GridLayout;
+  /** Copied from the monitor so scheduled runs keep its depth and price. */
+  depth?: GridDepth;
   frequency: GridScheduleFrequency;
   weekday: number | null;
   time_of_day: string;
@@ -2049,12 +2073,14 @@ export interface GridPoint {
  */
 export function gridSeriesId(
   keyword: string, center: string, gridSize: number, spacingKm: number, target: string, language: string,
-  layout: GridLayout = DEFAULT_GRID_LAYOUT,
+  layout: GridLayout = DEFAULT_GRID_LAYOUT, depth: GridDepth = LEGACY_GRID_DEPTH,
 ): string {
   const parts: Array<string | number> = [keyword.trim().toLowerCase(), center.trim(), gridSize, spacingKm, target.trim().toLowerCase(), language.trim().toLowerCase()];
   // The default layout adds nothing, so monitors created before layouts existed keep their id.
   const layoutKey = gridLayoutKey(layout);
   if (layoutKey) parts.push(layoutKey);
+  // Same for depth 20: a top 10 monitor is a separate series, since its "not found" means something else.
+  if (depth !== LEGACY_GRID_DEPTH) parts.push(`d${depth}`);
   const key = parts.join('|');
   let hash = 0x811c9dc5;
   for (let index = 0; index < key.length; index += 1) {
@@ -2066,17 +2092,19 @@ export function gridSeriesId(
 
 function entryFromGridRow(row: {
   id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string;
-  cost: number | null; status: string; queue_mode: string; grid_layout?: string | null; results?: string | null; task_ids?: string | null;
+  cost: number | null; status: string; queue_mode: string; grid_layout?: string | null; depth?: number | null; results?: string | null; task_ids?: string | null;
 }): GridSearchEntry & { task_ids?: GridTaskPoint[] } {
   const layout = parseGridLayout(row.grid_layout, row.grid_size);
+  const depth = parseGridDepth(row.depth, LEGACY_GRID_DEPTH);
   return {
     id: row.id,
-    series_id: row.series_id || gridSeriesId(row.keyword, row.center, row.grid_size, row.spacing_km, row.target, row.language, layout),
+    series_id: row.series_id || gridSeriesId(row.keyword, row.center, row.grid_size, row.spacing_km, row.target, row.language, layout, depth),
     layout,
     ts: row.ts, keyword: row.keyword, target: row.target, center: row.center,
     grid_size: row.grid_size, spacing_km: row.spacing_km, language: row.language, cost: row.cost ?? undefined,
     status: (row.status ?? 'done') as GridStatus,
     queue_mode: (row.queue_mode ?? 'live') as GridQueueMode,
+    depth,
     summary: row.status === 'pending' ? undefined : summarizeGridResults(row.results ?? null, row.target),
     task_ids: row.task_ids ? JSON.parse(row.task_ids) as GridTaskPoint[] : undefined,
   };
@@ -2099,21 +2127,23 @@ function summarizeGridResults(resultsJson: string | null, target: string): GridH
     ? Math.round((ranked.reduce((s, p) => s + p.rank!, 0) / ranked.length) * 10) / 10
     : null;
   const ato = Math.round((points.reduce((s, p) => s + (21 - Math.min(p.rank ?? 21, 21)), 0) / (totalPoints * 20)) * 100);
-  return { totalPoints, foundCount: ranked.length, avgRank, top3Count, ato };
+  const coverage = Math.round((ranked.length / totalPoints) * 100);
+  const solv = Math.round((top3Count / totalPoints) * 100);
+  return { totalPoints, foundCount: ranked.length, avgRank, top3Count, ato, coverage, solv };
 }
 
 export function getGridHistory(): GridSearchEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, results FROM grid_searches ORDER BY ts DESC LIMIT 100')
-    .all() as Array<{ id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; results: string | null }>;
+    .prepare('SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, depth, results FROM grid_searches ORDER BY ts DESC LIMIT 100')
+    .all() as Array<{ id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; depth: number | null; results: string | null }>;
   return rows.map(entryFromGridRow);
 }
 
 /** Every run of one monitor, newest first. Not derived from getGridHistory(), whose cap spans all monitors. */
 export function getGridSeriesHistory(seriesId: string): GridSearchEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, results FROM grid_searches WHERE series_id = ? ORDER BY ts DESC')
-    .all(seriesId) as Array<{ id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; results: string | null }>;
+    .prepare('SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, depth, results FROM grid_searches WHERE series_id = ? ORDER BY ts DESC')
+    .all(seriesId) as Array<{ id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; depth: number | null; results: string | null }>;
   return rows.map(entryFromGridRow);
 }
 
@@ -2123,16 +2153,16 @@ export function getGridEntry(id: string): (GridSearchEntry & { task_ids?: GridTa
 
 export function getGridEntryForProject(projectId: string, id: string): (GridSearchEntry & { task_ids?: GridTaskPoint[] }) | null {
   const row = getDbForProject(projectId)
-    .prepare('SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, task_ids FROM grid_searches WHERE id = ?')
-    .get(id) as { id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; task_ids: string | null } | undefined;
+    .prepare('SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, depth, task_ids FROM grid_searches WHERE id = ?')
+    .get(id) as { id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; depth: number | null; task_ids: string | null } | undefined;
   if (!row) return null;
   return entryFromGridRow(row);
 }
 
 export function saveGridSearch(entry: GridSearchEntry, results: GridPoint[]): void {
   getDb()
-    .prepare('INSERT OR REPLACE INTO grid_searches (id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, results, status, queue_mode, grid_layout) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.series_id, entry.keyword, entry.target, entry.center, entry.grid_size, entry.spacing_km, entry.language, entry.cost ?? null, JSON.stringify(results), entry.status, entry.queue_mode, serializeGridLayout(entry.layout));
+    .prepare('INSERT OR REPLACE INTO grid_searches (id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, results, status, queue_mode, grid_layout, depth) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.series_id, entry.keyword, entry.target, entry.center, entry.grid_size, entry.spacing_km, entry.language, entry.cost ?? null, JSON.stringify(results), entry.status, entry.queue_mode, serializeGridLayout(entry.layout), entry.depth ?? LEGACY_GRID_DEPTH);
 }
 
 export function saveGridSearchPending(entry: GridSearchEntry, taskPoints: GridTaskPoint[]): void {
@@ -2141,8 +2171,8 @@ export function saveGridSearchPending(entry: GridSearchEntry, taskPoints: GridTa
 
 function saveGridSearchPendingToDb(db: Database.Database, entry: GridSearchEntry, taskPoints: GridTaskPoint[]): void {
   db
-    .prepare('INSERT OR REPLACE INTO grid_searches (id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, results, status, queue_mode, grid_layout, task_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.series_id, entry.keyword, entry.target, entry.center, entry.grid_size, entry.spacing_km, entry.language, entry.cost ?? null, '[]', 'pending', entry.queue_mode, serializeGridLayout(entry.layout), JSON.stringify(taskPoints));
+    .prepare('INSERT OR REPLACE INTO grid_searches (id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, results, status, queue_mode, grid_layout, depth, task_ids) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.series_id, entry.keyword, entry.target, entry.center, entry.grid_size, entry.spacing_km, entry.language, entry.cost ?? null, '[]', 'pending', entry.queue_mode, serializeGridLayout(entry.layout), entry.depth ?? LEGACY_GRID_DEPTH, JSON.stringify(taskPoints));
 }
 
 export function saveGridSearchPendingForProject(projectId: string, entry: GridSearchEntry, taskPoints: GridTaskPoint[]): void {
@@ -2193,9 +2223,9 @@ export function updateGridProgressForProject(projectId: string, id: string, accu
 
 export function getPendingGridEntriesForProject(projectId: string): Array<GridSearchEntry & { task_ids?: GridTaskPoint[] }> {
   const rows = getDbForProject(projectId)
-    .prepare(`SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, task_ids
+    .prepare(`SELECT id, ts, series_id, keyword, target, center, grid_size, spacing_km, language, cost, status, queue_mode, grid_layout, depth, task_ids
       FROM grid_searches WHERE status = 'pending' ORDER BY ts ASC LIMIT 100`)
-    .all() as Array<{ id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; task_ids: string | null }>;
+    .all() as Array<{ id: string; ts: number; series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string; cost: number | null; status: string; queue_mode: string; grid_layout: string | null; depth: number | null; task_ids: string | null }>;
   return rows.map(entryFromGridRow);
 }
 
@@ -2211,13 +2241,14 @@ export function getGridResults(id: string): GridPoint[] | null {
 
 function parseScheduleRow(row: {
   series_id: string; keyword: string; target: string; center: string; grid_size: number; spacing_km: number; language: string;
-  queue_mode: string; grid_layout: string | null; frequency: string; weekday: number | null; time_of_day: string; time_zone: string; next_run_at: number;
+  queue_mode: string; grid_layout: string | null; depth: number | null; frequency: string; weekday: number | null; time_of_day: string; time_zone: string; next_run_at: number;
 }): GridSchedule {
   return {
     series_id: row.series_id, keyword: row.keyword, target: row.target, center: row.center,
     grid_size: row.grid_size, spacing_km: row.spacing_km, language: row.language,
     queue_mode: (row.queue_mode ?? 'standard') as GridQueueMode,
     layout: parseGridLayout(row.grid_layout, row.grid_size),
+    depth: parseGridDepth(row.depth, LEGACY_GRID_DEPTH),
     frequency: row.frequency as GridScheduleFrequency,
     weekday: row.weekday, time_of_day: row.time_of_day, time_zone: row.time_zone, next_run_at: row.next_run_at,
   };
@@ -2251,10 +2282,20 @@ function timeZoneOffset(timestamp: number, timeZone: string): number {
 
 function localTimeToTimestamp(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): number {
   const localUtc = Date.UTC(year, month - 1, day, hour, minute);
-  let timestamp = localUtc - timeZoneOffset(localUtc, timeZone);
-  // Re-evaluate once so DST offset changes on the target date are applied.
-  timestamp = localUtc - timeZoneOffset(timestamp, timeZone);
-  return timestamp;
+  // Test offsets on both sides of a transition. On a repeated hour choose the
+  // earlier occurrence; on a missing hour move forward by the DST gap.
+  const offsets = new Set([-48, -24, 0, 24, 48].map((hours) => timeZoneOffset(localUtc + hours * 3_600_000, timeZone)));
+  const candidates = [...offsets].map((offset) => localUtc - offset);
+  const matching = candidates.filter((timestamp) => {
+    const p = zonedParts(timestamp, timeZone);
+    return p.year === year && p.month === month && p.day === day && p.hour === hour && p.minute === minute;
+  });
+  if (matching.length) return Math.min(...matching);
+  const later = candidates.filter((timestamp) => {
+    const p = zonedParts(timestamp, timeZone);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) > localUtc;
+  });
+  return later.length ? Math.min(...later) : Math.max(...candidates);
 }
 
 function nextDailyRun(timeOfDay: string, timeZone: string, after: number): number {
@@ -2289,7 +2330,7 @@ function nextGridScheduleRun(schedule: Pick<GridSchedule, 'frequency' | 'weekday
 
 export function getGridSchedule(seriesId: string): GridSchedule | null {
   const row = getDb().prepare(`SELECT series_id, keyword, target, center, grid_size, spacing_km, language,
-    queue_mode, grid_layout, frequency, weekday, time_of_day, time_zone, next_run_at FROM grid_schedules WHERE series_id = ?`).get(seriesId) as Parameters<typeof parseScheduleRow>[0] | undefined;
+    queue_mode, grid_layout, depth, frequency, weekday, time_of_day, time_zone, next_run_at FROM grid_schedules WHERE series_id = ?`).get(seriesId) as Parameters<typeof parseScheduleRow>[0] | undefined;
   return row ? parseScheduleRow(row) : null;
 }
 
@@ -2301,14 +2342,14 @@ export function saveGridSchedule(input: Omit<GridSchedule, 'next_run_at'>): Grid
   const weekday = frequency === 'weekly' && input.weekday != null && input.weekday >= 0 && input.weekday <= 6 ? input.weekday : null;
   const next_run_at = nextGridScheduleRun({ frequency, weekday, time_of_day, time_zone }, now);
   getDb().prepare(`INSERT INTO grid_schedules
-    (series_id, keyword, target, center, grid_size, spacing_km, language, queue_mode, grid_layout, frequency, weekday, time_of_day, time_zone, next_run_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (series_id, keyword, target, center, grid_size, spacing_km, language, queue_mode, grid_layout, depth, frequency, weekday, time_of_day, time_zone, next_run_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(series_id) DO UPDATE SET
-      queue_mode = excluded.queue_mode, frequency = excluded.frequency, weekday = excluded.weekday,
+      queue_mode = excluded.queue_mode, depth = excluded.depth, frequency = excluded.frequency, weekday = excluded.weekday,
       time_of_day = excluded.time_of_day, time_zone = excluded.time_zone, next_run_at = excluded.next_run_at, updated_at = excluded.updated_at`)
     .run(input.series_id, input.keyword, input.target, input.center, input.grid_size, input.spacing_km, input.language,
-      input.queue_mode, serializeGridLayout(input.layout), frequency, weekday, time_of_day, time_zone, next_run_at, now, now);
-  return { ...input, layout: input.layout ?? DEFAULT_GRID_LAYOUT, frequency, weekday, time_of_day, time_zone, next_run_at };
+      input.queue_mode, serializeGridLayout(input.layout), input.depth ?? LEGACY_GRID_DEPTH, frequency, weekday, time_of_day, time_zone, next_run_at, now, now);
+  return { ...input, layout: input.layout ?? DEFAULT_GRID_LAYOUT, depth: input.depth ?? LEGACY_GRID_DEPTH, frequency, weekday, time_of_day, time_zone, next_run_at };
 }
 
 export function deleteGridSchedule(seriesId: string): void {
@@ -2330,7 +2371,7 @@ export function claimDueGridSchedules(now = Date.now()): DueGridSchedule[] {
   for (const project of getProjects()) {
     const db = getDbForProject(project.id);
     const rows = db.prepare(`SELECT series_id, keyword, target, center, grid_size, spacing_km, language,
-      queue_mode, grid_layout, frequency, weekday, time_of_day, time_zone, next_run_at FROM grid_schedules WHERE next_run_at <= ?`).all(now) as Parameters<typeof parseScheduleRow>[0][];
+      queue_mode, grid_layout, depth, frequency, weekday, time_of_day, time_zone, next_run_at FROM grid_schedules WHERE next_run_at <= ?`).all(now) as Parameters<typeof parseScheduleRow>[0][];
     const claim = db.prepare('UPDATE grid_schedules SET next_run_at = ?, updated_at = ? WHERE series_id = ? AND next_run_at = ?');
     for (const row of rows) {
       const schedule = parseScheduleRow(row);
@@ -2355,6 +2396,54 @@ export function retryClaimedGridSchedule(
   if (retryAt - schedule.scheduled_at > maxDelayMs || retryAt >= schedule.next_run_at) return false;
   return getDbForProject(projectId).prepare(`UPDATE grid_schedules SET next_run_at = ?, updated_at = ?
     WHERE series_id = ? AND next_run_at = ?`).run(retryAt, now, schedule.series_id, schedule.next_run_at).changes === 1;
+}
+
+// --- Business locations (competitor address pins on the Geo-grid map) ---
+
+export type BusinessLocationStatus = 'pending' | 'done' | 'error';
+
+export interface BusinessLocation {
+  cid: string;
+  ts: number;
+  status: BusinessLocationStatus;
+  taskId: string | null;
+  lat: number | null;
+  lng: number | null;
+  address: string | null;
+  error: string | null;
+  cost: number | null;
+}
+
+/** One row per Google listing, so a located competitor is shown again for free in every monitor of the project. */
+export function getBusinessLocationForProject(projectId: string, cid: string): BusinessLocation | null {
+  const row = getDbForProject(projectId)
+    .prepare('SELECT cid, ts, status, task_id, lat, lng, address, error, cost FROM business_locations WHERE cid = ?')
+    .get(cid) as { cid: string; ts: number; status: string; task_id: string | null; lat: number | null; lng: number | null; address: string | null; error: string | null; cost: number | null } | undefined;
+  if (!row) return null;
+  return {
+    cid: row.cid, ts: row.ts, status: row.status as BusinessLocationStatus, taskId: row.task_id,
+    lat: row.lat, lng: row.lng, address: row.address, error: row.error, cost: row.cost,
+  };
+}
+
+/** Records a posted lookup. A retry after an error replaces the row and adds its own cost to the previous one. */
+export function saveBusinessLocationPendingForProject(projectId: string, cid: string, taskId: string, cost: number): void {
+  const db = getDbForProject(projectId);
+  const previousCost = (db.prepare('SELECT cost FROM business_locations WHERE cid = ?').get(cid) as { cost: number | null } | undefined)?.cost ?? 0;
+  db.prepare(`INSERT OR REPLACE INTO business_locations (cid, ts, status, task_id, lat, lng, address, error, cost)
+    VALUES (?, ?, 'pending', ?, NULL, NULL, NULL, NULL, ?)`).run(cid, Date.now(), taskId, previousCost + cost);
+}
+
+export function completeBusinessLocationForProject(
+  projectId: string, cid: string, result: { lat: number; lng: number; address: string | null } | { error: string },
+): void {
+  const db = getDbForProject(projectId);
+  if ('error' in result) {
+    db.prepare(`UPDATE business_locations SET status = 'error', error = ? WHERE cid = ?`).run(result.error, cid);
+  } else {
+    db.prepare(`UPDATE business_locations SET status = 'done', lat = ?, lng = ?, address = ?, error = NULL WHERE cid = ?`)
+      .run(result.lat, result.lng, result.address, cid);
+  }
 }
 
 // --- Instant Pages ---
@@ -3228,6 +3317,7 @@ export const SPEND_SOURCES: Array<{ table: string; tool: string; href: string | 
   { table: 'lf_searches', tool: 'Local Finder', href: '/dashboard/local-finder' },
   { table: 'grid_searches', tool: 'Geo-Grid Ranking', href: '/dashboard/geo-grid' },
   { table: 'gbp_category_audits', tool: 'GBP Category Audit', href: '/dashboard/gbp-categories' },
+  { table: 'business_locations', tool: 'Geo-Grid Ranking', href: '/dashboard/geo-grid' },
   { table: 'ai_optimization_searches', tool: 'AI Optimization', href: '/dashboard/ai-optimization' },
   { table: 'ai_visibility_searches', tool: 'AI Visibility', href: '/dashboard/ai-visibility' },
   { table: 'llm_response_searches', tool: 'AI Prompt Test', href: '/dashboard/llm-responses' },

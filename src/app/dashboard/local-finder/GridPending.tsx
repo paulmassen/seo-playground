@@ -30,7 +30,7 @@ const MODE_LABEL: Record<GridQueueMode, string> = {
 };
 
 const WAIT_HINT: Record<GridQueueMode, string> = {
-  live:     'Results in ~6 seconds',
+  live:     'Live points arrive in batches; large grids can take a few minutes',
   priority: 'Results in ~1 minute on average',
   standard: 'Results typically in 5–45 minutes',
 };

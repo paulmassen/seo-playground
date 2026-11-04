@@ -8,6 +8,7 @@ import { brandPalette, fitBox, footerPalette, imageSize, resolveBrandStyle, type
 import { drawFooter, drawHeaderBand } from '@/lib/brand-pdf';
 import { formatDistance } from '@/lib/grid-preferences';
 import { MAP_CAPTURE_FETCH_OPTIONS } from '@/lib/map-capture';
+import { RANK_BANDS, hexToRgb, rankBand } from '@/lib/grid-rank-scale';
 import { useGridPreferences } from './GridPreferences';
 import { DEFAULT_GRID_LAYOUT, describeGridLayout, type GridLayout } from '@/lib/grid-layout';
 
@@ -40,14 +41,11 @@ const palette = {
 };
 
 function rankColor(rank: number | null): [number, number, number] {
-  if (rank === null) return [203, 213, 225];
-  if (rank === 1) return [5, 150, 105];
-  if (rank <= 3) return [16, 185, 129];
-  if (rank <= 7) return [20, 184, 166];
-  if (rank <= 10) return [59, 130, 246];
-  if (rank <= 15) return [245, 158, 11];
-  if (rank <= 20) return [249, 115, 22];
-  return [239, 68, 68];
+  return hexToRgb(rankBand(rank).fill);
+}
+
+function rankInk(rank: number | null): [number, number, number] {
+  return hexToRgb(rankBand(rank).ink);
 }
 
 /** The PDF text helper is ASCII-only: spell out the layout label's ×, · and ° signs. */
@@ -184,10 +182,10 @@ export default function GridPdfExportButton(props: Props) {
       text(`Target: ${props.target}  /  ${asciiLayoutLabel(describeGridLayout(props.gridSize, props.layout ?? DEFAULT_GRID_LAYOUT))}  /  ${formatDistance(props.spacingKm, distanceUnit)} spacing  /  ${props.language}`, margin, 60);
 
       const metrics = [
-        ['ATO SCORE', `${summary.ato}%`, 'Local visibility'],
-        ['AVERAGE RANK', summary.avgRank == null ? '-' : `#${summary.avgRank}`, `${summary.foundCount}/${summary.totalPoints} points found`],
-        ['TOP 3', `${summary.top3Count}`, `of ${summary.totalPoints} points`],
-        ['TOP 10', `${summary.top10Count}`, `of ${summary.totalPoints} points`],
+        ['VISIBILITY', `${summary.ato}%`, '100% = rank 1 everywhere'],
+        ['COVERAGE', `${summary.coverage}%`, `found on ${summary.foundCount}/${summary.totalPoints} points`],
+        ['ARP', summary.arp == null ? '-' : `#${summary.arp}`, 'average rank where found'],
+        ['SOLV', `${summary.solv}%`, `top 3 on ${summary.top3Count}/${summary.totalPoints} points`],
       ];
       const cardGap = 3;
       const cardWidth = (width - margin * 2 - cardGap * 3) / 4;
@@ -201,7 +199,7 @@ export default function GridPdfExportButton(props: Props) {
         setColor(palette.muted);
         text(label, x + 3, cardY + 6);
         pdf.setFontSize(15);
-        setColor(index === 0 || index === 2 ? [5, 150, 105] : palette.ink);
+        setColor(index === 0 || index === 3 ? [5, 150, 105] : palette.ink);
         text(value, x + 3, cardY + 15);
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(6.5);
@@ -254,7 +252,7 @@ export default function GridPdfExportButton(props: Props) {
             fill(color);
             pdf.rect(x + 0.5, y + 0.5, cell - 1, cell - 1, 'F');
             if (row === middle && col === middle) {
-              pdf.setDrawColor(255, 255, 255);
+              pdf.setDrawColor(15, 23, 42);
               pdf.setLineDashPattern([1, 0.7], 0);
               pdf.rect(x + 1.25, y + 1.25, cell - 2.5, cell - 2.5, 'S');
               pdf.setLineDashPattern([], 0);
@@ -262,7 +260,8 @@ export default function GridPdfExportButton(props: Props) {
             if (cell >= 10) {
               pdf.setFont('helvetica', 'bold');
               pdf.setFontSize(Math.min(8, cell * 0.45));
-              pdf.setTextColor(255, 255, 255);
+              const ink = rankInk(point?.rank ?? null);
+              pdf.setTextColor(ink[0], ink[1], ink[2]);
               text(point?.rank == null ? '-' : `#${point.rank}`, x + cell / 2, y + cell / 2 + 1.5, { align: 'center' });
             }
           }
@@ -270,11 +269,7 @@ export default function GridPdfExportButton(props: Props) {
         legendY = gridTop + gridDisplaySize + 7;
       }
 
-      const legend = [
-        ['#1', [5, 150, 105]], ['#2-3', [16, 185, 129]], ['#4-7', [20, 184, 166]],
-        ['#8-10', [59, 130, 246]], ['#11-15', [245, 158, 11]], ['#16-20', [249, 115, 22]],
-        ['#21+', [239, 68, 68]], ['Not found', [203, 213, 225]],
-      ] as const;
+      const legend = RANK_BANDS.map((band) => [band.label.replace('–', '-'), hexToRgb(band.fill)] as const);
       let legendX = margin;
       legend.forEach(([label, color]) => {
         fill(color);
@@ -308,9 +303,9 @@ export default function GridPdfExportButton(props: Props) {
         pdf.setTextColor(255, 255, 255);
         text('#', columns[0] + 3, y + 4.6);
         text('BUSINESS', columns[1], y + 4.6);
-        text('PRESENCE', columns[2], y + 4.6);
-        text('AVG. RANK', columns[3], y + 4.6);
-        text('VISIBILITY', columns[4], y + 4.6);
+        text('COVERAGE', columns[2], y + 4.6);
+        text('ARP', columns[3], y + 4.6);
+        text('SOLV', columns[4], y + 4.6);
         y += 7;
         competitors.forEach((competitor, index) => {
           if (index % 2 === 0) {
@@ -322,9 +317,9 @@ export default function GridPdfExportButton(props: Props) {
           setColor(palette.ink);
           text(String(index + 1), columns[0] + 3, y + 4.7);
           text(competitor.name, columns[1], y + 4.7, { maxWidth: 63 });
-          text(`${competitor.appearances}/${competitor.totalPoints}`, columns[2], y + 4.7);
-          text(`#${competitor.avgRank}`, columns[3], y + 4.7);
-          text(`${competitor.visibilityScore}%`, columns[4], y + 4.7);
+          text(`${competitor.coverage}%  (${competitor.appearances}/${competitor.totalPoints})`, columns[2], y + 4.7);
+          text(`#${competitor.arp}`, columns[3], y + 4.7);
+          text(`${competitor.solv}%`, columns[4], y + 4.7);
           y += 7.2;
         });
       }
@@ -355,10 +350,10 @@ export default function GridPdfExportButton(props: Props) {
       type="button"
       onClick={exportReport}
       disabled={isExporting}
-      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-slate-700 disabled:cursor-wait disabled:opacity-70 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 transition-colors hover:border-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
     >
-      {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-      {isExporting ? 'Preparing PDF…' : 'Export PDF'}
+      {isExporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Download className="h-3.5 w-3.5" aria-hidden="true" />}
+      {isExporting ? 'Preparing PDF…' : 'PDF report'}
     </button>
   );
 }

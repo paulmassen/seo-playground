@@ -9,9 +9,19 @@ export interface GridSummary {
   top10Count: number;
   /** Weighted visibility score (0-100): 21 minus rank (capped at 21, "not found" scores 0), averaged across the grid. */
   ato: number;
+  /** Coverage: % of all points where the target is in the results at all. */
+  coverage: number;
+  /** Average Rank Position: mean rank over the points where the target was found; null when never found. Same value as avgRank. */
+  arp: number | null;
+  /** Share of Local Voice: % of all points (found or not) where the target is in the top 3. */
+  solv: number;
 }
 
-/** Same stats shown in the results view (ATO score, avg rank, top 3/10 counts) — shared so history previews stay consistent. */
+function percent(count: number, total: number): number {
+  return total > 0 ? Math.round((count / total) * 100) : 0;
+}
+
+/** Same stats shown in the results view (ATO score, Coverage, ARP, SoLV) — shared so history previews stay consistent. */
 export function computeGridSummary(results: GridPoint[]): GridSummary {
   const totalPoints = results.length;
   const ranked = results.filter((p) => p.rank !== null);
@@ -23,7 +33,10 @@ export function computeGridSummary(results: GridPoint[]): GridSummary {
   const ato = totalPoints > 0
     ? Math.round((results.reduce((s, p) => s + (21 - Math.min(p.rank ?? 21, 21)), 0) / (totalPoints * 20)) * 100)
     : 0;
-  return { totalPoints, foundCount: ranked.length, avgRank, top3Count, top10Count, ato };
+  return {
+    totalPoints, foundCount: ranked.length, avgRank, top3Count, top10Count, ato,
+    coverage: percent(ranked.length, totalPoints), arp: avgRank, solv: percent(top3Count, totalPoints),
+  };
 }
 
 /**
@@ -48,6 +61,10 @@ export interface CompetitorSummary {
   avgRating: number | null;
   /** Same weighted-visibility formula as the target's ATO score, so the two are directly comparable. */
   visibilityScore: number;
+  /** Same Coverage / ARP / SoLV definitions as the target's, so every row of the table compares like for like. */
+  coverage: number;
+  arp: number;
+  solv: number;
 }
 
 /** Ranks every non-target business seen across the grid by how often and how highly it shows up. */
@@ -77,23 +94,30 @@ export function computeCompetitors(results: GridPoint[]): CompetitorSummary[] {
   }
 
   return Array.from(byKey.entries())
-    .map(([key, e]) => ({
-      key,
-      name: e.name,
-      domain: e.domain,
-      cid: e.cid,
-      appearances: e.ranks.length,
-      totalPoints,
-      avgRank: Math.round((e.ranks.reduce((s, r) => s + r, 0) / e.ranks.length) * 10) / 10,
-      bestRank: Math.min(...e.ranks),
-      top3Count: e.ranks.filter((r) => r <= 3).length,
-      avgRating: e.ratings.length
-        ? Math.round((e.ratings.reduce((s, r) => s + r, 0) / e.ratings.length) * 10) / 10
-        : null,
-      visibilityScore: totalPoints > 0
-        ? Math.round((e.ranks.reduce((s, r) => s + (21 - Math.min(r, 21)), 0) / (totalPoints * 20)) * 100)
-        : 0,
-    }))
+    .map(([key, e]) => {
+      const avgRank = Math.round((e.ranks.reduce((s, r) => s + r, 0) / e.ranks.length) * 10) / 10;
+      const top3Count = e.ranks.filter((r) => r <= 3).length;
+      return {
+        key,
+        name: e.name,
+        domain: e.domain,
+        cid: e.cid,
+        appearances: e.ranks.length,
+        totalPoints,
+        avgRank,
+        bestRank: Math.min(...e.ranks),
+        top3Count,
+        coverage: percent(e.ranks.length, totalPoints),
+        arp: avgRank,
+        solv: percent(top3Count, totalPoints),
+        avgRating: e.ratings.length
+          ? Math.round((e.ratings.reduce((s, r) => s + r, 0) / e.ratings.length) * 10) / 10
+          : null,
+        visibilityScore: totalPoints > 0
+          ? Math.round((e.ranks.reduce((s, r) => s + (21 - Math.min(r, 21)), 0) / (totalPoints * 20)) * 100)
+          : 0,
+      };
+    })
     .sort((a, b) => b.appearances - a.appearances || a.avgRank - b.avgRank);
 }
 

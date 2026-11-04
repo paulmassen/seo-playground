@@ -5,6 +5,7 @@ import type { GridPoint } from '@/lib/db';
 import type { PinStyle } from '@/lib/grid-preferences';
 import { competitorKey } from './grid-insights';
 import { useGridPreferences } from './GridPreferences';
+import { rankBand } from '@/lib/grid-rank-scale';
 
 interface Props {
   points: GridPoint[];
@@ -17,24 +18,12 @@ interface Props {
   previousPoints?: GridPoint[] | null;
   /** A stable DOM id allows the PDF export to capture this exact map. */
   captureId?: string;
+  /** Real address of the highlighted competitor, drawn above the rank pins. */
+  businessLocation?: { lat: number; lng: number; address: string | null } | null;
 }
 
-function rankColor(rank: number | null): string {
-  if (rank === null) return '#94a3b8';
-  if (rank === 1)    return '#059669';
-  if (rank <= 3)     return '#10b981';
-  if (rank <= 7)     return '#14b8a6';
-  if (rank <= 10)    return '#3b82f6';
-  if (rank <= 15)    return '#f59e0b';
-  if (rank <= 20)    return '#f97316';
-  return '#ef4444';
-}
-
-function rankTextColor(rank: number): string {
-  if (rank <= 3)  return '#059669';
-  if (rank <= 10) return '#2563eb';
-  if (rank <= 20) return '#d97706';
-  return '#dc2626';
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 }
 
 function buildPopupHtml(point: GridPoint, target: string, highlightKey?: string): string {
@@ -43,29 +32,29 @@ function buildPopupHtml(point: GridPoint, target: string, highlightKey?: string)
   const itemRows = items.slice(0, 20).map((item) => {
     const isHighlighted = !item.is_target && !!highlightKey && competitorKey(item) === highlightKey;
     const nameStyle = item.is_target
-      ? 'font-weight:700;color:#059669'
+      ? 'font-weight:700;color:#166534'
       : isHighlighted
-        ? 'font-weight:700;color:#2563eb'
+        ? 'font-weight:700;color:#1d4ed8'
         : 'font-weight:400;color:#334155';
-    const rankColor_ = rankTextColor(item.rank_group);
+    const rankColor_ = rankBand(item.rank_group).onWhite;
     const stars = item.rating_value != null
-      ? `<span style="color:#f59e0b;font-size:10px">★</span><span style="font-size:10px;color:#64748b"> ${item.rating_value.toFixed(1)}${item.rating_votes != null ? ` (${item.rating_votes.toLocaleString()})` : ''}</span>`
+      ? `<span style="color:#b45309;font-size:11px" aria-hidden="true">★</span><span style="font-size:11px;color:#475569"> ${item.rating_value.toFixed(1)}${item.rating_votes != null ? ` (${item.rating_votes.toLocaleString()})` : ''}</span>`
       : '';
     const rowBg = item.is_target
-      ? 'background:#f0fdf4;border-left:3px solid #10b981;padding-left:5px;margin-left:-5px;border-radius:2px;'
+      ? 'background:#f0fdf4;padding-left:5px;margin-left:-5px;border-radius:4px;'
       : isHighlighted
-        ? 'background:#eff6ff;border-left:3px solid #3b82f6;padding-left:5px;margin-left:-5px;border-radius:2px;'
+        ? 'background:#eff6ff;padding-left:5px;margin-left:-5px;border-radius:4px;'
         : '';
     const mapsHref = item.cid
       ? `https://www.google.com/maps?cid=${item.cid}`
       : `https://www.google.com/maps/search/${encodeURIComponent(item.title)}`;
-    const mapsLink = `<a href="${mapsHref}" target="_blank" rel="noopener noreferrer" style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;color:#3b82f6;text-decoration:none;white-space:nowrap;margin-top:2px;display:inline-block">Maps ↗</a>`;
+    const mapsLink = `<a href="${mapsHref}" target="_blank" rel="noopener noreferrer" style="font-size:11px;font-weight:700;color:#1d4ed8;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;margin-top:2px;display:inline-block">Open in Google Maps<span class="sr-only"> (new tab)</span></a>`;
     return `
       <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;${rowBg}">
         <span style="font-size:12px;font-weight:900;min-width:24px;color:${rankColor_}">#${item.rank_group}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:12px;${nameStyle};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">${item.title}</div>
-          ${item.domain ? `<div style="font-size:10px;color:#94a3b8;margin-top:1px">${item.domain}</div>` : ''}
+          <div style="font-size:12px;${nameStyle};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">${escapeHtml(item.title)}</div>
+          ${item.domain ? `<div style="font-size:11px;color:#475569;margin-top:1px">${escapeHtml(item.domain)}</div>` : ''}
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             ${stars ? `<div style="margin-top:1px">${stars}</div>` : ''}
             ${mapsLink}
@@ -75,13 +64,13 @@ function buildPopupHtml(point: GridPoint, target: string, highlightKey?: string)
   }).join('');
 
   const emptyMsg = items.length === 0
-    ? '<p style="color:#94a3b8;font-size:12px;margin:8px 0">No results at this point.</p>'
+    ? '<p style="color:#475569;font-size:12px;margin:8px 0">No local results came back for this point.</p>'
     : '';
 
   return `
     <div style="font-family:system-ui,-apple-system,sans-serif;min-width:230px;max-width:260px">
-      <p style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 6px">
-        Target: <span style="color:#334155">${target}</span>
+      <p style="font-size:11px;color:#475569;margin:0 0 6px">
+        Target: <span style="font-weight:700;color:#0f172a">${escapeHtml(target)}</span>
       </p>
       ${itemRows}${emptyMsg}
     </div>`;
@@ -102,7 +91,7 @@ const STAR_PATH = (() => {
   return `M${pts.join('L')}Z`;
 })();
 
-function starMarkerHtml(size: number, fontSize: number, color: string, label: string, isCenter: boolean, movement = '', movementColor = '#065f46'): string {
+function starMarkerHtml(size: number, fontSize: number, color: string, ink: string, label: string, isCenter: boolean, movement = '', movementColor = '#065f46'): string {
   // The center point loses its dashed border as a star, so a white halo keeps the "grid center" cue.
   const halo = isCenter
     ? `<path d="${STAR_PATH}" fill="white" stroke="white" stroke-width="20" stroke-linejoin="round"/>`
@@ -121,10 +110,10 @@ function starMarkerHtml(size: number, fontSize: number, color: string, label: st
       <div style="
         position:absolute;inset:0;z-index:1;padding-top:${Math.round(size * 0.06)}px;
         display:flex;align-items:center;justify-content:center;
-        font-size:${fontSize}px;font-weight:900;color:white;
-        font-family:system-ui,sans-serif;
+        font-size:${fontSize}px;font-weight:900;color:${ink};
+        font-family:inherit;font-variant-numeric:tabular-nums;
       ">${label}</div>
-      ${movement ? `<span style="position:absolute;bottom:-5px;left:50%;z-index:2;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);padding:1px 3px;font-size:9px;line-height:11px;font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22)">${movement}</span>` : ''}
+      ${movement ? `<span style="position:absolute;bottom:-5px;left:50%;z-index:2;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);padding:1px 3px;font-size:10px;line-height:12px;font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22)">${movement}</span>` : ''}
     </div>`;
 }
 
@@ -137,22 +126,21 @@ function markerMetrics(gridSize: number, pinStyle: PinStyle) {
   return { size: cellPx, fontSize, starScale: 1.3 };
 }
 
-function shapeMarkerHtml(pinStyle: PinStyle, size: number, fontSize: number, color: string, label: string, isCenter: boolean, movement: string, movementColor: string): string {
+function shapeMarkerHtml(pinStyle: PinStyle, size: number, fontSize: number, color: string, ink: string, label: string, isCenter: boolean, movement: string, movementColor: string): string {
   const round = pinStyle !== 'square';
   const radius = round ? '50%' : `${Math.round(size * 0.22)}px`;
-  // Round pins get a crisp white ring so they stay readable on top of busy map tiles.
+  // A crisp white ring keeps light fills (lime, yellow, grey) readable on pale map tiles;
+  // the grid center swaps it for a dark dashed ring.
   const border = isCenter
-    ? `border: ${pinStyle === 'dot' ? 2 : 3}px dashed rgba(255,255,255,0.9);`
-    : round
-      ? `border: ${pinStyle === 'dot' ? 1.5 : 2}px solid rgba(255,255,255,0.95);`
-      : 'border: 2px solid rgba(255,255,255,0.4);';
+    ? `border: ${pinStyle === 'dot' ? 2 : 3}px dashed #0f172a;`
+    : `border: ${pinStyle === 'dot' ? 1.5 : 2}px solid #ffffff;`;
   const shadow = pinStyle === 'dot' ? '0 1px 4px rgba(0,0,0,0.35)' : '0 2px 8px rgba(0,0,0,0.35)';
   // Movement badges shrink with dots so they don't outweigh the pin itself.
-  const badgeSize = pinStyle === 'dot' ? 'bottom:-6px;padding:0 2px;font-size:7.5px;line-height:9px;' : 'bottom:-7px;padding:1px 3px;font-size:9px;line-height:11px;';
+  const badgeSize = pinStyle === 'dot' ? 'bottom:-7px;padding:0 3px;font-size:9px;line-height:11px;' : 'bottom:-8px;padding:1px 4px;font-size:10px;line-height:12px;';
   const badge = movement
     ? `<span style="position:absolute;left:50%;transform:translateX(-50%);border-radius:99px;background:rgba(255,255,255,0.96);${badgeSize}font-weight:900;color:${movementColor};box-shadow:0 1px 2px rgba(15,23,42,0.22);white-space:nowrap">${movement}</span>`
     : '';
-  return `<div style="position:relative;box-sizing:border-box;width:${size}px;height:${size}px;background:${color};border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:900;color:white;font-family:system-ui,sans-serif;${border}box-shadow:${shadow};cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'"><span>${label}</span>${badge}</div>`;
+  return `<div style="position:relative;box-sizing:border-box;width:${size}px;height:${size}px;background:${color};border-radius:${radius};display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:900;color:${ink};font-family:inherit;font-variant-numeric:tabular-nums;${border}box-shadow:${shadow};cursor:pointer;transition:transform 0.1s" onmouseenter="this.style.transform='scale(1.12)'" onmouseleave="this.style.transform='scale(1)'"><span>${label}</span>${badge}</div>`;
 }
 
 /** Resolves the rank to display at a point, given whether a competitor is being highlighted. */
@@ -162,11 +150,14 @@ function pointRank(point: GridPoint, highlightKey?: string): number | null {
   return match ? match.rank_group : null;
 }
 
-export default function GridMap({ points, gridSize, target, highlightKey, highlightName, previousPoints, captureId }: Props) {
+const BUSINESS_PIN_HTML = `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#1d4ed8;border:3px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center"><div style="width:9px;height:9px;border-radius:50%;background:#ffffff"></div></div>`;
+
+export default function GridMap({ points, gridSize, target, highlightKey, highlightName, previousPoints, captureId, businessLocation }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('leaflet').Map | null>(null);
   const leafletRef = useRef<typeof import('leaflet') | null>(null);
   const markerLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
+  const businessLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
   const boundsSignatureRef = useRef<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const { pinStyle } = useGridPreferences();
@@ -201,6 +192,7 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
         referrerPolicy: 'strict-origin-when-cross-origin',
       }).addTo(map);
       markerLayerRef.current = L.layerGroup().addTo(map);
+      businessLayerRef.current = L.layerGroup().addTo(map);
       setMapReady(true);
     });
 
@@ -230,21 +222,31 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
     geoPoints.forEach((point) => {
       const isCenter = point.row === half && point.col === half;
       const rank = pointRank(point, highlightKey);
-      const color = rankColor(rank);
+      const band = rankBand(rank);
       const label = rank != null ? String(rank) : '—';
       const before = pointRank(previousByPoint.get(`${point.row}:${point.col}`) ?? { ...point, rank: null }, highlightKey);
-      const movement = before === null && rank === null ? ''
+      // Without a previous snapshot there is no movement to show (not "new" on every ranked pin).
+      const movement = !previousPoints || (before === null && rank === null) ? ''
         : before === null ? 'new'
           : rank === null ? 'lost'
             : before - rank === 0 ? ''
               : `${before - rank > 0 ? '+' : ''}${before - rank}`;
-      const movementColor = before === null || (rank !== null && before > rank) ? '#065f46' : '#991b1b';
+      const movementColor = before === null || (rank !== null && before > rank) ? '#166534' : '#991b1b';
       const markerPx = rank === 1 ? Math.round(size * starScale) : size;
       const html = rank === 1
-        ? starMarkerHtml(markerPx, fontSize, color, label, isCenter, movement, movementColor)
-        : shapeMarkerHtml(pinStyle, size, fontSize, color, label, isCenter, movement, movementColor);
-      const icon = L.divIcon({ html, className: '', iconSize: [markerPx, markerPx], iconAnchor: [markerPx / 2, markerPx / 2] });
-      const marker = L.marker([point.lat!, point.lng!], { icon }).addTo(markerLayer);
+        ? starMarkerHtml(markerPx, fontSize, band.fill, band.ink, label, isCenter, movement, movementColor)
+        : shapeMarkerHtml(pinStyle, size, fontSize, band.fill, band.ink, label, isCenter, movement, movementColor);
+      const icon = L.divIcon({ html, className: 'grid-rank-pin', iconSize: [markerPx, markerPx], iconAnchor: [markerPx / 2, markerPx / 2] });
+      const marker = L.marker([point.lat!, point.lng!], { icon, keyboard: true }).addTo(markerLayer);
+      // Leaflet makes each pin a focusable role=button whose only text is the visual label ("7", "—").
+      // Give it the full reading so keyboard and screen-reader users get rank and movement.
+      const movementText = movement === 'new' ? ', newly in the top 20' : movement === 'lost' ? ', dropped out of the top 20'
+        : movement ? `, ${movement.startsWith('+') ? 'up' : 'down'} ${movement.replace(/^[+-]/, '')} since the previous snapshot` : '';
+      const pinElement = marker.getElement();
+      if (pinElement) {
+        pinElement.setAttribute('aria-label', `Row ${point.row + 1}, column ${point.col + 1}${isCenter ? ' (grid center)' : ''}: ${rank != null ? `rank ${rank}` : 'not in the top 20'}${movementText}. Press Enter for the local results.`);
+        pinElement.firstElementChild?.setAttribute('aria-hidden', 'true');
+      }
       marker.bindPopup(buildPopupHtml(point, target, highlightKey), {
         maxWidth: 260, maxHeight: 240, className: 'grid-popup', autoPan: true, keepInView: true,
         autoPanPadding: [28, 28], closeButton: true, closeOnClick: true,
@@ -257,6 +259,33 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
       map.fitBounds(L.latLngBounds(geoPoints.map((point) => [point.lat!, point.lng!] as [number, number])), { padding: [48, 48] });
     }
   }, [mapReady, points, gridSize, target, highlightKey, previousPoints, pinStyle]);
+
+  // The highlighted competitor's real address, above every rank pin, so the map shows where its ranks come from.
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const layer = businessLayerRef.current;
+    if (!mapReady || !L || !map || !layer) return;
+    layer.clearLayers();
+    if (!businessLocation) return;
+    const name = highlightName ?? 'Competitor';
+    const marker = L.marker([businessLocation.lat, businessLocation.lng], {
+      icon: L.divIcon({ html: BUSINESS_PIN_HTML, className: 'grid-business-pin', iconSize: [30, 30], iconAnchor: [15, 30] }),
+      zIndexOffset: 10_000,
+      keyboard: true,
+      title: `${name} address`,
+    }).addTo(layer);
+    marker.getElement()?.setAttribute('aria-label', `${name}: business address${businessLocation.address ? `, ${businessLocation.address}` : ''}`);
+    marker.bindPopup(
+      `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;max-width:220px"><p style="margin:0;font-weight:700;color:#0f172a">${escapeHtml(name)}</p>${businessLocation.address ? `<p style="margin:2px 0 0;color:#475569">${escapeHtml(businessLocation.address)}</p>` : ''}</div>`,
+      { className: 'grid-popup', closeButton: true },
+    );
+    // Bring the address into view when it lies outside the grid, without zooming in on it.
+    const bounds = map.getBounds();
+    if (!bounds.contains([businessLocation.lat, businessLocation.lng])) {
+      map.fitBounds(bounds.extend([businessLocation.lat, businessLocation.lng]), { padding: [48, 48] });
+    }
+  }, [mapReady, businessLocation, highlightName]);
 
   return (
     <>
@@ -283,17 +312,24 @@ export default function GridMap({ points, gridSize, target, highlightKey, highli
         .grid-popup .leaflet-popup-tip {
           background: white;
         }
+        .grid-rank-pin:focus-visible {
+          outline: 3px solid #1d4ed8;
+          outline-offset: 3px;
+          border-radius: 6px;
+        }
       `}</style>
       <div id={captureId} className="relative bg-slate-100">
         {highlightKey && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
-            Showing: {highlightName ?? 'competitor'}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] max-w-[80%] truncate bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
+            Showing {highlightName ?? 'a competitor'}’s ranks
           </div>
         )}
         <div
           ref={containerRef}
           className="w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800"
-          style={{ height: 520 }}
+          style={{ height: 'clamp(340px, 62vh, 600px)' }}
+          role="region"
+          aria-label="Ranking map. Each pin is a grid point; Tab moves between pins."
         />
       </div>
     </>
