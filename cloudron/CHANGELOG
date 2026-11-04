@@ -1,3 +1,8 @@
+[0.7.0]
+* New GBP Category Audit, project overview dashboard and spending breakdown by project
+* Geo-grid: top 10 or top 20 results, grids up to 15×15, grid-local scheduling, competitor addresses and Coverage, ARP and SoLV metrics
+* Fix Geo-grid pricing estimates, exclude sponsored listings from organic rankings and require explicit confirmation before paid runs
+
 [0.6.3]
 * Update to SEO Playground 0.6.3
 * New: the dashboard bell follows Review Velocity and Rank Tracker checks across every page, and keeps completed checks until opened

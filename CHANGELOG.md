@@ -7,7 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] — 2026-11-04
+
 ### Added
+- **GBP Category Audit** — compare a Google Business Profile's primary and additional categories with local competitors, with weighted recommendations, project history and CSV export.
+- **Project overview dashboard** — see the current project's rankings, Geo-grid visibility, prompt citations, review benchmarks, recent results and spending at a glance, using stored data without extra DataForSEO calls.
+- **Spending by project** — filter spending by project and view a breakdown with CSV and Markdown exports.
+
 - **Top 10 or Top 20 results per Geo-grid point** — choose how many Local Finder results each point checks. DataForSEO bills Standard and Priority per 10 results, so Top 10 (the new default) costs half as much. The depth belongs to the monitor: scheduled and repeat runs keep it, so snapshots stay comparable. Existing monitors keep checking the top 20.
 - **Competitor address on the Geo-grid map** — with a competitor selected, "Show address" looks up its Google listing (one Business Info call, Priority queue, about $0.003) and pins it above the grid. The lookup only runs on click, is stored per project so it is free to show again, and appears in Spending.
 - **Coverage, ARP and SoLV** — Geo-grid results, the competitor table and the PDF report show Coverage (share of points where the business appears), ARP (average rank where found) and SoLV (share of all points in the top 3), for you and every competitor.
