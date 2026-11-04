@@ -13,6 +13,7 @@
     "check:release": "node scripts/check-release-version.mjs"
   },
   "dependencies": {
+    "@photostructure/tz-lookup": "^11.7.0",
     "@types/leaflet": "^1.9.21",
     "better-auth": "^1.7.7",
     "better-sqlite3": "^12.8.0",
