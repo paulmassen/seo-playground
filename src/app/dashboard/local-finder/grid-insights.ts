@@ -15,6 +15,8 @@ export interface GridSummary {
   arp: number | null;
   /** Share of Local Voice: % of all points (found or not) where the target is in the top 3. */
   solv: number;
+  /** Average Google rating of the target listing where it was found; null when none was returned. */
+  avgRating: number | null;
 }
 
 function percent(count: number, total: number): number {
@@ -33,9 +35,15 @@ export function computeGridSummary(results: GridPoint[]): GridSummary {
   const ato = totalPoints > 0
     ? Math.round((results.reduce((s, p) => s + (21 - Math.min(p.rank ?? 21, 21)), 0) / (totalPoints * 20)) * 100)
     : 0;
+  // One rating per point at most: a point can list the target twice, and that must not weigh double.
+  const ratings = results.flatMap((point) => {
+    const rating = (point.items ?? []).find((item) => item.is_target && item.rating_value != null)?.rating_value;
+    return rating != null ? [rating] : [];
+  });
+  const avgRating = ratings.length > 0 ? Math.round((ratings.reduce((s, r) => s + r, 0) / ratings.length) * 10) / 10 : null;
   return {
     totalPoints, foundCount: ranked.length, avgRank, top3Count, top10Count, ato,
-    coverage: percent(ranked.length, totalPoints), arp: avgRank, solv: percent(top3Count, totalPoints),
+    coverage: percent(ranked.length, totalPoints), arp: avgRank, solv: percent(top3Count, totalPoints), avgRating,
   };
 }
 
@@ -67,7 +75,10 @@ export interface CompetitorSummary {
   solv: number;
 }
 
-/** Ranks every non-target business seen across the grid by how often and how highly it shows up. */
+/**
+ * Every non-target business seen across the grid, strongest first: by top 3 share (SoLV), since the
+ * local pack is where calls and visits come from, then by presence, then by average rank.
+ */
 export function computeCompetitors(results: GridPoint[]): CompetitorSummary[] {
   const totalPoints = results.length;
   const byKey = new Map<string, {
@@ -118,7 +129,7 @@ export function computeCompetitors(results: GridPoint[]): CompetitorSummary[] {
           : 0,
       };
     })
-    .sort((a, b) => b.appearances - a.appearances || a.avgRank - b.avgRank);
+    .sort((a, b) => b.top3Count - a.top3Count || b.appearances - a.appearances || a.avgRank - b.avgRank);
 }
 
 export interface RingStat {

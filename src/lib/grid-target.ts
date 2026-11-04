@@ -30,6 +30,15 @@ export function formatBusinessTarget(title: string, cid: string): string {
   return `${title.trim()} (cid:${cid})`;
 }
 
+/**
+ * The target as people read it: "Business Name" rather than "Business Name (cid:1234…)". The stored
+ * value keeps the CID, which is what matching relies on; only what is shown drops it.
+ */
+export function displayGridTarget(target: string): string {
+  const name = target.replace(/\s*\(\s*cid:\s*\d+\s*\)\s*$/i, '').trim();
+  return name || target.trim();
+}
+
 /** Lowercase, accent-free, letters and digits only. */
 function normalize(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');

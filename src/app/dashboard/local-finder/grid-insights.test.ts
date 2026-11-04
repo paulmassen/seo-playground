@@ -63,3 +63,35 @@ describe('competitor metrics', () => {
     expect(c.solv).toBe(25);
   });
 });
+
+describe('competitor ranking', () => {
+  it('puts the business that holds the top 3 ahead of one that is merely everywhere', () => {
+    const everywhere: GridLocalItem = { rank_group: 9, title: 'Everywhere', cid: '1', is_target: false };
+    const packLeader: GridLocalItem = { rank_group: 2, title: 'Pack leader', cid: '2', is_target: false };
+    const results = [
+      point(0, [packLeader, everywhere]), point(1, [packLeader, everywhere]),
+      point(2, [everywhere]), point(3, [everywhere]),
+    ];
+    expect(computeCompetitors(results).map((c) => c.name)).toEqual(['Pack leader', 'Everywhere']);
+  });
+
+  it('breaks top 3 ties on presence', () => {
+    const a: GridLocalItem = { rank_group: 1, title: 'A', cid: 'a', is_target: false };
+    const b: GridLocalItem = { rank_group: 1, title: 'B', cid: 'b', is_target: false };
+    const results = [point(0, [a]), point(1, [b]), point(2, [{ ...b, rank_group: 8 }])];
+    expect(computeCompetitors(results).map((c) => c.name)).toEqual(['B', 'A']);
+  });
+});
+
+describe('target rating', () => {
+  it('averages the target rating once per point', () => {
+    const you = (rating?: number): GridLocalItem => ({ rank_group: 1, title: 'You', is_target: true, rating_value: rating });
+    const summary = computeGridSummary([
+      { row: 0, col: 0, rank: 1, items: [you(4.6), you(4.6)] },
+      { row: 0, col: 1, rank: 1, items: [you(4.8)] },
+      { row: 0, col: 2, rank: null, items: [] },
+    ]);
+    expect(summary.avgRating).toBe(4.7);
+    expect(computeGridSummary([{ row: 0, col: 0, rank: null, items: [] }]).avgRating).toBeNull();
+  });
+});

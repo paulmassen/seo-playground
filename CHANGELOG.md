@@ -15,6 +15,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Schedules in the grid's own time zone** — scheduled Geo-grid runs use the time zone of the grid center.
 
 ### Changed
+- **Geo-grid competitors ranked by top 3 share** — "Who takes the local pack" and the map's business switcher now rank businesses by SoLV, the share of grid points where they are in the top 3 (the local pack), then by presence and average rank. A business that appears everywhere at #12 no longer outranks one that holds the pack on half the map. The switcher shows the same top 3 share, and your own row now shows your top 3 count and average rating like every competitor. ([#17](https://github.com/paulmassen/seo-playground/issues/17))
+- **Geo-grid target names without the CID** — a business picked on the map is shown as "Business Name" instead of "Business Name (cid:…)" in monitors, results, the dashboard, map popups and the PDF report. The CID is still stored and used to match the exact listing. ([#17](https://github.com/paulmassen/seo-playground/issues/17))
 - **Geo-grid runs only start from an explicit confirmation** — refreshing a page, going back or opening an old link no longer starts a paid run. "Run again" shows the API mode and price before anything is billed.
 
 ### Fixed

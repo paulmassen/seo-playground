@@ -6,6 +6,7 @@ import type { PinStyle } from '@/lib/grid-preferences';
 import { competitorKey } from './grid-insights';
 import { useGridPreferences } from './GridPreferences';
 import { rankBand } from '@/lib/grid-rank-scale';
+import { displayGridTarget } from '@/lib/grid-target';
 
 interface Props {
   points: GridPoint[];
@@ -70,7 +71,7 @@ function buildPopupHtml(point: GridPoint, target: string, highlightKey?: string)
   return `
     <div style="font-family:system-ui,-apple-system,sans-serif;min-width:230px;max-width:260px">
       <p style="font-size:11px;color:#475569;margin:0 0 6px">
-        Target: <span style="font-weight:700;color:#0f172a">${escapeHtml(target)}</span>
+        Target: <span style="font-weight:700;color:#0f172a">${escapeHtml(displayGridTarget(target))}</span>
       </p>
       ${itemRows}${emptyMsg}
     </div>`;

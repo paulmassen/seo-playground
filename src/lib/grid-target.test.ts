@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBusinessTarget, matchesGridTarget, parseTargetCid, reconcileGridPoints } from './grid-target';
+import { formatBusinessTarget, matchesGridTarget, parseTargetCid, reconcileGridPoints, displayGridTarget } from './grid-target';
 
 const listing = { title: 'Elevation Athletics Physical Therapy', domain: 'www.elevationathleticspt.com', url: 'https://www.elevationathleticspt.com/', cid: '1234567890' };
 const other = { title: 'Elevate Rehab', domain: 'elevaterehab.com', url: 'https://elevaterehab.com/', cid: '999' };
@@ -65,5 +65,21 @@ describe('reconcileGridPoints', () => {
       ],
     }], formatBusinessTarget('Elevation Athletics Physical Therapy', '1234567890'));
     expect(point.rank).toBe(2);
+  });
+});
+
+describe('displayGridTarget', () => {
+  it('hides the CID suffix of a listing picked on the map', () => {
+    expect(displayGridTarget('BrightPaws Veterinary Clinic (cid:1234567890)')).toBe('BrightPaws Veterinary Clinic');
+    expect(displayGridTarget('Café du Coin ( cid: 42 )')).toBe('Café du Coin');
+  });
+
+  it('leaves domains and plain names unchanged', () => {
+    expect(displayGridTarget('example.com')).toBe('example.com');
+    expect(displayGridTarget('Dr Smith (dentist)')).toBe('Dr Smith (dentist)');
+  });
+
+  it('never returns an empty label', () => {
+    expect(displayGridTarget('(cid:42)')).toBe('(cid:42)');
   });
 });

@@ -1,4 +1,5 @@
 import type { BrandStyle } from '@/lib/brand';
+import { displayGridTarget } from '@/lib/grid-target';
 import type { GridSchedule, GridSearchEntry } from '@/lib/db';
 import { formatDistance, type DistanceUnit } from '@/lib/grid-preferences';
 import { gridTimeZone } from '@/lib/grid-timezone';
@@ -37,7 +38,7 @@ export default function GridTimeline({ entry, snapshots, schedule, brandName, br
         <div className="min-w-0">
           <h2 id="monitor-title" className="text-xl font-black tracking-tight text-slate-900 [overflow-wrap:anywhere] dark:text-white">{entry.keyword}</h2>
           <p className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">
-            <span className="font-bold">{entry.target}</span>
+            <span className="font-bold">{displayGridTarget(entry.target)}</span>
           </p>
           <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
             {describeGridLayout(entry.grid_size, layout)} · top {entry.depth ?? 20} results · {formatDistance(entry.spacing_km, distanceUnit)} spacing · {entry.language} results · centered on {entry.center}

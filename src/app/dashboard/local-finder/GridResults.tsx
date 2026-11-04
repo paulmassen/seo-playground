@@ -9,6 +9,7 @@ import { DEFAULT_GRID_LAYOUT, type GridLayout } from '@/lib/grid-layout';
 import { RANK_BANDS, rankBand, visibilityTone } from '@/lib/grid-rank-scale';
 import { LEGACY_GRID_DEPTH, type GridDepth } from '@/lib/grid-pricing';
 import { useBusinessLocation } from './useBusinessLocation';
+import { displayGridTarget } from '@/lib/grid-target';
 
 const GridMap = lazy(() => import('./GridMap'));
 
@@ -89,6 +90,7 @@ export default function GridResults({ results, previousResults, gridSize, layout
 
   const summary = computeGridSummary(results);
   const { ato } = summary;
+  const targetName = displayGridTarget(target);
   const competitors = useMemo(() => computeCompetitors(results), [results]);
   const topCompetitors = competitors.slice(0, 5);
   const ringStats = useMemo(() => computeRingStats(results, gridSize, spacingKm, layout.shape), [results, gridSize, spacingKm, layout.shape]);
@@ -101,7 +103,7 @@ export default function GridResults({ results, previousResults, gridSize, layout
           <h3 id="ranking-map-title" className="text-sm font-bold text-slate-900 dark:text-white">
             {highlight ? <>Ranks of {highlight.name}</> : 'Ranking map'}
           </h3>
-          <p className="text-xs text-slate-600 dark:text-slate-400">Select a pin to see the full local pack at that point.</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">Percentages are top 3 share. Select a pin to see the full local pack at that point.</p>
         </div>
 
         {topCompetitors.length > 0 && (
@@ -117,7 +119,7 @@ export default function GridResults({ results, previousResults, gridSize, layout
                   : 'border-slate-300 bg-white text-slate-800 hover:border-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
               }`}
             >
-              You <span className="tabular-nums font-normal">{ato}%</span>
+              You <span className="tabular-nums font-normal">{summary.solv}%</span>
             </button>
             {topCompetitors.map((c) => {
               const isActive = highlight?.key === c.key;
@@ -128,7 +130,7 @@ export default function GridResults({ results, previousResults, gridSize, layout
                   role="radio"
                   aria-checked={isActive}
                   onClick={() => showOnMap(isActive ? null : c)}
-                  title={`${c.name} · ${c.appearances}/${c.totalPoints} points · avg #${c.avgRank}`}
+                  title={`${c.name} · top 3 on ${c.top3Count}/${c.totalPoints} points · avg #${c.avgRank}`}
                   className={`inline-flex max-w-[16rem] items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                     isActive
                       ? 'border-blue-700 bg-blue-700 text-white'
@@ -136,7 +138,7 @@ export default function GridResults({ results, previousResults, gridSize, layout
                   }`}
                 >
                   <span className="truncate">{c.name}</span>
-                  <span className="tabular-nums font-normal">{c.visibilityScore}%</span>
+                  <span className="tabular-nums font-normal">{c.solv}%</span>
                 </button>
               );
             })}
@@ -209,8 +211,8 @@ export default function GridResults({ results, previousResults, gridSize, layout
         <section aria-labelledby="competitors-title">
           <h3 id="competitors-title" className="text-sm font-bold text-slate-900 dark:text-white">Who takes the local pack</h3>
           <p className="mb-3 mt-0.5 text-xs text-slate-600 dark:text-slate-400">
-            Businesses in the top {depth} across this grid, ranked by how often they appear. Coverage: share of points where it appears.
-            ARP: average rank where found. SoLV: share of all points where it is in the top 3.
+            Ranked by top 3 share (SoLV): the share of all grid points where a business is in the local pack, the top 3.
+            Coverage: share of points where it appears in the top {depth}. ARP: average rank where found.
           </p>
           <table className="w-full text-sm">
             <thead>
@@ -227,10 +229,14 @@ export default function GridResults({ results, previousResults, gridSize, layout
               <tr className="bg-slate-50 dark:bg-slate-800/50">
                 <td className="py-2.5 pl-3 pr-3">
                   <p className="font-bold text-slate-900 dark:text-white">You</p>
-                  <p className="max-w-[24rem] truncate text-xs text-slate-600 dark:text-slate-400" title={target}>{target}</p>
+                  <p className="max-w-[24rem] truncate text-xs text-slate-600 dark:text-slate-400" title={targetName}>{targetName}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 sm:hidden">
+                    top 3 on {summary.top3Count}/{summary.totalPoints} · avg {summary.arp == null ? '—' : `#${summary.arp}`}
+                  </p>
                 </td>
                 <td className="hidden py-2.5 pr-3 text-xs tabular-nums text-slate-700 dark:text-slate-300 sm:table-cell">
-                  {summary.foundCount}/{summary.totalPoints} points · visibility <span className={`font-bold ${visibilityTone(ato).text}`}>{ato}%</span>
+                  top 3 on {summary.top3Count}/{summary.totalPoints} points · visibility <span className={`font-bold ${visibilityTone(ato).text}`}>{ato}%</span>
+                  {summary.avgRating != null && <> · {summary.avgRating.toFixed(1)}<span aria-hidden="true">★</span><span className="sr-only"> stars</span></>}
                 </td>
                 <MetricCells coverage={summary.coverage} arp={summary.arp} solv={summary.solv} strong />
                 <td className="py-2.5 pr-3" />
@@ -242,11 +248,11 @@ export default function GridResults({ results, previousResults, gridSize, layout
                     <td className="py-2.5 pl-3 pr-3">
                       <p className="max-w-[24rem] truncate font-bold text-slate-900 dark:text-white" title={c.name}>{c.name}</p>
                       <p className="text-xs text-slate-600 dark:text-slate-400 sm:hidden">
-                        {c.appearances}/{c.totalPoints} points · avg #{c.avgRank}
+                        top 3 on {c.top3Count}/{c.totalPoints} · avg #{c.avgRank}
                       </p>
                     </td>
                     <td className="hidden py-2.5 pr-3 text-xs tabular-nums text-slate-700 dark:text-slate-300 sm:table-cell">
-                      {c.appearances}/{c.totalPoints} points · visibility {c.visibilityScore}%
+                      top 3 on {c.top3Count}/{c.totalPoints} points · visibility {c.visibilityScore}%
                       {c.avgRating != null && <> · {c.avgRating.toFixed(1)}<span aria-hidden="true">★</span><span className="sr-only"> stars</span></>}
                     </td>
                     <MetricCells coverage={c.coverage} arp={c.arp} solv={c.solv} />

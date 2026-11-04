@@ -4,7 +4,7 @@ import type { GridLayout } from '@/lib/grid-layout';
 
 import { useEffect, useMemo, useState } from 'react';
 import { SearchX } from 'lucide-react';
-import { parseTargetCid } from '@/lib/grid-target';
+import { displayGridTarget, parseTargetCid } from '@/lib/grid-target';
 import { LEGACY_GRID_DEPTH, formatUsd, type GridDepth } from '@/lib/grid-pricing';
 import { visibilityTone } from '@/lib/grid-rank-scale';
 import LocalTime from '@/components/LocalTime';
@@ -135,7 +135,7 @@ export default function GridAnalysisPanel({ snapshots, selectedId, gridSize, lay
         <div role="status" className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
           <SearchX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <div>
-            <p className="font-bold">{target} was not in the top {depth} at any of the {current.totalPoints} points.</p>
+            <p className="font-bold">{displayGridTarget(target)} was not in the top {depth} at any of the {current.totalPoints} points.</p>
             <p className="mt-1">
               {pickedListing
                 ? 'The target is an exact Google listing, so this is likely a real ranking gap: check the competitors below, or widen the spacing to see where the listing starts to appear.'

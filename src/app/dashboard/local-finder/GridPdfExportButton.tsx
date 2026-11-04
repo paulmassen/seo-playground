@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Download, LoaderCircle } from 'lucide-react';
+import { displayGridTarget } from '@/lib/grid-target';
 import type { GridPoint } from '@/lib/db';
 import { computeCompetitors, computeGridSummary } from './grid-insights';
 import { brandPalette, fitBox, footerPalette, imageSize, resolveBrandStyle, type BrandStyle } from '@/lib/brand';
@@ -179,7 +180,7 @@ export default function GridPdfExportButton(props: Props) {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       setColor(palette.muted);
-      text(`Target: ${props.target}  /  ${asciiLayoutLabel(describeGridLayout(props.gridSize, props.layout ?? DEFAULT_GRID_LAYOUT))}  /  ${formatDistance(props.spacingKm, distanceUnit)} spacing  /  ${props.language}`, margin, 60);
+      text(`Target: ${displayGridTarget(props.target)}  /  ${asciiLayoutLabel(describeGridLayout(props.gridSize, props.layout ?? DEFAULT_GRID_LAYOUT))}  /  ${formatDistance(props.spacingKm, distanceUnit)} spacing  /  ${props.language}`, margin, 60);
 
       const metrics = [
         ['VISIBILITY', `${summary.ato}%`, '100% = rank 1 everywhere'],

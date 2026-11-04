@@ -9,6 +9,7 @@ import {
 } from '@/lib/db';
 import { visibilityTone } from '@/lib/grid-rank-scale';
 import { DEFAULT_GRID_DEPTH } from '@/lib/grid-pricing';
+import { displayGridTarget } from '@/lib/grid-target';
 import LocalTime from '@/components/LocalTime';
 import LocalFinderForm from '../local-finder/LocalFinderForm';
 import HistorySidebar from '@/components/HistorySidebar';
@@ -165,7 +166,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
       <div key={entry.id} className={`relative px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
         <a href={`/dashboard/geo-grid?grid_history_id=${entry.id}#results`} aria-current={isActive ? 'page' : undefined} className="block min-w-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
           <p className={`truncate text-sm font-bold ${isActive ? 'text-blue-800 dark:text-blue-200' : 'text-slate-900 dark:text-slate-100'}`}>{entry.keyword}</p>
-          <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-400" title={entry.target}>{entry.target}</p>
+          <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-400" title={displayGridTarget(entry.target)}>{displayGridTarget(entry.target)}</p>
           <p className="mt-1 flex items-baseline justify-between gap-2 text-xs tabular-nums text-slate-600 dark:text-slate-400">
             <span>{gridBadge(entry)} · <LocalTime ts={entry.ts} /></span>
             {isPending
@@ -229,7 +230,7 @@ async function GeoGridPage({ searchParams }: { searchParams: Promise<SearchParam
                     <a href={`/dashboard/geo-grid?grid_history_id=${entry.id}#results`} className="flex h-full items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-500">
                       <span className="min-w-0">
                         <span className="block truncate text-base font-bold text-slate-900 dark:text-white">{entry.keyword}</span>
-                        <span className="mt-0.5 block truncate text-sm text-slate-700 dark:text-slate-300" title={entry.target}>{entry.target}</span>
+                        <span className="mt-0.5 block truncate text-sm text-slate-700 dark:text-slate-300" title={displayGridTarget(entry.target)}>{displayGridTarget(entry.target)}</span>
                         <span className="mt-2 block text-xs tabular-nums text-slate-600 dark:text-slate-400">
                           {gridBadge(entry)} · {entry.center} · last run <LocalTime ts={entry.ts} />
                         </span>

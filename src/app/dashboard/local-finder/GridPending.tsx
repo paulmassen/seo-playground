@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { displayGridTarget } from '@/lib/grid-target';
 import { useRouter } from 'next/navigation';
 import type { GridQueueMode } from '@/lib/db';
 import { DEFAULT_GRID_LAYOUT, describeGridLayout, type GridLayout } from '@/lib/grid-layout';
@@ -136,7 +137,7 @@ export default function GridPending({ searchId, projectId, totalPoints, queueMod
         <div>
           <p className="text-sm font-bold text-slate-900 dark:text-white">{keyword}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Target: <span className="font-bold text-slate-600 dark:text-slate-300">{target}</span>
+            Target: <span className="font-bold text-slate-600 dark:text-slate-300">{displayGridTarget(target)}</span>
             {' · '}{describeGridLayout(gridSize, layout)}
           </p>
         </div>

@@ -1,4 +1,5 @@
 import { withProjectScope } from '@/lib/db';
+import { displayGridTarget } from '@/lib/grid-target';
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
@@ -228,7 +229,7 @@ function GridPanel({ monitors, now }: { monitors: Monitor[]; now: number }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{latest.keyword}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-400">
-                      {latest.target} · {latest.grid_size}×{latest.grid_size} · {ago(latest.ts, now)}
+                      {displayGridTarget(latest.target)} · {latest.grid_size}×{latest.grid_size} · {ago(latest.ts, now)}
                       {pending && s && <span className="text-amber-600 dark:text-amber-400"> · new run in progress</span>}
                     </p>
                   </div>
