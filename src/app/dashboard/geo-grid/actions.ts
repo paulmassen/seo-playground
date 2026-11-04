@@ -5,6 +5,7 @@ import { runWithCurrentProject } from '@/lib/db';
 import { deleteGridSchedule, deleteGridSeries, getGridEntry, getSetting, saveGridSchedule, type GridQueueMode, type GridScheduleFrequency } from '@/lib/db';
 import { DEFAULT_GRID_LAYOUT, gridLayoutFromParams } from '@/lib/grid-layout';
 import { LEGACY_GRID_DEPTH, parseGridDepth, parseGridQueueMode } from '@/lib/grid-pricing';
+import { normalizeGridSize } from '@/lib/grid-preferences';
 import { gridTimeZone } from '@/lib/grid-timezone';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -40,7 +41,7 @@ export async function createGridMonitor(_previous: GridRunState, formData: FormD
     if (!COORDINATE.test(center)) return { error: 'Set the grid center: click the map, or type coordinates as lat,lng.' };
     if (!target) return { error: 'Enter the target domain or business, or pick a Google listing on the map.' };
 
-    const gridSize = Math.min(Math.max(parseInt(text(formData, 'grid_size') || '5', 10) || 5, 3), 11);
+    const gridSize = normalizeGridSize(text(formData, 'grid_size'));
     const spacingKm = parseFloat(text(formData, 'spacing_km'));
     if (!Number.isFinite(spacingKm) || spacingKm <= 0) return { error: 'Choose the spacing between grid points.' };
 

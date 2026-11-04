@@ -183,18 +183,20 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       gridLayerRef.current.clearLayers();
       const coords = gridLayoutCoords(centerLat, centerLng, gridSize, spacingKm, gridLayout);
       const bounds: [number, number][] = [];
+      // Smaller dots on 13×13 and 15×15 so neighbouring points stay distinct.
+      const dot = gridSize >= 13 ? 4 : 6;
       const toggleable = !!toggleCellRef.current;
 
       coords.forEach(({ row, col, lat, lng, isCenter, excluded }) => {
         bounds.push([lat, lng]);
         const marker = L.circleMarker([lat, lng], isCenter ? {
-          radius: 9, fillColor: '#3b82f6', color: '#1d4ed8', weight: 1.5, opacity: 0.9, fillOpacity: 0.7,
+          radius: dot + 3, fillColor: '#3b82f6', color: '#1d4ed8', weight: 1.5, opacity: 0.9, fillOpacity: 0.7,
         } : excluded ? {
           // Skipped points stay visible as dashed rings so they can be added back.
-          radius: 6, fillColor: '#ffffff', color: '#94a3b8', weight: 1.5, opacity: 0.9, fillOpacity: 0.15, dashArray: '2 3',
+          radius: dot, fillColor: '#ffffff', color: '#94a3b8', weight: 1.5, opacity: 0.9, fillOpacity: 0.15, dashArray: '2 3',
           bubblingMouseEvents: false,
         } : {
-          radius: 6, fillColor: '#94a3b8', color: '#475569', weight: 1.5, opacity: 0.9, fillOpacity: 0.35,
+          radius: dot, fillColor: '#94a3b8', color: '#475569', weight: 1.5, opacity: 0.9, fillOpacity: 0.35,
           // Without this, the map's own click handler would also move the grid center here.
           bubblingMouseEvents: !toggleable,
         });
@@ -207,7 +209,7 @@ export default function MapPicker({ coordinate, onChange, showGrid, gridSize, sp
       gridBoundsRef.current = llBounds;
       if (llBounds && fittedGeometryRef.current !== geometry) {
         fittedGeometryRef.current = geometry;
-        mapRef.current!.fitBounds(llBounds, { padding: [28, 28], maxZoom: 15 });
+        mapRef.current!.fitBounds(llBounds, { padding: [28, 28], maxZoom: 17 });
         setExpanded(true);
       }
     });

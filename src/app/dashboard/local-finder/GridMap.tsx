@@ -119,8 +119,8 @@ function starMarkerHtml(size: number, fontSize: number, color: string, ink: stri
 
 /** Marker and label sizes for a grid, per pin style. Circles and dots leave more of the basemap visible. */
 function markerMetrics(gridSize: number, pinStyle: PinStyle) {
-  const cellPx = gridSize <= 3 ? 52 : gridSize <= 5 ? 44 : gridSize <= 7 ? 38 : 32;
-  const fontSize = gridSize <= 5 ? 15 : 13;
+  const cellPx = gridSize <= 3 ? 52 : gridSize <= 5 ? 44 : gridSize <= 7 ? 38 : gridSize <= 11 ? 32 : gridSize <= 13 ? 28 : 25;
+  const fontSize = gridSize <= 5 ? 15 : gridSize <= 11 ? 13 : 11;
   if (pinStyle === 'circle') return { size: Math.round(cellPx * 0.9), fontSize: fontSize - 1, starScale: 1.3 };
   if (pinStyle === 'dot') return { size: Math.max(22, Math.round(cellPx * 0.6)), fontSize: gridSize <= 5 ? 11 : 10, starScale: 1.45 };
   return { size: cellPx, fontSize, starScale: 1.3 };

@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState, lazy, Suspense } from 'react';
 import { LANGUAGES } from '@/lib/geo-options';
 import { formatBusinessTarget } from '@/lib/grid-target';
-import { formatDistance, spacingOptions, type DistanceUnit } from '@/lib/grid-preferences';
+import { GRID_SIZES, formatDistance, normalizeGridSize, spacingOptions, type DistanceUnit } from '@/lib/grid-preferences';
 import {
   DEFAULT_GRID_LAYOUT, GRID_SHAPES, gridCellKey, gridLayoutCells, gridLayoutParams, gridPointCount, normalizeGridLayout,
   normalizeRotation, type GridLayout, type GridShape,
@@ -69,7 +69,7 @@ function GridPreview({ size, spacingKm, unit, layout, onToggle, onResetSkipped }
   onToggle: (row: number, col: number) => void; onResetSkipped: () => void;
 }) {
   const cells = new Map(gridLayoutCells(size, layout).map((cell) => [gridCellKey(cell.row, cell.col), cell]));
-  const cellPx = size <= 5 ? 20 : size <= 7 ? 17 : 14;
+  const cellPx = size <= 5 ? 20 : size <= 7 ? 17 : size <= 11 ? 14 : size <= 13 ? 12 : 10;
   const pointCount = gridPointCount(size, layout);
   return (
     <div className="flex flex-col items-center gap-3 py-2">
@@ -127,7 +127,7 @@ export default function LocalFinderForm({ defaults }: Props) {
   const [coordinate, setCoordinate] = useState(defaults.locationCoordinate || defaults.defaultCenter);
   const [isLoading, setIsLoading] = useState(false);
   const [runState, createAction, isCreating] = useActionState<GridRunState, FormData>(createGridMonitor, null);
-  const [gridSize, setGridSize] = useState(parseInt(defaults.gridSize ?? '5', 10));
+  const [gridSize, setGridSize] = useState(normalizeGridSize(defaults.gridSize ?? '5'));
   const [spacingKm, setSpacingKm] = useState(parseFloat(defaults.spacingKm ?? '1'));
   // Standard is the cheapest mode and the one scheduled runs use; Live stays one explicit click away.
   const [queueMode, setQueueMode] = useState<QueueMode>((defaults.queueMode as QueueMode) || 'standard');
@@ -290,7 +290,7 @@ export default function LocalFinderForm({ defaults }: Props) {
                   }}
                   className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800"
                 >
-                  {[3, 5, 7, 9, 11].map((size) => (
+                  {GRID_SIZES.map((size) => (
                     <option key={size} value={size}>
                       {size}×{size} ({gridPointCount(size, { shape: gridShape, rotationDeg: 0, excluded: [] })} points)
                     </option>
@@ -458,7 +458,10 @@ export default function LocalFinderForm({ defaults }: Props) {
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
                 {queueMode === 'live' ? (
-                  <>Keep this page open for {formatLiveDuration(pointCount)}. DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.</>
+                  <>
+                    Keep this page open for {formatLiveDuration(pointCount)}. DataForSEO’s live endpoint has slowed down, so large grids can take several minutes.
+                    {pointCount > 121 && <> For {pointCount} points, Priority is cheaper and runs in the background.</>}
+                  </>
                 ) : queueMode === 'priority' ? (
                   <>Queued with DataForSEO’s high-priority flag. The page checks every 10 seconds; you can leave and come back.</>
                 ) : (

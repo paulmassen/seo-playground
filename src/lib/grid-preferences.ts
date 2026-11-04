@@ -48,10 +48,26 @@ export function formatDistance(km: number, unit: DistanceUnit, decimals = 2): st
   return `${value} ${unit}`;
 }
 
-/** Spacing presets offered by the Geo-grid form, in the display unit. */
+/** Grid sizes offered by the Geo-grid form. Odd, so there is always a center point. */
+export const GRID_SIZES = [3, 5, 7, 9, 11, 13, 15] as const;
+export const MIN_GRID_SIZE = GRID_SIZES[0];
+export const MAX_GRID_SIZE = GRID_SIZES[GRID_SIZES.length - 1];
+
+/** Clamps a requested size to the offered range, rounding an even value up to the next odd one. */
+export function normalizeGridSize(value: unknown, fallback = 5): number {
+  const parsed = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+  const size = Number.isFinite(parsed) ? Math.round(parsed) : fallback;
+  const clamped = Math.min(Math.max(size, MIN_GRID_SIZE), MAX_GRID_SIZE);
+  return clamped % 2 === 0 ? clamped + 1 : clamped;
+}
+
+/**
+ * Spacing presets offered by the Geo-grid form, in the display unit. Fine steps for dense city
+ * centres (a few streets apart), wider ones for regional service areas.
+ */
 const SPACING_PRESETS: Record<DistanceUnit, number[]> = {
-  km: [0.5, 1, 2, 3, 5, 10],
-  mi: [0.25, 0.5, 1, 2, 3, 5],
+  km: [0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10, 15, 20],
+  mi: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10, 15],
 };
 
 export type SpacingOption = { km: number; label: string };
