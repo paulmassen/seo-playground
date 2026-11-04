@@ -59,4 +59,20 @@ describe('collectGridProgress', () => {
     expect(getGridEntryForProject(projectId, run.id)?.status).toBe('done');
     expect(getGridProgressForProject(projectId, run.id)?.pendingTasks).toEqual([]);
   });
+
+  it('excludes sponsored listings from the target rank', async () => {
+    const run = entry(`paid-${crypto.randomUUID()}`);
+    saveGridSearchPendingForProject(projectId, run, [taskPoint]);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      tasks: [{ status_code: 20000, result: [{ items: [
+        { type: 'local_pack', rank_group: 1, title: 'Ad', domain: 'ad.example', is_paid: true },
+        { type: 'local_pack', rank_group: 2, title: 'Example', domain: 'example.com' },
+      ] }] }],
+    }), { status: 200 })));
+
+    await collectGridProgress(projectId, run, creds);
+    const [point] = getGridProgressForProject(projectId, run.id)!.results;
+    expect(point.rank).toBe(1);
+    expect(point.items?.map((item) => item.title)).toEqual(['Example']);
+  });
 });

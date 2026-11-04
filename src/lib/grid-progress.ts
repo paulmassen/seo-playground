@@ -1,5 +1,6 @@
 import { matchesGridTarget } from '@/lib/grid-target';
 import { DEFAULT_GRID_LAYOUT, gridPointCount } from '@/lib/grid-layout';
+import { organicLocalPack } from '@/lib/grid-local-pack';
 import {
   getGridProgressForProject, updateGridProgressForProject,
   type GridLocalItem, type GridPoint, type GridSearchEntry, type GridTaskPoint,
@@ -12,7 +13,7 @@ interface DFSTaskGetResponse {
     status_code?: number;
     status_message?: string;
     result?: Array<{ items?: Array<{
-      type: string; rank_group: number; title?: string; domain?: string; url?: string; cid?: string;
+      type: string; rank_group: number; title?: string; domain?: string; url?: string; cid?: string; is_paid?: boolean;
       rating?: { value?: number; votes_count?: number };
     }> }>;
   }> | null;
@@ -56,7 +57,8 @@ async function collectGridProgressOnce(
       const task = data.tasks?.[0];
       if (!task || stillProcessing.has(task.status_code ?? 0)) return { taskPoint, ready: false, items: [] };
       if (task.status_code !== 20000) return { taskPoint, ready: false, items: [] };
-      const items = (task.result?.[0]?.items ?? []).filter((item) => item.type === 'local_pack');
+      // Sponsored listings are not earned positions: drop them and renumber the organic ones.
+      const items = organicLocalPack(task.result?.[0]?.items ?? []);
       return { taskPoint, ready: true, items };
     } catch {
       return { taskPoint, ready: false, items: [] };
