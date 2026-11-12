@@ -6,6 +6,13 @@
 
 SEO Playground is actively evolving. Highlights of the latest releases:
 
+### v0.7.0 — 2026-11-04
+
+- 📍 **GBP Category Audit** — compare a Google Business Profile's primary and additional categories with local competitors, with recommendations and CSV export.
+- 📊 **Project overview and spending** — see the current project's key metrics on the dashboard and break down DataForSEO spending by project.
+- 🗺️ **More flexible Geo-grids** — choose top 10 or top 20 results, use grids up to 15×15, show competitor addresses and track Coverage, ARP and SoLV. Schedules can use the grid location's time zone.
+- 🛡️ **Safer, clearer Geo-grid runs** — paid runs require explicit confirmation, cost estimates reflect the selected depth, and sponsored listings no longer count as organic positions. Existing monitors keep their top 20 depth and history.
+
 ### v0.6.3 — 2026-10-19
 
 - 🔔 **Unified task notifications** — the bell tracks Geo-grid, Review Velocity and Rank Tracker work across the dashboard, including completed checks until opened.
@@ -63,16 +70,11 @@ https://github.com/user-attachments/assets/fb506723-0996-4704-a6a5-b12b1115b805
 
 *Geo-grid: see where a business ranks block by block, then switch to any competitor's grid*
 
-![Google Reviews — rating goal](public/readme/google-reviews.gif)
-*Google Reviews: rating distribution, and exactly how many 5★ reviews it takes to reach the next rating*
-
-![Web Mentions](public/readme/web-mentions.gif)
-*Web Mentions: sentiment, emotions, top domains and countries, plus every mention found across the web*
-
 ## Features
 
 - **Rank Tracker** — Track keyword positions over time for any domain
-- **Spending** — What your DataForSEO calls cost over any date range, per day and per tool, with calls of unknown cost counted separately and estimated
+- **Spending** — What your DataForSEO calls cost over any date range, by project, day and tool, with calls of unknown cost counted separately and estimated
+- **GBP Category Audit** — Compare primary and additional Google Business Profile categories with local competitors, with recommendations and CSV export
 - **SERP Checker** — Analyze Google organic results with target domain highlighting
 - **Ranked Keywords** — Discover what keywords a domain ranks for
 - **Keyword Overview** — Metrics (volume, CPC, competition) for a list of keywords
@@ -93,7 +95,7 @@ https://github.com/user-attachments/assets/fb506723-0996-4704-a6a5-b12b1115b805
 - **Backlinks Domain Intersection** — Domains linking to you and a competitor
 - **Bulk Backlinks / Bulk Referring Domains** — Aggregated backlink metrics for a domain list
 - **Local Finder** — Google local pack results for any keyword and location, with map-based coordinate picker
-- **Geo-Grid Ranking** — Local visibility heatmap across a configurable grid of points (3×3 to 11×11; square, diamond or circle, optionally rotated, with any point skippable), with a timeline of snapshots and point-by-point movement against the previous run. Choose between three API modes: Live (~6 s, instant results), Priority (~1 min, 40% cheaper) or Standard (background queue, 70% cheaper). A grid can be scheduled daily or weekly.
+- **Geo-Grid Ranking** — Local visibility heatmap across a configurable grid of points (3×3 to 15×15; square, diamond or circle, optionally rotated, with any point skippable), with snapshot history, competitor comparisons and Coverage, ARP and SoLV metrics. Choose the top 10 or top 20 results and Live, Priority or Standard API mode. Schedule checks daily or weekly in the grid location's time zone.
 - **On-Page Site Audit** — Full site crawl with pages, links, resources, duplicate tags and non-indexable pages
 - **On-Page Instant Pages** — Instant single-page audit without crawling
 - **Microdata Analysis** — Structured data inspection for any crawled URL
