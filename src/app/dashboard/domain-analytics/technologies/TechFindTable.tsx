@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -65,13 +66,13 @@ export default function TechFindTable({ items }: { items: FindDomainItem[] }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -108,7 +109,7 @@ export default function TechFindTable({ items }: { items: FindDomainItem[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
-              <Header label="DR" sortK="dr" align="center" className="w-14" />
+              <Header label="DR" hint={METRIC_HINTS.domainRank} sortK="dr" align="center" className="w-14" />
               <Header label="Domain" sortK="domain" align="left" />
               <Header label="Title" sortK="title" align="left" className="hidden md:table-cell" />
               <Header label="Country" sortK="country" align="center" className="hidden sm:table-cell w-16" />

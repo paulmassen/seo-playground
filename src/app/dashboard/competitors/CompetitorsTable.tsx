@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { CompetitorItem } from './page';
@@ -23,7 +24,7 @@ function TrafficBadge({ value }: { value?: number }) {
   const color = value >= 10000 ? 'text-emerald-700 bg-emerald-50'
     : value >= 1000 ? 'text-blue-700 bg-blue-50'
     : 'text-slate-600 bg-slate-100';
-  return <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tabular-nums ${color}`}>{n(value)}</span>;
+  return <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tabular-nums ${color}`}>{n(Math.round(value))}</span>;
 }
 
 function sortValue(item: CompetitorItem, key: SortKey): number | string {
@@ -31,7 +32,7 @@ function sortValue(item: CompetitorItem, key: SortKey): number | string {
     case 'domain': return item.domain?.toLowerCase() ?? '';
     case 'intersections': return item.intersections ?? -1;
     case 'avg_position': return item.avg_position ?? -1;
-    case 'traffic': return item.metrics?.organic?.estimated_traffic ?? item.full_domain_metrics?.organic?.estimated_traffic ?? -1;
+    case 'traffic': return item.metrics?.organic?.etv ?? -1;
     case 'total_kw': return item.full_domain_metrics?.organic?.count ?? -1;
   }
 }
@@ -59,13 +60,13 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -79,17 +80,17 @@ export default function CompetitorsTable({ items, maxIntersections }: { items: C
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <th className="px-5 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 w-10">#</th>
             <Header label="Competitor domain" sortK="domain" align="left" />
-            <Header label="Common keywords" sortK="intersections" align="left" />
-            <Header label="Avg pos." sortK="avg_position" align="right" />
-            <Header label="Est. traffic" sortK="traffic" align="right" className="hidden sm:table-cell" />
-            <Header label="Total KW" sortK="total_kw" align="right" className="hidden md:table-cell" />
+            <Header label="Common keywords" hint={METRIC_HINTS.commonKeywords} sortK="intersections" align="left" />
+            <Header label="Avg pos." hint={METRIC_HINTS.avgPosition} sortK="avg_position" align="right" />
+            <Header label="Est. traffic" hint={METRIC_HINTS.competitorTraffic} sortK="traffic" align="right" className="hidden sm:table-cell" />
+            <Header label="Total KW" hint={METRIC_HINTS.totalKeywords} sortK="total_kw" align="right" className="hidden md:table-cell" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
           {sorted.map((item, i) => {
             const intersections = item.intersections ?? 0;
             const barPct = Math.round((intersections / maxIntersections) * 100);
-            const traffic = item.metrics?.organic?.estimated_traffic;
+            const traffic = item.metrics?.organic?.etv;
             const totalKw = item.full_domain_metrics?.organic?.count;
 
             return (

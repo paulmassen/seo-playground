@@ -16,7 +16,7 @@ interface PageIntApiItem { page_intersection?: Record<string, PageIntBacklink[] 
 async function fetchPageInt(targets: string[], login: string, pass: string): Promise<{ items: PageIntItem[]; cost?: number; error?: string }> {
   const { result, cost, error } = await callDataForSeoFirst<{ items?: PageIntApiItem[] }>(
     'backlinks/page_intersection/live',
-    { targets: Object.fromEntries(targets.map((t, i) => [String(i + 1), t])), limit: 500, order_by: ['1.page_from_rank,desc'] },
+    { targets: Object.fromEntries(targets.map((t, i) => [String(i + 1), t])), limit: 500, order_by: ['1.page_from_rank,desc'], rank_scale: 'one_hundred' },
     { login, pass },
   );
   if (error) return { items: [], error };

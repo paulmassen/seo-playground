@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -71,13 +72,13 @@ export default function KeywordDataTable({ items }: { items: KeywordItem[] }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -115,12 +116,12 @@ export default function KeywordDataTable({ items }: { items: KeywordItem[] }) {
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
-              <Header label="Vol." sortK="volume" align="right" />
-              <Header label="Competition" sortK="competition" align="center" />
-              <Header label="Index" sortK="index" align="right" />
-              <Header label="CPC" sortK="cpc" align="right" />
-              <Header label="Bid Low" sortK="bid_low" align="right" />
-              <Header label="Bid High" sortK="bid_high" align="right" />
+              <Header label="Vol." hint={METRIC_HINTS.volume} sortK="volume" align="right" />
+              <Header label="Competition" hint={METRIC_HINTS.competitionLevel} sortK="competition" align="center" />
+              <Header label="Index" hint={METRIC_HINTS.competitionIndex} sortK="index" align="right" />
+              <Header label="CPC" hint={METRIC_HINTS.cpc} sortK="cpc" align="right" />
+              <Header label="Bid Low" hint={METRIC_HINTS.bidLow} sortK="bid_low" align="right" />
+              <Header label="Bid High" hint={METRIC_HINTS.bidHigh} sortK="bid_high" align="right" />
               <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hidden xl:table-cell">Trend</th>
             </tr>
           </thead>

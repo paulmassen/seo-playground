@@ -7,6 +7,7 @@ import { reconcileGridPoints } from './grid-target';
 import { DEFAULT_GRID_LAYOUT, gridLayoutKey, parseGridLayout, serializeGridLayout, type GridLayout } from './grid-layout';
 import { LEGACY_GRID_DEPTH, parseGridDepth, type GridDepth } from './grid-pricing';
 import type { RankTopResult } from './rank-serp';
+import { ranksTo100 } from './dfs-rank';
 
 // Operation-local identity, never the mutable UI selection after an await.
 const projectScope = new AsyncLocalStorage<string>();
@@ -938,6 +939,46 @@ function initSchema(db: Database.Database) {
 
   backfillGridSeriesIds(db);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_grid_searches_series ON grid_searches(series_id, ts DESC)`);
+  rescaleStoredRanks(db);
+}
+
+/**
+ * Searches saved before every view asked for (or converted to) the 0–100 rank scale hold ranks on
+ * DataForSEO's default 0–1000 scale. Convert them once so saved and new results compare directly.
+ * The main Backlinks tool handles its own legacy rows (rescaleLegacyLink) and is not touched here.
+ */
+function rescaleStoredRanks(db: Database.Database): void {
+  const MARKER = 'migration_rank_scale_100';
+  if (db.prepare('SELECT 1 FROM settings WHERE key = ?').get(MARKER)) return;
+  const lists: Array<{ table: string; column: string; nested?: string }> = [
+    { table: 'ref_domains_searches', column: 'items' },
+    { table: 'bl_broken', column: 'items' },
+    { table: 'bl_domain_intersection', column: 'items' },
+    { table: 'bl_page_intersection', column: 'items' },
+    { table: 'bl_ref_networks', column: 'items' },
+    { table: 'domain_find_searches', column: 'items' },
+    { table: 'domain_tech_searches', column: 'result' },
+    { table: 'domain_whois_searches', column: 'result', nested: 'backlinks_info' },
+  ];
+  db.transaction(() => {
+    for (const { table, column, nested } of lists) {
+      const rows = db.prepare(`SELECT id, ${column} AS data FROM ${table}`).all() as Array<{ id: string; data: string }>;
+      const update = db.prepare(`UPDATE ${table} SET ${column} = ? WHERE id = ?`);
+      for (const row of rows) {
+        let parsed: unknown;
+        try { parsed = JSON.parse(row.data); } catch { continue; }
+        const convert = (item: unknown) => {
+          if (!item || typeof item !== 'object') return item;
+          if (!nested) return ranksTo100(item);
+          const inner = (item as Record<string, unknown>)[nested];
+          return inner && typeof inner === 'object' ? { ...item, [nested]: ranksTo100(inner) } : item;
+        };
+        const next = Array.isArray(parsed) ? parsed.map(convert) : convert(parsed);
+        update.run(JSON.stringify(next), row.id);
+      }
+    }
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(MARKER, String(Date.now()));
+  })();
 }
 
 /** Runs saved before monitors existed have no series_id; persist it so a series can be queried directly. */

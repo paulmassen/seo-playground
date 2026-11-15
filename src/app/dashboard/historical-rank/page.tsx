@@ -1,6 +1,7 @@
 import { withProjectScope } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { getCredentials, getHistRankHistory, saveHistRankSearch, getHistRankResults, getSetting } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
 import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields';
@@ -220,7 +221,7 @@ async function HistoricalRankPage({ searchParams }: { searchParams: Promise<Sear
                       <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">2–3</th>
                       <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">4–10</th>
                       <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">11–30</th>
-                      <th className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">ETV</th>
+                      <th title={METRIC_HINTS.etv} className="text-right px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest"><span className="underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help">ETV</span></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">

@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -50,13 +51,13 @@ export default function ReferringNetworksTable({ items }: { items: NetworkItem[]
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -70,9 +71,9 @@ export default function ReferringNetworksTable({ items }: { items: NetworkItem[]
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <th className="px-6 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">#</th>
             <Header label="Network" sortK="network" align="left" />
-            <Header label="Ref. domains" sortK="referring_domains" align="left" className="hidden md:table-cell" />
-            <Header label="IPs" sortK="ip_count" align="right" />
-            <Header label="Backlinks" sortK="backlinks" align="right" className="hidden sm:table-cell" />
+            <Header label="Ref. domains" hint={METRIC_HINTS.refDomains} sortK="referring_domains" align="left" className="hidden md:table-cell" />
+            <Header label="IPs" hint={METRIC_HINTS.networkIps} sortK="ip_count" align="right" />
+            <Header label="Backlinks" hint={METRIC_HINTS.backlinks} sortK="backlinks" align="right" className="hidden sm:table-cell" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

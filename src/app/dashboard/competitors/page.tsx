@@ -21,7 +21,8 @@ import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
 interface DomainMetricsOrganic {
   count?: number;
-  estimated_traffic?: number;
+  /** Estimated monthly organic visits. DataForSEO calls it `etv`; there is no `estimated_traffic` field. */
+  etv?: number;
   is_new?: number;
   is_up?: number;
   is_down?: number;
@@ -212,7 +213,7 @@ async function CompetitorsPage({ searchParams }: { searchParams: Promise<SearchP
                       domain: item.domain ?? '',
                       intersections: item.intersections ?? '',
                       avg_position: item.avg_position ?? '',
-                      traffic: item.full_domain_metrics?.organic?.estimated_traffic ?? item.metrics?.organic?.estimated_traffic ?? '',
+                      traffic: item.metrics?.organic?.etv != null ? Math.round(item.metrics.organic.etv) : '',
                       total_kw: item.full_domain_metrics?.organic?.count ?? item.metrics?.organic?.count ?? '',
                     }))}
                     columns={[
@@ -228,7 +229,7 @@ async function CompetitorsPage({ searchParams }: { searchParams: Promise<SearchP
                       domain: item.domain ?? '',
                       intersections: item.intersections ?? '',
                       avg_position: item.avg_position ?? '',
-                      traffic: item.full_domain_metrics?.organic?.estimated_traffic ?? item.metrics?.organic?.estimated_traffic ?? '',
+                      traffic: item.metrics?.organic?.etv != null ? Math.round(item.metrics.organic.etv) : '',
                       total_kw: item.full_domain_metrics?.organic?.count ?? item.metrics?.organic?.count ?? '',
                     }))}
                     filename={`competitors-${displayTarget}.csv`}

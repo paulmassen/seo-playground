@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-react';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -109,13 +110,13 @@ function LeaderboardTable({
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align }: { label: string; sortK: SortKey; align: 'left' | 'right' }) {
+  function Header({ label, sortK, align, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'}`}
         onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -155,8 +156,8 @@ function LeaderboardTable({
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                 <Header label={nameLabel} sortK="name" align="left" />
-                <Header label="Mentions" sortK="mentions" align="right" />
-                <Header label="AI Search Volume" sortK="volume" align="right" />
+                <Header label="Mentions" hint={METRIC_HINTS.mentionsAi} sortK="mentions" align="right" />
+                <Header label="AI Search Volume" hint={METRIC_HINTS.aiVolume} sortK="volume" align="right" />
               </tr>
             </thead>
             {sorted.map((item, i) => {

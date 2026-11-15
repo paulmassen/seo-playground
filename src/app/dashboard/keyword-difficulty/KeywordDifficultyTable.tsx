@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
@@ -86,13 +87,13 @@ export default function KeywordDifficultyTable({ items }: { items: DifficultyIte
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -128,11 +129,11 @@ export default function KeywordDifficultyTable({ items }: { items: DifficultyIte
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
-              <Header label="Difficulty" sortK="difficulty" align="left" />
-              <Header label="Vol." sortK="volume" align="right" />
-              <Header label="CPC" sortK="cpc" align="right" />
-              <Header label="Ref. domains" sortK="ref_domains" align="right" className="hidden md:table-cell" />
-              <Header label="Results" sortK="results" align="right" className="hidden lg:table-cell" />
+              <Header label="Difficulty" hint={METRIC_HINTS.kd} sortK="difficulty" align="left" />
+              <Header label="Vol." hint={METRIC_HINTS.volume} sortK="volume" align="right" />
+              <Header label="CPC" hint={METRIC_HINTS.cpc} sortK="cpc" align="right" />
+              <Header label="Ref. domains" hint={METRIC_HINTS.refDomainsAvg} sortK="ref_domains" align="right" className="hidden md:table-cell" />
+              <Header label="Results" hint={METRIC_HINTS.serpResults} sortK="results" align="right" className="hidden lg:table-cell" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

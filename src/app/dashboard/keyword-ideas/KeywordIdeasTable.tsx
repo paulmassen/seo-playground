@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -66,13 +67,13 @@ export default function KeywordIdeasTable({ items }: { items: IdeaItem[] }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -85,12 +86,12 @@ export default function KeywordIdeasTable({ items }: { items: IdeaItem[] }) {
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
-            <Header label="KD" sortK="kd" align="center" />
-            <Header label="Volume" sortK="volume" align="right" />
-            <Header label="CPC" sortK="cpc" align="right" />
-            <Header label="Intent" sortK="intent" align="center" className="hidden sm:table-cell" />
-            <Header label="Competition" sortK="competition" align="right" className="hidden md:table-cell" />
-            <Header label="Ref. Domains" sortK="ref_domains" align="right" className="hidden lg:table-cell" />
+            <Header label="KD" hint={METRIC_HINTS.kd} sortK="kd" align="center" />
+            <Header label="Volume" hint={METRIC_HINTS.volume} sortK="volume" align="right" />
+            <Header label="CPC" hint={METRIC_HINTS.cpc} sortK="cpc" align="right" />
+            <Header label="Intent" hint={METRIC_HINTS.intent} sortK="intent" align="center" className="hidden sm:table-cell" />
+            <Header label="Competition" hint={METRIC_HINTS.competitionLevel} sortK="competition" align="right" className="hidden md:table-cell" />
+            <Header label="Ref. Domains" hint={METRIC_HINTS.refDomainsAvg} sortK="ref_domains" align="right" className="hidden lg:table-cell" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

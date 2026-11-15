@@ -13,7 +13,7 @@ interface SearchParams { target?: string; history_id?: string; }
 async function fetchNetworks(target: string, login: string, pass: string): Promise<{ items: NetworkItem[]; cost?: number; error?: string }> {
   const { result, cost, error } = await callDataForSeoFirst<{ items?: NetworkItem[] }>(
     'backlinks/referring_networks/live',
-    { target, limit: 1000, order_by: ['referring_domains,desc'] },
+    { target, limit: 1000, order_by: ['referring_domains,desc'], rank_scale: 'one_hundred' },
     { login, pass },
   );
   if (error) return { items: [], error };

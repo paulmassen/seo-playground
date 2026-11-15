@@ -24,7 +24,7 @@ async function fetchRefDomains(target: string, limit: number, login: string, pas
     items?: (Omit<RefDomain, 'domain_from_rank'> & { rank: number })[];
   }>(
     'backlinks/referring_domains/live',
-    { target, limit, order_by: ['rank,desc'], include_subdomains: true },
+    { target, limit, order_by: ['rank,desc'], include_subdomains: true, rank_scale: 'one_hundred' },
     { login, pass },
   );
   if (error) return { items: [], total: 0, cost: 0, error };

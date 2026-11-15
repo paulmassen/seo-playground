@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -56,13 +57,13 @@ export default function BulkRdTable({ items }: { items: BulkRdItem[] }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'} ${className ?? ''}`}
         onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -75,11 +76,11 @@ export default function BulkRdTable({ items }: { items: BulkRdItem[] }) {
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Domain" sortK="target" align="left" />
-            <Header label="Ref. Domains" sortK="referring_domains" align="left" />
-            <Header label="Main RD" sortK="referring_main_domains" align="right" className="hidden sm:table-cell" />
-            <Header label="Ref. IPs" sortK="referring_ips" align="right" className="hidden md:table-cell" />
-            <Header label="Nofollow RD" sortK="referring_domains_nofollow" align="right" className="hidden lg:table-cell" />
-            <Header label="Broken BL" sortK="broken_backlinks" align="right" className="hidden lg:table-cell" />
+            <Header label="Ref. Domains" hint={METRIC_HINTS.refDomains} sortK="referring_domains" align="left" />
+            <Header label="Main RD" hint={METRIC_HINTS.refMainDomains} sortK="referring_main_domains" align="right" className="hidden sm:table-cell" />
+            <Header label="Ref. IPs" hint={METRIC_HINTS.refIps} sortK="referring_ips" align="right" className="hidden md:table-cell" />
+            <Header label="Nofollow RD" hint={METRIC_HINTS.refDomainsNofollow} sortK="referring_domains_nofollow" align="right" className="hidden lg:table-cell" />
+            <Header label="Broken BL" hint={METRIC_HINTS.brokenBacklinks} sortK="broken_backlinks" align="right" className="hidden lg:table-cell" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

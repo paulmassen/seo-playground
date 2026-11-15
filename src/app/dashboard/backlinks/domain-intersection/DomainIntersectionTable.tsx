@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -57,13 +58,13 @@ export default function DomainIntersectionTable({ items, t1, t2 }: { items: DomI
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? 'text-slate-400'}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? 'text-slate-400'}`}
         onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -76,10 +77,10 @@ export default function DomainIntersectionTable({ items, t1, t2 }: { items: DomI
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Linking domain" sortK="domain_from" align="left" />
-            <Header label="DR" sortK="domain_from_rank" align="center" />
+            <Header label="DR" hint={METRIC_HINTS.dr} sortK="domain_from_rank" align="center" />
             <Header label={`→ ${t1 || 'Target 1'}`} sortK="backlinks_from_target1" align="right" className="text-blue-600" />
             <Header label={`→ ${t2 || 'Target 2'}`} sortK="backlinks_from_target2" align="right" className="text-violet-600" />
-            <Header label="First seen" sortK="first_seen" align="right" className="hidden lg:table-cell text-slate-400" />
+            <Header label="First seen" hint={METRIC_HINTS.firstSeen} sortK="first_seen" align="right" className="hidden lg:table-cell text-slate-400" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

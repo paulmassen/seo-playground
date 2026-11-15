@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -55,13 +56,13 @@ export default function AnchorsTable({ items }: { items: AnchorItem[] }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align }: { label: string; sortK: SortKey; align: 'left' | 'right' }) {
+  function Header({ label, sortK, align, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left !px-5' : 'text-right'}`}
+      <th title={hint} className={`px-3 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left !px-5' : 'text-right'}`}
         onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -73,10 +74,10 @@ export default function AnchorsTable({ items }: { items: AnchorItem[] }) {
       <thead>
         <tr className="border-b border-slate-100 dark:border-slate-800">
           <Header label="Anchor Text" sortK="anchor" align="left" />
-          <Header label="Links" sortK="backlinks" align="right" />
-          <Header label="Domains" sortK="referring_domains" align="right" />
-          <Header label="Split" sortK="dofollow_pct" align="left" />
-          <Header label="First Seen" sortK="first_seen" align="left" />
+          <Header label="Links" hint={METRIC_HINTS.backlinks} sortK="backlinks" align="right" />
+          <Header label="Domains" hint={METRIC_HINTS.refDomains} sortK="referring_domains" align="right" />
+          <Header label="Split" hint={METRIC_HINTS.dofollow} sortK="dofollow_pct" align="left" />
+          <Header label="First Seen" hint={METRIC_HINTS.firstSeen} sortK="first_seen" align="left" />
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -57,13 +58,13 @@ export default function BacklinksHistoryTable({ points }: { points: HistoryPoint
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'} ${className ?? 'text-slate-400'}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'} ${className ?? 'text-slate-400'}`}
         onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -76,12 +77,12 @@ export default function BacklinksHistoryTable({ points }: { points: HistoryPoint
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Date" sortK="date" align="left" />
-            <Header label="Backlinks" sortK="backlinks" align="right" />
-            <Header label="+New" sortK="new_backlinks" align="right" className="text-emerald-600" />
-            <Header label="−Lost" sortK="lost_backlinks" align="right" className="text-red-500" />
-            <Header label="Ref. Domains" sortK="referring_domains" align="right" className="hidden sm:table-cell text-slate-400" />
-            <Header label="+New RD" sortK="new_referring_domains" align="right" className="hidden md:table-cell text-emerald-600" />
-            <Header label="−Lost RD" sortK="lost_referring_domains" align="right" className="hidden md:table-cell text-red-500" />
+            <Header label="Backlinks" hint={METRIC_HINTS.backlinks} sortK="backlinks" align="right" />
+            <Header label="+New" hint={METRIC_HINTS.newLost} sortK="new_backlinks" align="right" className="text-emerald-600" />
+            <Header label="−Lost" hint={METRIC_HINTS.newLost} sortK="lost_backlinks" align="right" className="text-red-500" />
+            <Header label="Ref. Domains" hint={METRIC_HINTS.refDomains} sortK="referring_domains" align="right" className="hidden sm:table-cell text-slate-400" />
+            <Header label="+New RD" hint={METRIC_HINTS.newLost} sortK="new_referring_domains" align="right" className="hidden md:table-cell text-emerald-600" />
+            <Header label="−Lost RD" hint={METRIC_HINTS.newLost} sortK="lost_referring_domains" align="right" className="hidden md:table-cell text-red-500" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

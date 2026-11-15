@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -60,13 +61,13 @@ export default function TrafficEstimationTable({ items }: { items: TrafficItem[]
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -79,9 +80,9 @@ export default function TrafficEstimationTable({ items }: { items: TrafficItem[]
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Domain" sortK="target" align="left" className="!px-6" />
-            <Header label="Est. traffic (ETV)" sortK="traffic" align="left" />
-            <Header label="Keywords" sortK="keywords" align="right" />
-            <Header label="Paid KWs" sortK="paid_keywords" align="right" className="hidden sm:table-cell" />
+            <Header label="Est. traffic (ETV)" hint={METRIC_HINTS.etv} sortK="traffic" align="left" />
+            <Header label="Keywords" hint={METRIC_HINTS.rankedKeywords} sortK="keywords" align="right" />
+            <Header label="Paid KWs" hint={METRIC_HINTS.paidKeywords} sortK="paid_keywords" align="right" className="hidden sm:table-cell" />
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

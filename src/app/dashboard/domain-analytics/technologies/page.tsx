@@ -12,6 +12,7 @@ import {
 } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { ranksTo100 } from '@/lib/dfs-rank';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import TechFindTable from './TechFindTable';
 import DeleteHistoryButton from '@/components/DeleteHistoryButton';
@@ -76,7 +77,8 @@ async function fetchDomainTech(
     'domain_analytics/technologies/domain_technologies/live', { target }, { login, pass }, 20_000,
   );
   if (error) return { result: null, error };
-  return { result: result ?? null, cost };
+  // Domain Analytics has no rank_scale option: ranks come on 0–1000, the app shows 0–100.
+  return { result: result ? ranksTo100(result) : null, cost };
 }
 
 async function fetchDomainsByTech(opts: {
@@ -94,7 +96,7 @@ async function fetchDomainsByTech(opts: {
     'domain_analytics/technologies/domains_by_technology/live', body, { login: opts.login, pass: opts.pass }, 20_000,
   );
   if (error) return { items: [], error };
-  return { items: result?.items ?? [], total: result?.total_count, cost };
+  return { items: (result?.items ?? []).map(ranksTo100), total: result?.total_count, cost };
 }
 
 // ---- UI helpers ----

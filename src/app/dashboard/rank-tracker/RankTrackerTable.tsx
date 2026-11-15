@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { TrackedKeyword, RankCheck } from '@/lib/db';
@@ -63,13 +64,13 @@ export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, ch
     else { setSortKey(key); setSortDir(key === 'keyword' ? 'asc' : 'desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left' : 'text-center'} ${className ?? ''}`}
+      <th title={hint} className={`px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left' : 'text-center'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'center' ? 'justify-center w-full' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -81,8 +82,8 @@ export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, ch
       <thead>
         <tr className="border-b border-slate-50 dark:border-slate-800">
           <Header label="Keyword" sortK="keyword" align="left" className="!px-5" />
-          <Header label="Pos." sortK="position" align="center" />
-          <Header label="Trend" sortK="trend" align="center" />
+          <Header label="Pos." hint={METRIC_HINTS.position} sortK="position" align="center" />
+          <Header label="Trend" hint={METRIC_HINTS.rankTrend} sortK="trend" align="center" />
           <th className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">14d</th>
           <Header label="Checked" sortK="checked" align="left" />
           <th className="px-3 py-3"></th>

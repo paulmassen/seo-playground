@@ -1,3 +1,4 @@
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
@@ -398,19 +399,19 @@ async function BacklinksPage({ searchParams }: { searchParams: Promise<RawParams
           {summary && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatCard label="Backlinks" value={summary.backlinks} new={summary.new_backlinks} lost={summary.lost_backlinks}
+                <StatCard label="Backlinks" info={METRIC_HINTS.backlinks} value={summary.backlinks} new={summary.new_backlinks} lost={summary.lost_backlinks}
                   href={summary.lost_backlinks ? drill({ status: 'lost', orderBy: 'domain_from_rank,desc' }) : undefined} hrefLabel="See lost links" />
-                <StatCard label="Referring domains" value={summary.referring_domains} new={summary.new_referring_domains} lost={summary.lost_referring_domains}
+                <StatCard label="Referring domains" info={METRIC_HINTS.refDomains} value={summary.referring_domains} new={summary.new_referring_domains} lost={summary.lost_referring_domains}
                   href={drill({ mode: 'one_per_domain' })} hrefLabel="One link per domain" />
-                <StatCard label="Referring IPs" value={summary.referring_ips} hint={summary.referring_subnets !== undefined ? `${fmt(summary.referring_subnets)} subnets` : undefined} />
-                <StatCard label="Referring pages" value={summary.referring_pages}
+                <StatCard label="Referring IPs" info={METRIC_HINTS.refIps} value={summary.referring_ips} hint={summary.referring_subnets !== undefined ? `${fmt(summary.referring_subnets)} subnets` : undefined} />
+                <StatCard label="Referring pages" info="Unique pages that contain at least one link to the target." value={summary.referring_pages}
                   hint={summary.referring_pages_nofollow !== undefined ? `${fmt(summary.referring_pages_nofollow)} nofollow` : undefined} />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <StatCard label="Broken backlinks" value={summary.broken_backlinks}
+                <StatCard label="Broken backlinks" info={METRIC_HINTS.brokenBacklinks} value={summary.broken_backlinks}
                   href={summary.broken_backlinks ? `/dashboard/backlinks/broken?target=${encodeURIComponent(target)}` : undefined} hrefLabel="See broken links" />
-                <StatCard label="Broken pages" value={summary.broken_pages} />
-                <StatCard label="New backlinks" value={summary.new_backlinks}
+                <StatCard label="Broken pages" info="Pages of the target that answer 4xx/5xx and still receive links." value={summary.broken_pages} />
+                <StatCard label="New backlinks" info="Links DataForSEO marks as new, recently found by its crawler." value={summary.new_backlinks}
                   href={summary.new_backlinks ? drill({ newOnly: true, orderBy: 'first_seen,desc' }) : undefined} hrefLabel="See new links" />
               </div>
 

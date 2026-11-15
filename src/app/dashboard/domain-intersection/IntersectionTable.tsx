@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -83,13 +84,13 @@ export default function IntersectionTable({
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align, className }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string }) {
+  function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-3 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
+      <th title={hint} className={`px-3 py-3.5 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : align === 'center' ? 'justify-center' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -124,10 +125,10 @@ export default function IntersectionTable({
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800">
               <Header label="Keyword" sortK="keyword" align="left" className="!px-5" />
-              <Header label="Vol." sortK="volume" align="right" />
-              <Header label="KD" sortK="kd" align="center" />
-              <Header label="D1" sortK="pos1" align="center" className="!text-blue-400" />
-              <Header label="D2" sortK="pos2" align="center" />
+              <Header label="Vol." hint={METRIC_HINTS.volume} sortK="volume" align="right" />
+              <Header label="KD" hint={METRIC_HINTS.kd} sortK="kd" align="center" />
+              <Header label="D1" hint={METRIC_HINTS.positionAbsolute} sortK="pos1" align="center" className="!text-blue-400" />
+              <Header label="D2" hint={METRIC_HINTS.positionAbsolute} sortK="pos2" align="center" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

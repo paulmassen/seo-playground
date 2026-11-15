@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -73,13 +74,13 @@ export default function AiKeywordDataTable({ items }: { items: AiKeywordItem[] }
     else { setSortKey(key); setSortDir('desc'); }
   }
 
-  function Header({ label, sortK, align }: { label: string; sortK: SortKey; align: 'left' | 'right' }) {
+  function Header({ label, sortK, align, hint }: { label: string; sortK: SortKey; align: 'left' | 'right'; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'}`}
+      <th title={hint} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left !px-6' : 'text-right'}`}
         onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -92,7 +93,7 @@ export default function AiKeywordDataTable({ items }: { items: AiKeywordItem[] }
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
             <Header label="Keyword" sortK="keyword" align="left" />
-            <Header label="AI volume" sortK="volume" align="right" />
+            <Header label="AI volume" hint={METRIC_HINTS.aiVolume} sortK="volume" align="right" />
             <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">12mo trend</th>
           </tr>
         </thead>

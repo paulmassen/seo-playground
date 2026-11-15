@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { Fragment, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { groupByBrokenPage, type BrokenLink, type BrokenPage } from './group';
@@ -59,16 +60,16 @@ function cmp(a: number | string, b: number | string) {
 
 const TH = 'px-4 py-3 whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-slate-400';
 
-function SortHeader<K extends string>({ label, k, sort, align = 'left', className = '' }: {
-  label: string; k: K; sort: { key: K; dir: SortDir; toggle: (k: K) => void }; align?: 'left' | 'right' | 'center'; className?: string;
+function SortHeader<K extends string>({ label, k, sort, align = 'left', className = '', hint }: {
+  label: string; k: K; sort: { key: K; dir: SortDir; toggle: (k: K) => void }; align?: 'left' | 'right' | 'center'; className?: string; hint?: string;
 }) {
   const active = sort.key === k;
   return (
-    <th aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+    <th title={hint} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
       className={`${TH} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${className}`}>
       <button type="button" onClick={() => sort.toggle(k)}
         className={`inline-flex items-center gap-1 uppercase tracking-widest hover:text-slate-600 dark:hover:text-slate-200 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-        {label}
+        <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
         <SortIcon active={active} dir={sort.dir} />
       </button>
     </th>
@@ -130,10 +131,10 @@ function PagesView({ pages }: { pages: BrokenPage[] }) {
         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
           <th className={`${TH} text-left`}>Broken page</th>
           <th className={`${TH} text-center w-16`}>Status</th>
-          <SortHeader label="Domains" k="domains" sort={sort} align="right" className="w-24" />
+          <SortHeader label="Domains" hint="Unique domains linking to this broken page." k="domains" sort={sort} align="right" className="w-24" />
           <SortHeader label="Links" k="links" sort={sort} align="right" className="w-20" />
-          <SortHeader label="Dofollow" k="dofollow" sort={sort} align="right" className="w-24 hidden sm:table-cell" />
-          <SortHeader label="Best DR" k="dr" sort={sort} align="center" className="w-24" />
+          <SortHeader label="Dofollow" hint="Links without nofollow, the ones whose SEO value is lost while the page is broken." k="dofollow" sort={sort} align="right" className="w-24 hidden sm:table-cell" />
+          <SortHeader label="Best DR" hint={`Highest domain rank among the linking domains. ${METRIC_HINTS.dr}`} k="dr" sort={sort} align="center" className="w-24" />
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -204,11 +205,11 @@ function LinksView({ links }: { links: BrokenLink[] }) {
     <table className="w-full text-sm table-fixed">
       <thead>
         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-          <SortHeader label="DR" k="dr" sort={sort} align="center" className="w-16" />
+          <SortHeader label="DR" hint={METRIC_HINTS.dr} k="dr" sort={sort} align="center" className="w-16" />
           <SortHeader label="Source page" k="source" sort={sort} />
           <th className={`${TH} text-left w-48 hidden md:table-cell`}>Anchor</th>
           <SortHeader label="Broken page" k="target" sort={sort} />
-          <SortHeader label="First seen" k="seen" sort={sort} align="right" className="w-32 hidden lg:table-cell" />
+          <SortHeader label="First seen" hint={METRIC_HINTS.firstSeen} k="seen" sort={sort} align="right" className="w-32 hidden lg:table-cell" />
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-50 dark:divide-slate-800">

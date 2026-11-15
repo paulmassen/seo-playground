@@ -24,7 +24,7 @@ interface SearchParams { target1?: string; target2?: string; history_id?: string
 async function fetchDomInt(target1: string, target2: string, login: string, pass: string): Promise<{ items: DomIntItem[]; cost?: number; error?: string }> {
   const { result, cost, error } = await callDataForSeoFirst<{ items?: DomIntApiItem[] }>(
     'backlinks/domain_intersection/live',
-    { targets: { '1': target1, '2': target2 }, limit: 500, order_by: ['1.rank,desc'] },
+    { targets: { '1': target1, '2': target2 }, limit: 500, order_by: ['1.rank,desc'], rank_scale: 'one_hundred' },
     { login, pass },
   );
   if (error) return { items: [], error };

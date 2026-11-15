@@ -47,6 +47,7 @@ async function fetchBroken(
       backlinks_status_type: 'live',
       filters: dofollowOnly ? [broken, 'and', ['dofollow', '=', true]] : broken,
       order_by: ['domain_from_rank,desc'],
+      rank_scale: 'one_hundred',
     },
     { login, pass },
   );

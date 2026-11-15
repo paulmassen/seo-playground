@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 
@@ -63,13 +64,13 @@ export default function PageIntersectionTable({ items, pageList }: { items: Inte
     else { setSortKey(key); setSortDir(typeof key === 'number' ? 'asc' : 'desc'); }
   }
 
-  function Header({ label, sortK, align, className, title }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; title?: string }) {
+  function Header({ label, sortK, align, className, title, hint }: { label: string; sortK: SortKey; align: 'left' | 'center' | 'right'; className?: string; title?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
       <th className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className ?? ''}`}
-          title={title} onClick={() => toggleSort(sortK)}>
+          title={hint ?? title} onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center justify-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
-          {label}
+          <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
           <SortIcon active={active} dir={sortDir} />
         </span>
       </th>
@@ -82,8 +83,8 @@ export default function PageIntersectionTable({ items, pageList }: { items: Inte
         <thead>
           <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <Header label="Keyword" sortK="keyword" align="left" className="!px-6" />
-            <Header label="KD" sortK="kd" align="center" />
-            <Header label="Volume" sortK="volume" align="right" />
+            <Header label="KD" hint={METRIC_HINTS.kd} sortK="kd" align="center" />
+            <Header label="Volume" hint={METRIC_HINTS.volume} sortK="volume" align="right" />
             {pageList.map((p, i) => (
               <Header key={i} label={`Page ${i + 1}`} sortK={i} align="center" className="max-w-[100px]" title={p} />
             ))}

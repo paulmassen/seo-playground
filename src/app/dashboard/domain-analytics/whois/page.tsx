@@ -1,3 +1,4 @@
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { withProjectScope } from '@/lib/db';
 import {
   getCredentials,
@@ -8,6 +9,7 @@ import {
 } from '@/lib/db';
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
+import { ranksTo100 } from '@/lib/dfs-rank';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
@@ -84,7 +86,10 @@ async function fetchWhois(
     'domain_analytics/whois/overview/live', { filters: ['domain', '=', domain], limit: 1 }, { login, pass }, 20_000,
   );
   if (error) return { result: null, error };
-  return { result: result?.items?.[0] ?? null, cost };
+  const item = result?.items?.[0] ?? null;
+  // Whois has no rank_scale option: its ranks come on 0–1000, the app shows 0–100.
+  if (item?.backlinks_info) item.backlinks_info = ranksTo100(item.backlinks_info);
+  return { result: item, cost };
 }
 
 // ---- Price ----
@@ -290,12 +295,12 @@ async function WhoisPage({ searchParams }: { searchParams: Promise<SearchParams>
             <div>
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Backlinks</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <StatCard label="Backlinks" value={fmt(bl.backlinks)} />
-                <StatCard label="Referring Domains" value={fmt(bl.referring_domains)} />
-                <StatCard label="Referring Main Domains" value={fmt(bl.referring_main_domains)} />
-                <StatCard label="Referring Pages" value={fmt(bl.referring_pages)} />
-                <StatCard label="Domain Rank" value={fmt(bl.rank)} />
-                <StatCard label="Main Domain Rank" value={fmt(bl.main_domain_rank)} />
+                <StatCard label="Backlinks" value={fmt(bl.backlinks)} info={METRIC_HINTS.backlinks} />
+                <StatCard label="Referring Domains" value={fmt(bl.referring_domains)} info={METRIC_HINTS.refDomains} />
+                <StatCard label="Referring Main Domains" value={fmt(bl.referring_main_domains)} info={METRIC_HINTS.refMainDomains} />
+                <StatCard label="Referring Pages" value={fmt(bl.referring_pages)} info="Unique pages that contain at least one link to the domain." />
+                <StatCard label="Domain Rank" value={fmt(bl.rank)} info={METRIC_HINTS.domainRank} />
+                <StatCard label="Main Domain Rank" value={fmt(bl.main_domain_rank)} info="Domain rank of the root domain, subdomains included, 0–100." />
               </div>
             </div>
           )}
@@ -305,10 +310,10 @@ async function WhoisPage({ searchParams }: { searchParams: Promise<SearchParams>
             <div>
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Organic Search</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatCard label="Keywords" value={fmt(org.count)} />
-                <StatCard label="Traffic (ETV)" value={fmt(org.etv)} />
-                <StatCard label="Traffic Value" value={org.estimated_paid_traffic_cost !== undefined ? `$${org.estimated_paid_traffic_cost.toFixed(0)}` : '—'} />
-                <StatCard label="Top 3" value={fmt((org.pos_1 ?? 0) + (org.pos_2_3 ?? 0))} />
+                <StatCard label="Keywords" value={fmt(org.count)} info={METRIC_HINTS.rankedKeywords} />
+                <StatCard label="Traffic (ETV)" value={fmt(org.etv)} info={METRIC_HINTS.etv} />
+                <StatCard label="Traffic Value" value={org.estimated_paid_traffic_cost !== undefined ? `$${org.estimated_paid_traffic_cost.toFixed(0)}` : '—'} info={METRIC_HINTS.trafficValue} />
+                <StatCard label="Top 3" value={fmt((org.pos_1 ?? 0) + (org.pos_2_3 ?? 0))} info={METRIC_HINTS.top3} />
               </div>
               {/* Position distribution */}
               {[
@@ -355,9 +360,9 @@ async function WhoisPage({ searchParams }: { searchParams: Promise<SearchParams>
             <div>
               <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">Paid Search</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <StatCard label="Paid Keywords" value={fmt(paid.count)} />
-                <StatCard label="Paid Traffic (ETV)" value={fmt(paid.etv)} />
-                <StatCard label="Top Position" value={fmt(paid.pos_1)} />
+                <StatCard label="Paid Keywords" value={fmt(paid.count)} info={METRIC_HINTS.paidKeywords} />
+                <StatCard label="Paid Traffic (ETV)" value={fmt(paid.etv)} info={METRIC_HINTS.paidEtv} />
+                <StatCard label="Top Position" value={fmt(paid.pos_1)} info="Keywords where the domain's ad shows in the first ad slot." />
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { Fragment, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Search, X } from 'lucide-react';
 import ExportCSVButton from '@/components/ExportCSVButton';
@@ -251,9 +252,9 @@ function LinkList({ links, showGroupCount, onPickDomain }: { links: BacklinkItem
               {h('Source page', 'source')}
               {h('Anchor', 'anchor')}
               <Th label="Target page" className="hidden 2xl:table-cell" />
-              {h('Spam', 'spam', 'center', 'hidden sm:table-cell', 'Backlink spam score (0–100)')}
+              {h('Spam', 'spam', 'center', 'hidden sm:table-cell', METRIC_HINTS.spam)}
               {h('KW', 'kw', 'right', 'hidden md:table-cell', 'Keywords the source page ranks for: top 10 / top 100')}
-              {h('First seen', 'seen', 'right', 'hidden md:table-cell')}
+              {h('First seen', 'seen', 'right', 'hidden md:table-cell', METRIC_HINTS.firstSeen)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -306,9 +307,9 @@ function GroupTable({ groups, by, onPickDomain }: { groups: LinkGroup[]; by: Gro
               <th className="w-6" />
               {h(by === 'domain' ? 'Referring domain' : 'Target page', 'key')}
               {h('Links', 'count', 'left')}
-              {h(by === 'domain' ? 'DR' : 'Best DR', 'best', 'center')}
-              {h('Dofollow', 'dofollow', 'right', 'hidden sm:table-cell')}
-              {h('Max spam', 'spam', 'center', 'hidden md:table-cell')}
+              {h(by === 'domain' ? 'DR' : 'Best DR', 'best', 'center', '', 'Domain rank of the linking domain (0–100), DataForSEO\'s authority score based on its backlinks.')}
+              {h('Dofollow', 'dofollow', 'right', 'hidden sm:table-cell', METRIC_HINTS.dofollow)}
+              {h('Max spam', 'spam', 'center', 'hidden md:table-cell', `Highest spam score in the group. ${METRIC_HINTS.spam}`)}
               <Th label={by === 'domain' ? 'Pages linked' : 'Domains'} align="right" className="hidden md:table-cell" />
               <Th label="Top anchors" className="hidden 2xl:table-cell" />
               {h('First seen', 'seen', 'right', 'hidden md:table-cell')}
