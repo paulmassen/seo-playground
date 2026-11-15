@@ -15,6 +15,7 @@ import DownloadCsvButton from './DownloadCsvButton';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import ExportExcelButton from '@/components/ExportExcelButton';
 import ReportPdfExportButton from '@/components/ReportPdfExportButton';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -654,12 +655,15 @@ async function GoogleReviewsPage({ searchParams }: { searchParams: Promise<Searc
   const historyItems = tasks.map((t) => {
     const isActive = t.id === activeId;
     return (
-      <a
+      <div
         key={t.id}
-        href={t.status === 'ready' ? `/dashboard/google-reviews?id=${t.id}` : '#'}
-        className={`flex items-start gap-3 px-5 py-3.5 transition-colors ${
-          isActive ? 'bg-blue-50 dark:bg-blue-950/30' : t.status === 'ready' ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer' : 'cursor-default'
+        className={`flex items-center gap-2 pr-3 transition-colors ${
+          isActive ? 'bg-blue-50 dark:bg-blue-950/30' : t.status === 'ready' ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''
         }`}
+      >
+      <a
+        href={t.status === 'ready' ? `/dashboard/google-reviews?id=${t.id}` : '#'}
+        className={`flex flex-1 min-w-0 items-start gap-3 pl-5 py-3.5 ${t.status === 'ready' ? 'cursor-pointer' : 'cursor-default'}`}
       >
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-semibold truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>
@@ -673,6 +677,8 @@ async function GoogleReviewsPage({ searchParams }: { searchParams: Promise<Searc
         </div>
         <StatusBadge status={t.status} />
       </a>
+      <DeleteHistoryButton table="reviews_tasks" id={t.id} path="/dashboard/google-reviews" label={t.business} />
+      </div>
     );
   });
 

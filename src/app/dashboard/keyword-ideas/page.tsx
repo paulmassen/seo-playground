@@ -1,3 +1,4 @@
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getKeywordIdeasHistory, saveKeywordIdeasSearch, getKeywordIdeasResults, type KeywordIdeasEntry } from '@/lib/db';
 import { toLabsCountry } from '@/lib/geo-options';
@@ -147,14 +148,17 @@ async function KeywordIdeasPage({ searchParams }: { searchParams: Promise<Search
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a key={entry.id} href={`/dashboard/keyword-ideas?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/keyword-ideas?history_id=${entry.id}#results`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.keyword}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">{entry.count} ideas · {entry.location}{entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}</p>
                   </div>
                   <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                 </a>
+                <DeleteHistoryButton table="keyword_ideas_searches" id={entry.id} path="/dashboard/keyword-ideas" label={entry.keyword} />
+                </div>
               );
             })}
           </div>

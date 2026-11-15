@@ -13,6 +13,7 @@ import LabsLocationLanguageFields from '@/components/LabsLocationLanguageFields'
 import SearchForm from '@/components/SearchForm';
 import HistorySidebar from '@/components/HistorySidebar';
 import CopyMarkdownButton from '@/components/CopyMarkdownButton';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import AiKeywordDataTable from './AiKeywordDataTable';
 
 // ---- Types ----
@@ -134,8 +135,9 @@ async function AiKeywordDataPage({ searchParams }: { searchParams: Promise<Searc
   const historyItems = history.map((entry) => {
     const isActive = entry.id === historyId;
     return (
-      <a key={entry.id} href={`/dashboard/ai-keyword-data?history_id=${entry.id}#results`}
-        className={`flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950/40' : ''}`}>
+      <div key={entry.id} className={`flex items-center gap-2 pr-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950/40' : ''}`}>
+      <a href={`/dashboard/ai-keyword-data?history_id=${entry.id}#results`}
+        className="flex flex-1 min-w-0 items-center gap-4 pl-5 py-3.5">
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.keywords}</p>
           <p className="text-[11px] text-slate-400 mt-0.5">
@@ -146,6 +148,8 @@ async function AiKeywordDataPage({ searchParams }: { searchParams: Promise<Searc
         </div>
         <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
       </a>
+      <DeleteHistoryButton table="ai_kwdata_searches" id={entry.id} path="/dashboard/ai-keyword-data" label={entry.keywords} />
+      </div>
     );
   });
 

@@ -867,6 +867,13 @@ function initSchema(db: Database.Database) {
       summary TEXT NOT NULL
     );
 
+    -- What deleted saved searches cost, so removing one from a history keeps Spending accurate.
+    CREATE TABLE IF NOT EXISTS deleted_spend (
+      source_table TEXT NOT NULL,
+      ts INTEGER NOT NULL,
+      cost REAL
+    );
+
     CREATE TABLE IF NOT EXISTS dfs_locations (
       location_code INTEGER PRIMARY KEY,
       location_name TEXT NOT NULL,
@@ -3289,6 +3296,44 @@ export function getCategoryAuditItems<T>(id: string): T[] | null {
   try { return JSON.parse(row.items) as T[]; } catch { return null; }
 }
 
+// --- Deleting saved searches ---
+
+/**
+ * Tables holding one saved search per row, keyed by a TEXT `id`. Only these can be targeted by
+ * deleteHistoryEntry: the table name comes from the client, so it must stay a whitelist.
+ */
+export const DELETABLE_HISTORY_TABLES = [
+  'serp_searches', 'kd_searches', 'lf_searches', 'kw_overview_searches', 'backlinks_searches',
+  'competitors_searches', 'ranked_kw_searches', 'onpage_tasks', 'ref_domains_searches', 'anchors_searches',
+  'hist_rank_searches', 'domain_intersection_searches', 'kw_difficulty_searches', 'related_kw_searches',
+  'instant_page_searches', 'reviews_tasks', 'site_audit_tasks', 'top_searches_searches', 'domain_tech_searches',
+  'domain_find_searches', 'domain_whois_searches', 'bl_ref_networks', 'bl_page_intersection',
+  'bl_domain_intersection', 'bl_history', 'bl_bulk_backlinks', 'bl_bulk_ref_domains', 'bl_broken',
+  'keyword_ideas_searches', 'search_intent_searches', 'page_intersection_searches', 'domain_categories_searches',
+  'subdomains_searches', 'traffic_estimation_searches', 'ai_kwdata_searches', 'llm_response_searches',
+  'ai_visibility_searches', 'fan_out_searches', 'ai_optimization_searches', 'gbp_category_audits',
+  'web_mentions_searches',
+] as const;
+
+export type DeletableHistoryTable = typeof DELETABLE_HISTORY_TABLES[number];
+
+export function isDeletableHistoryTable(table: string): table is DeletableHistoryTable {
+  return (DELETABLE_HISTORY_TABLES as readonly string[]).includes(table);
+}
+
+/** Removes one saved search from the current project. Returns whether a row was deleted. */
+export function deleteHistoryEntry(table: DeletableHistoryTable, id: string): boolean {
+  if (!isDeletableHistoryTable(table)) throw new Error(`Not a history table: ${table}`);
+  const db = getDb();
+  return db.transaction(() => {
+    const row = db.prepare(`SELECT ts, cost FROM ${table} WHERE id = ?`).get(id) as { ts: number; cost: number | null } | undefined;
+    if (!row) return false;
+    db.prepare('INSERT INTO deleted_spend (source_table, ts, cost) VALUES (?, ?, ?)').run(table, row.ts, row.cost);
+    db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+    return true;
+  })();
+}
+
 // --- Spending (aggregates the `cost` recorded by every tool) ---
 
 // Every table that records what a DataForSEO call cost, mapped to the tool the user sees.
@@ -3373,21 +3418,25 @@ function spendSources(db: Database.Database) {
   });
 }
 
+/** A source's calls as `(ts, cost)` rows, including the searches deleted from its history. */
+function spendRows(s: (typeof SPEND_SOURCES)[number]): string {
+  return `(SELECT ${s.tsColumn ?? 'ts'} AS ts, cost FROM ${s.table} UNION ALL SELECT ts, cost FROM deleted_spend WHERE source_table = '${s.table}')`;
+}
+
 /** Per-tool spend in range, plus all-time known totals used to price unknown-cost calls. */
 type RawToolSpend = Omit<ToolSpend, 'avgKnownCost'> & { allKnownCost: number; allKnownCalls: number };
 
 function rawSpendByTool(db: Database.Database, fromMs: number, toMs: number): Map<string, RawToolSpend> {
   const byTool = new Map<string, RawToolSpend>();
   for (const s of spendSources(db)) {
-    const ts = s.tsColumn ?? 'ts';
     const r = db.prepare(`
       SELECT
-        SUM(CASE WHEN ${ts} >= @from AND ${ts} < @to THEN 1 ELSE 0 END) AS calls,
-        SUM(CASE WHEN ${ts} >= @from AND ${ts} < @to THEN COALESCE(cost, 0) ELSE 0 END) AS known_cost,
-        SUM(CASE WHEN ${ts} >= @from AND ${ts} < @to AND cost IS NULL THEN 1 ELSE 0 END) AS unknown_calls,
+        SUM(CASE WHEN ts >= @from AND ts < @to THEN 1 ELSE 0 END) AS calls,
+        SUM(CASE WHEN ts >= @from AND ts < @to THEN COALESCE(cost, 0) ELSE 0 END) AS known_cost,
+        SUM(CASE WHEN ts >= @from AND ts < @to AND cost IS NULL THEN 1 ELSE 0 END) AS unknown_calls,
         COALESCE(SUM(cost), 0) AS all_known_cost,
         COUNT(cost) AS all_known_calls
-      FROM ${s.table}
+      FROM ${spendRows(s)}
     `).get({ from: fromMs, to: toMs }) as { calls: number | null; known_cost: number | null; unknown_calls: number | null; all_known_cost: number; all_known_calls: number };
     const acc = byTool.get(s.tool) ?? { tool: s.tool, href: s.href, calls: 0, knownCost: 0, unknownCalls: 0, allKnownCost: 0, allKnownCalls: 0 };
     acc.calls += r.calls ?? 0;
@@ -3457,7 +3506,7 @@ function spendByDayFromDb(db: Database.Database, fromMs: number, toMs: number): 
   const sources = spendSources(db);
   if (sources.length === 0) return [];
   const union = sources
-    .map((s) => `SELECT ${s.tsColumn ?? 'ts'} AS ts, cost FROM ${s.table} WHERE ${s.tsColumn ?? 'ts'} >= @from AND ${s.tsColumn ?? 'ts'} < @to`)
+    .map((s) => `SELECT ts, cost FROM ${spendRows(s)} WHERE ts >= @from AND ts < @to`)
     .join(' UNION ALL ');
   const rows = db.prepare(`
     SELECT date(ts / 1000, 'unixepoch', 'localtime') AS day, COUNT(*) AS calls,
@@ -3486,7 +3535,7 @@ export function getSpendByDay(fromMs: number, toMs: number, opts: { allProjects?
 function firstSpendTsFromDb(db: Database.Database): number | null {
   const sources = spendSources(db);
   if (sources.length === 0) return null;
-  const union = sources.map((s) => `SELECT MIN(${s.tsColumn ?? 'ts'}) AS ts FROM ${s.table}`).join(' UNION ALL ');
+  const union = sources.map((s) => `SELECT MIN(ts) AS ts FROM ${spendRows(s)}`).join(' UNION ALL ');
   const row = db.prepare(`SELECT MIN(ts) AS ts FROM (${union})`).get() as { ts: number | null };
   return row.ts;
 }

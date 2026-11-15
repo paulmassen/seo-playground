@@ -17,6 +17,7 @@ import LinksTable from './LinksTable';
 import ResourcesTable from './ResourcesTable';
 import NonIndexableTable from './NonIndexableTable';
 import AutoRefresh from '@/components/AutoRefresh';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -934,8 +935,9 @@ async function SiteAuditPage({ searchParams }: { searchParams: Promise<SearchPar
             {history.map((entry) => {
               const isActive = entry.id === params.task_id;
               return (
-                <a key={entry.id} href={`/dashboard/on-page/site-audit?task_id=${entry.id}`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/on-page/site-audit?task_id=${entry.id}`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <StatusBadge status={entry.status} />
@@ -950,6 +952,8 @@ async function SiteAuditPage({ searchParams }: { searchParams: Promise<SearchPar
                   </div>
                   <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                 </a>
+                <DeleteHistoryButton table="site_audit_tasks" id={entry.id} path="/dashboard/on-page/site-audit" label={entry.target} />
+                </div>
               );
             })}
           </div>

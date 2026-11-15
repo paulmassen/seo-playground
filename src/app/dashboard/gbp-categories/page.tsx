@@ -1,3 +1,4 @@
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting, getCategoryAuditHistory, getCategoryAuditEntry, getCategoryAuditItems, saveCategoryAudit,
@@ -497,14 +498,17 @@ async function GbpCategoriesPage({ searchParams }: { searchParams: Promise<Searc
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800"><h2 className={h2}>History</h2></div>
           <div className="divide-y divide-slate-50 dark:divide-slate-800">
             {history.map((h) => (
-              <a key={h.id} href={`${PATH}?history_id=${h.id}#results`}
-                className={`flex items-center gap-3 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 ${h.id === entry?.id ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}>
+              <div key={h.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 ${h.id === entry?.id ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}>
+              <a href={`${PATH}?history_id=${h.id}#results`}
+                className="flex flex-1 min-w-0 items-center gap-3 pl-6 py-3.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{h.keyword}</p>
                   <p className="text-[11px] text-slate-500 truncate">{h.area} · {h.count} listings{h.cost !== undefined ? ` · $${h.cost.toFixed(4)}` : ''}</p>
                 </div>
                 <span className="text-[11px] text-slate-500">{formatDate(h.ts)}</span>
               </a>
+              <DeleteHistoryButton table="gbp_category_audits" id={h.id} path={PATH} label={h.keyword} />
+              </div>
             ))}
           </div>
         </div>

@@ -16,6 +16,7 @@ import SearchForm from '@/components/SearchForm';
 import ExportCSVButton from '@/components/ExportCSVButton';
 import ExportExcelButton, { type ExportSheet } from '@/components/ExportExcelButton';
 import ReportPdfExportButton, { type ReportMetric, type ReportSection } from '@/components/ReportPdfExportButton';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import LeaderboardTables from './LeaderboardTables';
 import HistoricalTargetingFields from './HistoricalTargetingFields';
 import MentionTargetingFields from './MentionTargetingFields';
@@ -637,8 +638,9 @@ async function AiVisibilityPage({ searchParams }: { searchParams: Promise<Search
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a key={entry.id} href={`/dashboard/ai-visibility?history_id=${entry.id}&mode=${entry.mode}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/ai-visibility?history_id=${entry.id}&mode=${entry.mode}#results`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.target}</p>
@@ -653,6 +655,8 @@ async function AiVisibilityPage({ searchParams }: { searchParams: Promise<Search
                   </div>
                   <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                 </a>
+                <DeleteHistoryButton table="ai_visibility_searches" id={entry.id} path="/dashboard/ai-visibility" label={entry.target} />
+                </div>
               );
             })}
           </div>

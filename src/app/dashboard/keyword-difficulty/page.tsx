@@ -1,3 +1,4 @@
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting,
@@ -183,8 +184,9 @@ async function KeywordDifficultyPage({ searchParams }: { searchParams: Promise<S
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a key={entry.id} href={`/dashboard/keyword-difficulty?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/keyword-difficulty?history_id=${entry.id}#results`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.keywords}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
@@ -195,6 +197,8 @@ async function KeywordDifficultyPage({ searchParams }: { searchParams: Promise<S
                   </div>
                   <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                 </a>
+                <DeleteHistoryButton table="kw_difficulty_searches" id={entry.id} path="/dashboard/keyword-difficulty" label={entry.keywords} />
+                </div>
               );
             })}
           </div>

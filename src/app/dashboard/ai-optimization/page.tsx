@@ -10,6 +10,7 @@ import { toLabsCountry } from '@/lib/geo-options';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import SearchForm from '@/components/SearchForm';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import AiOptimizationTargetingFields from './AiOptimizationTargetingFields';
 
 // ---- Types ----
@@ -394,8 +395,9 @@ async function AiOptimizationPage({ searchParams }: { searchParams: Promise<Sear
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a key={entry.id} href={`/dashboard/ai-optimization?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/ai-optimization?history_id=${entry.id}#results`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.target}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
@@ -407,6 +409,8 @@ async function AiOptimizationPage({ searchParams }: { searchParams: Promise<Sear
                     {new Date(entry.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </a>
+                <DeleteHistoryButton table="ai_optimization_searches" id={entry.id} path="/dashboard/ai-optimization" label={entry.target} />
+                </div>
               );
             })}
           </div>

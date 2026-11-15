@@ -1,3 +1,4 @@
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getTargetDomains, getSerpHistory, saveSerpSearch, getSerpResults, type SerpHistoryEntry, type TargetHit } from '@/lib/db';
 import { LANGUAGES } from '@/lib/geo-options';
@@ -316,8 +317,9 @@ async function SerpPage({ searchParams }: { searchParams: Promise<SearchParams> 
                 {history.map((entry) => {
                   const isActive = entry.id === historyId;
                   return (
-                    <a key={entry.id} href={`/dashboard/serp?history_id=${entry.id}#results`}
-                      className={`block px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                    <div key={entry.id} className={`flex items-center gap-1 pr-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                    <a href={`/dashboard/serp?history_id=${entry.id}#results`}
+                      className="block flex-1 min-w-0 pl-4 py-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className={`text-xs font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.keyword}</p>
                         <span className="shrink-0 text-[10px] text-slate-400">{formatDate(entry.ts)}</span>
@@ -334,6 +336,8 @@ async function SerpPage({ searchParams }: { searchParams: Promise<SearchParams> 
                         </div>
                       )}
                     </a>
+                    <DeleteHistoryButton table="serp_searches" id={entry.id} path="/dashboard/serp" label={entry.keyword} />
+                    </div>
                   );
                 })}
               </div>

@@ -9,6 +9,7 @@ import {
 import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,10 +106,10 @@ function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function StatCard({ label, value }: { label: string; value: string | number | undefined }) {
+function StatCard({ label, value, info }: { label: string; value: string | number | undefined; info?: string }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-5 py-4 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400"><span title={info} className={info ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span></p>
       <p className="text-xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{value ?? '—'}</p>
     </div>
   );
@@ -373,19 +374,18 @@ async function WhoisPage({ searchParams }: { searchParams: Promise<SearchParams>
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a
-                  key={entry.id}
-                  href={`/dashboard/domain-analytics/whois?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-bold font-mono truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.domain}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {entry.cost !== undefined ? `$${entry.cost.toFixed(4)}` : ''}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
-                </a>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                  <a href={`/dashboard/domain-analytics/whois?history_id=${entry.id}#results`} className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-bold font-mono truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.domain}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {entry.cost !== undefined ? `$${entry.cost.toFixed(4)}` : ''}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
+                  </a>
+                  <DeleteHistoryButton table="domain_whois_searches" id={entry.id} path="/dashboard/domain-analytics/whois" label={entry.domain} />
+                </div>
               );
             })}
           </div>

@@ -2,6 +2,7 @@ import { withProjectScope } from '@/lib/db';
 import { getCredentials, getOnpageTasks, upsertOnpageTask, getOnpageResult, saveOnpageResult, type OnpageTask } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
 interface TestResult {
   level: 'fatal' | 'error' | 'warning' | 'info';
@@ -328,8 +329,9 @@ async function MicrodataPage({ searchParams }: { searchParams: Promise<SearchPar
             {historyIndex.map((entry) => {
               const isActive = entry.id === params.task_id;
               return (
-                <a key={entry.id} href={`/dashboard/on-page/microdata?task_id=${entry.id}`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/on-page/microdata?task_id=${entry.id}`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       {statusBadge(entry.status)}
@@ -339,6 +341,8 @@ async function MicrodataPage({ searchParams }: { searchParams: Promise<SearchPar
                   </div>
                   <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                 </a>
+                <DeleteHistoryButton table="onpage_tasks" id={entry.id} path="/dashboard/on-page/microdata" label={entry.url} />
+                </div>
               );
             })}
           </div>

@@ -6,6 +6,7 @@ import CopyMarkdownButton from '@/components/CopyMarkdownButton';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import PageIntersectionTable, { type PageIntItem } from './PageIntersectionTable';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
 interface SearchParams { targets?: string; history_id?: string; }
 
@@ -140,14 +141,16 @@ async function BacklinksPageIntersectionPage({ searchParams }: { searchParams: P
             {history.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a key={entry.id} href={`/dashboard/backlinks/page-intersection?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.targets}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{entry.count} results{entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}</p>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
-                </a>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                  <a href={`/dashboard/backlinks/page-intersection?history_id=${entry.id}#results`} className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200'}`}>{entry.targets}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{entry.count} results{entry.cost !== undefined ? ` · $${entry.cost.toFixed(4)}` : ''}</p>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
+                  </a>
+                  <DeleteHistoryButton table="bl_page_intersection" id={entry.id} path="/dashboard/backlinks/page-intersection" label={entry.targets} />
+                </div>
               );
             })}
           </div>

@@ -15,7 +15,7 @@ import {
   getActiveProject, getProjects, createProject, deleteProject, setActiveProject,
   getAiOptimizationHistory, saveAiOptimizationSearch, getAiOptimizationResults, type AiOptimizationEntry,
   getWebMentionsHistory, saveWebMentionsSearch, getWebMentionsItems, getWebMentionsSummary, type WebMentionsEntry,
-  getSerpHistory, saveSerpSearch,
+  getSerpHistory, saveSerpSearch, deleteHistoryEntry, isDeletableHistoryTable,
   getSpendByTool, getSpendByDay, getFirstSpendTs, getSpendAcrossProjects,
   gridSeriesId, getGridSeriesHistory, getGridSchedule, saveGridSchedule, saveGridSearch, deleteGridSchedule, deleteGridSeries, type GridSearchEntry,
   claimDueGridSchedules, retryClaimedGridSchedule,
@@ -130,6 +130,28 @@ describe('SERP search cost', () => {
   it('keeps an unknown cost as undefined rather than zero', () => {
     saveSerpSearch({ ...base, id: 'test-serp-no-cost' }, [{ type: 'organic' }]);
     expect(getSerpHistory().find((h) => h.id === 'test-serp-no-cost')?.cost).toBeUndefined();
+  });
+});
+
+describe('deleting a saved search', () => {
+  const base = { keyword: 'to delete', location: 'France', language: 'French', device: 'desktop', depth: 10, count: 1 };
+
+  it('removes it from the history but keeps what it cost in Spending', () => {
+    const ts = Date.UTC(2020, 0, 15, 12);
+    const range = [Date.UTC(2020, 0, 1), Date.UTC(2020, 1, 1)] as const;
+    saveSerpSearch({ ...base, ts, id: 'test-serp-delete', cost: 0.5 }, [{ type: 'organic' }]);
+    const before = getSpendByTool(...range).find((t) => t.tool === 'SERP Checker');
+
+    expect(deleteHistoryEntry('serp_searches', 'test-serp-delete')).toBe(true);
+    expect(getSerpHistory().some((h) => h.id === 'test-serp-delete')).toBe(false);
+    expect(getSpendByTool(...range).find((t) => t.tool === 'SERP Checker')).toEqual(before);
+    expect(getSpendByDay(...range).reduce((sum, d) => sum + d.knownCost, 0)).toBeCloseTo(0.5);
+  });
+
+  it('reports false for an unknown id and refuses tables outside the whitelist', () => {
+    expect(deleteHistoryEntry('serp_searches', 'never-saved')).toBe(false);
+    expect(isDeletableHistoryTable('projects')).toBe(false);
+    expect(() => deleteHistoryEntry('settings' as never, 'x')).toThrow();
   });
 });
 

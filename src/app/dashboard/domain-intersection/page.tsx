@@ -11,6 +11,7 @@ import SearchForm from '@/components/SearchForm';
 import { stableSearchId } from '@/lib/dedupe';
 import { callDataForSeoFirst } from '@/lib/dataforseo';
 import IntersectionTable, { type IntersectionItem } from './IntersectionTable';
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 
 interface SearchParams {
   target1?: string;
@@ -162,12 +163,15 @@ async function DomainIntersectionPage({ searchParams }: { searchParams: Promise<
             ) : (
               <div className="space-y-2">
                 {history.map((h) => (
-                  <a key={h.id} href={`?history_id=${h.id}`} className="block rounded-xl px-3 py-2.5 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
-                    <div className="font-bold text-xs text-slate-800">{h.target1} <span className="text-slate-300">vs</span> {h.target2}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
-                      {h.totalCount.toLocaleString()} common · {new Date(h.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                    </div>
-                  </a>
+                  <div key={h.id} className="flex items-center gap-1 rounded-xl pr-2 hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
+                    <a href={`?history_id=${h.id}`} className="block flex-1 min-w-0 pl-3 py-2.5">
+                      <div className="font-bold text-xs text-slate-800">{h.target1} <span className="text-slate-300">vs</span> {h.target2}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {h.totalCount.toLocaleString()} common · {new Date(h.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </a>
+                    <DeleteHistoryButton table="domain_intersection_searches" id={h.id} path="/dashboard/domain-intersection" label={`${h.target1} vs ${h.target2}`} />
+                  </div>
                 ))}
               </div>
             )}

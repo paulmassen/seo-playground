@@ -1,3 +1,4 @@
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { withProjectScope } from '@/lib/db';
 import { getCredentials, getSetting, getKdHistory, saveKdSearch, getKdResults, type KdHistoryEntry } from '@/lib/db';
 import KeywordDataForm from './KeywordDataForm';
@@ -188,8 +189,9 @@ async function KeywordDataPage({ searchParams }: { searchParams: Promise<SearchP
             {historyIndex.map((entry) => {
               const isActive = entry.id === historyId;
               return (
-                <a key={entry.id} href={`/dashboard/keyword-data?history_id=${entry.id}#results`}
-                  className={`flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <div key={entry.id} className={`flex items-center gap-2 pr-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950' : ''}`}>
+                <a href={`/dashboard/keyword-data?history_id=${entry.id}#results`}
+                  className="flex flex-1 min-w-0 items-center gap-4 pl-6 py-3.5">
                   <div className="shrink-0 flex flex-col items-center gap-1">
                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{SE_LABELS[entry.se] ?? entry.se}</span>
                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 dark:text-slate-600">{TYPE_LABELS[entry.seType] ?? entry.seType}</span>
@@ -202,6 +204,8 @@ async function KeywordDataPage({ searchParams }: { searchParams: Promise<SearchP
                   </div>
                   <span className="shrink-0 text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                 </a>
+                <DeleteHistoryButton table="kd_searches" id={entry.id} path="/dashboard/keyword-data" label={entry.label} />
+                </div>
               );
             })}
           </div>

@@ -1,3 +1,4 @@
+import DeleteHistoryButton from '@/components/DeleteHistoryButton';
 import { withProjectScope } from '@/lib/db';
 import {
   getCredentials, getSetting, getLfHistory, saveLfSearch, getLfResults, type LfHistoryEntry,
@@ -245,6 +246,7 @@ async function LocalFinderPage({ searchParams }: { searchParams: Promise<SearchP
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-[11px] text-slate-400">{formatDate(entry.ts)}</span>
                     <a href={lfRerunUrl(entry)} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-800 transition-colors" title="Run again">Re-run ↻</a>
+                    <DeleteHistoryButton table="lf_searches" id={entry.id} path="/dashboard/local-finder" label={entry.keyword} />
                   </div>
                 </div>
               );
