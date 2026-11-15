@@ -901,6 +901,8 @@ function initSchema(db: Database.Database) {
   addColumnIfMissing(db, 'serp_searches', 'ADD COLUMN cost REAL');
   addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN links TEXT');
   addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN links_total INTEGER');
+  // Query string of the search (mode, filters…). NULL = saved before filters existed, ranks on the 0–1000 scale.
+  addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN params TEXT');
   addColumnIfMissing(db, 'grid_searches', `ADD COLUMN status TEXT NOT NULL DEFAULT 'done'`);
   addColumnIfMissing(db, 'grid_searches', 'ADD COLUMN task_ids TEXT');
   addColumnIfMissing(db, 'grid_searches', `ADD COLUMN queue_mode TEXT NOT NULL DEFAULT 'live'`);
@@ -1379,19 +1381,28 @@ export interface BacklinksSearchEntry {
   target: string;
   cost?: number;
   linksTotal?: number;
+  /** URL query string of the search; undefined for searches saved before it was recorded. */
+  params?: string;
 }
 
 export function getBacklinksHistory(): BacklinksSearchEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, target, cost, links_total FROM backlinks_searches ORDER BY ts DESC LIMIT 30')
-    .all() as Array<{ id: string; ts: number; target: string; cost: number | null; links_total: number | null }>;
-  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, cost: r.cost ?? undefined, linksTotal: r.links_total ?? undefined }));
+    .prepare('SELECT id, ts, target, cost, links_total, params FROM backlinks_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; target: string; cost: number | null; links_total: number | null; params: string | null }>;
+  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, cost: r.cost ?? undefined, linksTotal: r.links_total ?? undefined, params: r.params ?? undefined }));
+}
+
+export function getBacklinksEntry(id: string): BacklinksSearchEntry | null {
+  const r = getDb()
+    .prepare('SELECT id, ts, target, cost, links_total, params FROM backlinks_searches WHERE id = ?')
+    .get(id) as { id: string; ts: number; target: string; cost: number | null; links_total: number | null; params: string | null } | undefined;
+  return r ? { id: r.id, ts: r.ts, target: r.target, cost: r.cost ?? undefined, linksTotal: r.links_total ?? undefined, params: r.params ?? undefined } : null;
 }
 
 export function saveBacklinksSearch<T, L>(entry: BacklinksSearchEntry, result: T, links?: L[], linksTotal?: number): void {
   getDb()
-    .prepare('INSERT OR REPLACE INTO backlinks_searches (id, ts, target, cost, result, links, links_total) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.target, entry.cost ?? null, JSON.stringify(result), links ? JSON.stringify(links) : null, linksTotal ?? null);
+    .prepare('INSERT OR REPLACE INTO backlinks_searches (id, ts, target, cost, result, links, links_total, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.target, entry.cost ?? null, JSON.stringify(result), links ? JSON.stringify(links) : null, linksTotal ?? null, entry.params ?? null);
 }
 
 export function getBacklinksResult<T>(id: string): T | null {

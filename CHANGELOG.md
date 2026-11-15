@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Backlinks: filters, grouping and richer data** — choose one link per domain or per anchor, live / lost / all links, and up to 8 DataForSEO filters (minimum domain or page rank, maximum spam score, link type, anchor, source domain, target URL, country, language, platform, first seen date, new only, subdomains, internal links). Results are paginated beyond 1,000 links.
+- **Instant filters on loaded backlinks** — free text search, toggles (dofollow, new, lost, broken, indirect, in content, ranking source page, low spam, uncrowded page, original) and *By domain* / *By target page* views, with no extra API call.
+- **More per-link data** — spam score, source page title and rank, keywords the source page ranks for, context around the anchor, indirect redirect/canonical path and badges. The CSV export now has 27 columns and follows the active filters.
+- **Clickable summary breakdowns** — link types, attributes, platforms, countries, position in page and TLDs; clicking a bar loads the matching backlinks. New "See lost links", "See new links" and "One link per domain" shortcuts.
+
+### Fixed
+- **Backlinks domain rank badge** — ranks are now requested on the 0–100 scale (previously 0–1000, which turned almost every badge green). Older saved searches are rescaled when reopened.
+- **Backlinks "Type" column** always showed "backlink"; it now shows the real link type (anchor, image, redirect, canonical…).
+
 ---
 
 ## [0.7.0] — 2026-11-04
