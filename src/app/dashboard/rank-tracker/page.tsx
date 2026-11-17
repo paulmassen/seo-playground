@@ -4,11 +4,15 @@ export const dynamic = 'force-dynamic';
 import {
   getCredentials, getTrackedKeywords, getRankHistory, getLatestRankCheck,
   getSetting, getTargetDomains, getPendingRankTasks, getRankTrackerSchedule, markRankTaskSeen,
+  getAiModeHistory, getPendingAiModeKeywordIds,
 } from '@/lib/db';
+import { AI_MODE_STANDARD_COST } from '@/lib/ai-mode';
+import { formatUsd } from '@/lib/grid-pricing';
 import { LANGUAGES } from '@/lib/geo-options';
 import {
   addKeywordAction, removeKeywordAction, checkOneAction, checkAllAction,
   saveDepthAction, addDomainAction, removeDomainAction, checkDomainAction, saveRankScheduleAction,
+  setAiModeAction, setDomainAiModeAction,
 } from './actions';
 import RankTrackerTable from './RankTrackerTable';
 import PendingButton from '@/components/PendingButton';
@@ -39,6 +43,8 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
   const pendingRankTasks = getPendingRankTasks();
   const rankSchedule = getRankTrackerSchedule();
   const pendingKeywordIds = pendingRankTasks.map((task) => task.keywordId);
+  const pendingAiModeIds = getPendingAiModeKeywordIds();
+  const aiModeCount = allKeywords.filter((k) => k.aiMode).length;
   const kwDomains = [...new Set(allKeywords.map((k) => k.domain))];
   const domains = [...new Set([...savedDomains, ...kwDomains])];
 
@@ -55,10 +61,12 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
     const latest = getLatestRankCheck(kw.id);
     const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
     const previous = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
-    return { kw, history, latest, previous };
+    const aiModeHistory = getAiModeHistory(kw.id, 30);
+    return { kw, history, latest, previous, aiModeHistory };
   });
+  const domainAiModeCount = keywords.filter((k) => k.aiMode).length;
 
-  const csvData = rows.map(({ kw, latest, previous }) => ({
+  const csvData = rows.map(({ kw, latest, previous, aiModeHistory }) => ({
     keyword: kw.keyword,
     location: kw.location,
     language: kw.language,
@@ -67,6 +75,8 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
     checked_at: latest ? new Date(latest.checkedAt).toISOString().split('T')[0] : '',
     url: latest?.url ?? '',
     ai_overview: latest?.aiOverview == null ? '' : latest.aiOverview ? 'Cited' : 'Not cited',
+    ai_mode: !kw.aiMode && !aiModeHistory[0] ? '' : aiModeHistory[0]?.status === 'cited' ? `Cited (#${aiModeHistory[0].citationPosition})`
+      : aiModeHistory[0]?.status === 'not_cited' ? 'Not cited' : aiModeHistory[0] ? 'No AI answer' : 'Not checked yet',
   }));
   const csvColumns = [
     { key: 'keyword', label: 'Keyword' },
@@ -77,6 +87,7 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
     { key: 'checked_at', label: 'Checked' },
     { key: 'url', label: 'Ranked URL' },
     { key: 'ai_overview', label: 'AI Overview' },
+    { key: 'ai_mode', label: 'AI Mode' },
   ];
 
   return (
@@ -117,7 +128,7 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
                 pendingClassName="px-5 py-3 bg-slate-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xl shadow-slate-200 dark:shadow-none cursor-not-allowed"
                 pendingChildren={`Queuing ${allKeywords.length}…`}
               >
-                Queue All ({allKeywords.length})
+                Queue All ({allKeywords.length}{aiModeCount > 0 ? ` + ${aiModeCount} AI Mode` : ''})
               </PendingButton>
             </form>
           )}
@@ -225,18 +236,37 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
                           pendingClassName="px-3 py-1.5 bg-blue-300 text-white text-[9px] font-black uppercase tracking-widest rounded-lg cursor-not-allowed"
                           pendingChildren={`Queuing ${rows.length}…`}
                         >
-                          Queue {rows.length}
+                          Queue {rows.length}{domainAiModeCount > 0 ? ` + ${domainAiModeCount} AI` : ''}
                         </PendingButton>
                       </form>
                     )}
                   </div>
                 </div>
+                <div className="px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-violet-50/40 dark:bg-violet-950/20">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                    <span className="font-bold text-violet-700 dark:text-violet-300">Google AI Mode</span> tracked on {domainAiModeCount} of {rows.length} keyword{rows.length !== 1 ? 's' : ''}.
+                    {' '}Each AI Mode check is a separate Standard task, about {formatUsd(AI_MODE_STANDARD_COST)} per keyword, on top of the organic check.
+                  </p>
+                  <form action={setDomainAiModeAction}>
+                    <input type="hidden" name="domain" value={activeDomain} />
+                    <input type="hidden" name="enabled" value={domainAiModeCount === rows.length ? '0' : '1'} />
+                    <PendingButton
+                      type="submit"
+                      className="px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-violet-200 text-violet-700 hover:bg-violet-600 hover:text-white dark:border-violet-900 dark:text-violet-300 transition-all"
+                      pendingClassName="px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg border border-violet-100 text-violet-300 cursor-not-allowed"
+                    >
+                      {domainAiModeCount === rows.length ? 'Turn off for all' : `Track all (+${formatUsd(AI_MODE_STANDARD_COST * (rows.length - domainAiModeCount))}/check)`}
+                    </PendingButton>
+                  </form>
+                </div>
                 <RankTrackerTable
                   rows={rows}
                   hasCreds={!!creds}
                   pendingKeywordIds={pendingKeywordIds}
+                  pendingAiModeIds={pendingAiModeIds}
                   checkAction={checkOneAction}
                   removeAction={removeKeywordAction}
+                  aiModeAction={setAiModeAction}
                 />
               </div>
             )}
@@ -276,6 +306,14 @@ async function RankTrackerPage({ searchParams }: { searchParams: Promise<SearchP
                     ))}
                   </select>
                 </div>
+
+                <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2.5 cursor-pointer">
+                  <input type="checkbox" name="ai_mode" className="mt-0.5 h-4 w-4 accent-violet-600" />
+                  <span>
+                    <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">Also track Google AI Mode</span>
+                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">Whether AI Mode cites {activeDomain}, and who it cites. About {formatUsd(AI_MODE_STANDARD_COST)} more per keyword per check.</span>
+                  </span>
+                </label>
 
                 <PendingButton
                   type="submit"

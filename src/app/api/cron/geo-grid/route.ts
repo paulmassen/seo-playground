@@ -10,6 +10,7 @@ import { postGridTasksQueue } from '@/app/dashboard/local-finder/grid-api';
 import { collectGridProgress } from '@/lib/grid-progress';
 import { collectRankProgress } from '@/lib/rank-progress';
 import { queueStandardRankChecksForProject } from '@/lib/rank-queue';
+import { collectAiModeProgress, queueAiModeChecksForProject } from '@/lib/ai-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +107,7 @@ async function runPass(credentials: { login: string; pass: string }) {
 
   let rankScheduled = 0;
   let rankScheduleRetries = 0;
+  let aiModeScheduled = 0;
   for (const schedule of dueRankSchedules) {
     try {
       const result = await queueStandardRankChecksForProject(
@@ -115,6 +117,14 @@ async function runPass(credentials: { login: string; pass: string }) {
         parseInt(schedule.depth, 10) || 20,
       );
       rankScheduled += result.queued;
+      // AI Mode is opt-in per keyword. A failure here does not reopen the schedule: the organic
+      // checks were already posted, and retrying would bill them twice.
+      try {
+        const aiKeywords = getTrackedKeywordsForProject(schedule.projectId).filter((keyword) => keyword.aiMode);
+        aiModeScheduled += (await queueAiModeChecksForProject(schedule.projectId, aiKeywords, credentials)).queued;
+      } catch {
+        // Recorded as failed tasks by the queue; nothing to retry.
+      }
       if (result.failed) {
         retryClaimedRankTrackerSchedule(schedule.projectId, schedule.nextRunAt);
         rankScheduleRetries += 1;
@@ -130,6 +140,7 @@ async function runPass(credentials: { login: string; pass: string }) {
   let rankPendingChecked = 0;
   let rankCompleted = 0;
   let rankFailed = 0;
+  let aiModeCompleted = 0;
   for (const project of getProjects()) {
     const pending = getPendingGridEntriesForProject(project.id);
     for (const entry of pending) {
@@ -148,6 +159,12 @@ async function runPass(credentials: { login: string; pass: string }) {
       rankFailed += rankProgress.failed;
     } catch {
       // A temporary API failure leaves local rank tasks pending for the next worker pass.
+    }
+    try {
+      const aiProgress = await collectAiModeProgress(project.id, credentials);
+      aiModeCompleted += aiProgress.completed;
+    } catch {
+      // Same: pending AI Mode tasks are collected on the next pass.
     }
   }
 
@@ -169,6 +186,7 @@ async function runPass(credentials: { login: string; pass: string }) {
   return {
     due: due.length, started, failed, gridRetries, pendingChecked, completed,
     rankSchedulesDue: dueRankSchedules.length, rankScheduled, rankScheduleRetries, rankPendingChecked, rankCompleted, rankFailed,
+    aiModeScheduled, aiModeCompleted,
     promptSchedulesDue: duePromptSchedules.length, promptRuns, promptRunsFailed,
   };
 }

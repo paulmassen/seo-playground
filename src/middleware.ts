@@ -2,10 +2,19 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authEnabled } from '@/lib/auth-config';
 
 // Reachable without a session. /api/cron has its own bearer secret (used by the worker container).
-const PUBLIC_PREFIXES = ['/login', '/setup', '/api/auth', '/api/cron'];
+const PUBLIC_PREFIXES = ['/login', '/setup', '/api/auth', '/api/cron', '/landing'];
+const LANDING_ASSETS = new Set([
+  '/logo.png',
+  '/screenshot-local-finder.png',
+  '/screenshot-rank-tracker.png',
+  '/readme/hero.png',
+  '/readme/geo-grid.gif',
+  '/readme/menu-tour-poster.jpg',
+  '/readme/menu-tour.mp4',
+]);
 
 function isPublic(pathname: string) {
-  return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return LANDING_ASSETS.has(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 /**

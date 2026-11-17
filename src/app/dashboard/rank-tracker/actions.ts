@@ -7,19 +7,25 @@ import {
   removeTrackedKeyword, getSetting, setSetting,
   addTargetDomain, removeTargetDomain, getCurrentProject,
   saveRankTrackerSchedule, deleteRankTrackerSchedule, getRankTopResultsHistory,
-  type RankTopResultsCheck,
+  setTrackedKeywordsAiMode, getAiModeDetails,
+  type RankTopResultsCheck, type AiModeCheckDetail,
 } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { queueStandardRankChecksForProject } from '@/lib/rank-queue';
+import { queueAiModeChecksForProject } from '@/lib/ai-mode';
 
-async function queueStandardRankChecks(
-  keywords: Array<{ id: number; keyword: string; domain: string; location: string; language: string }>,
-) {
+type KeywordInput = { id: number; keyword: string; domain: string; location: string; language: string; aiMode?: boolean };
+
+/** Queues the organic check of each keyword, plus a Google AI Mode check for keywords that opted in. */
+async function queueStandardRankChecks(keywords: KeywordInput[]) {
   const creds = getCredentials();
   if (!creds || keywords.length === 0) return;
   const depth = parseInt(getSetting('rank_tracker_depth') ?? '20', 10);
-  await queueStandardRankChecksForProject(getCurrentProject().id, keywords, creds, depth);
+  const projectId = getCurrentProject().id;
+  await queueStandardRankChecksForProject(projectId, keywords, creds, depth);
+  const aiKeywords = keywords.filter((keyword) => keyword.aiMode);
+  if (aiKeywords.length > 0) await queueAiModeChecksForProject(projectId, aiKeywords, creds);
 }
 
 export async function saveDepthAction(formData: FormData) {
@@ -76,9 +82,11 @@ export async function addKeywordAction(formData: FormData) {
 
     const kwList = raw.split('\n').map((k) => k.trim()).filter(Boolean).slice(0, 50);
     if (kwList.length === 0) return;
+    const aiMode = formData.get('ai_mode') === 'on';
 
     // Adding only saves the keywords, so they show up at once. Checking is a separate step (Queue, or ↻ on a row).
-    for (const keyword of kwList) addTrackedKeyword(keyword, domain, location, language);
+    const ids = kwList.map((keyword) => addTrackedKeyword(keyword, domain, location, language));
+    if (aiMode) setTrackedKeywordsAiMode(ids, true);
     revalidatePath('/dashboard/rank-tracker');
   });
 }
@@ -100,7 +108,8 @@ export async function checkOneAction(formData: FormData) {
     const location = formData.get('location') as string;
     const language = formData.get('language') as string;
     if (!id || !keyword || !domain) return;
-    await queueStandardRankChecks([{ id, keyword, domain, location, language }]);
+    const aiMode = getTrackedKeywords().find((k) => k.id === id)?.aiMode ?? false;
+    await queueStandardRankChecks([{ id, keyword, domain, location, language, aiMode }]);
     revalidatePath('/dashboard/rank-tracker');
   });
 }
@@ -129,5 +138,33 @@ export async function getTopResultsAction(keywordId: number): Promise<RankTopRes
   return runWithCurrentProject(async () => {
     if (!Number.isInteger(keywordId) || keywordId <= 0) return [];
     return getRankTopResultsHistory(keywordId, 30);
+  });
+}
+
+export async function setAiModeAction(formData: FormData) {
+  return runWithCurrentProject(async () => {
+    const id = Number(formData.get('id'));
+    if (!Number.isInteger(id) || id <= 0) return;
+    setTrackedKeywordsAiMode([id], formData.get('enabled') === '1');
+    revalidatePath('/dashboard/rank-tracker');
+  });
+}
+
+/** Turns Google AI Mode tracking on or off for every keyword of a domain. */
+export async function setDomainAiModeAction(formData: FormData) {
+  return runWithCurrentProject(async () => {
+    const domain = (formData.get('domain') as string | null)?.trim();
+    if (!domain) return;
+    const ids = getTrackedKeywords().filter((k) => k.domain === domain).map((k) => k.id);
+    setTrackedKeywordsAiMode(ids, formData.get('enabled') === '1');
+    revalidatePath('/dashboard/rank-tracker');
+  });
+}
+
+/** Saved AI Mode answers and sources, loaded when a keyword row is expanded. */
+export async function getAiModeDetailsAction(keywordId: number): Promise<AiModeCheckDetail[]> {
+  return runWithCurrentProject(async () => {
+    if (!Number.isInteger(keywordId) || keywordId <= 0) return [];
+    return getAiModeDetails(keywordId, 30);
   });
 }

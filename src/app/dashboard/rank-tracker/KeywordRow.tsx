@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { TrackedKeyword, RankCheck, RankTopResultsCheck } from '@/lib/db';
+import type { TrackedKeyword, RankCheck, RankTopResultsCheck, AiModeCheck, AiModeCheckDetail } from '@/lib/db';
 import PendingButton from '@/components/PendingButton';
 import TopResultsPanel from './TopResultsPanel';
-import { getTopResultsAction } from './actions';
+import AiModePanel from './AiModePanel';
+import { getAiModeDetailsAction, getTopResultsAction } from './actions';
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,25 @@ function AiOverviewBadge() {
   );
 }
 
+function AiModeCell({ enabled, pending, latest, previous }: { enabled: boolean; pending: boolean; latest: AiModeCheck | undefined; previous: AiModeCheck | undefined }) {
+  if (pending) return <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">Queued</span>;
+  if (!latest) return <span className="text-[10px] text-slate-300" title={enabled ? 'Tracked; no check yet' : 'Not tracked'}>{enabled ? 'next check' : '—'}</span>;
+  const moved = previous && previous.status !== latest.status
+    ? latest.status === 'cited' ? ' · new' : previous.status === 'cited' ? ' · lost' : ''
+    : '';
+  if (latest.status === 'cited') {
+    return (
+      <span title={`Cited by Google AI Mode, #${latest.citationPosition} among the cited sites`} className="px-1.5 py-0.5 rounded-lg text-[10px] font-black tabular-nums bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/50 dark:text-violet-300 dark:border-violet-900 whitespace-nowrap">
+        #{latest.citationPosition}{moved}
+      </span>
+    );
+  }
+  if (latest.status === 'not_cited') {
+    return <span title="Google AI Mode answered without citing this domain" className={`text-[10px] font-bold whitespace-nowrap ${moved ? 'text-red-500' : 'text-slate-400'}`}>not cited{moved}</span>;
+  }
+  return <span title="No AI Mode answer was returned" className="text-[10px] text-slate-300 whitespace-nowrap">no answer</span>;
+}
+
 function TrendBadge({ current, previous }: { current: number | null; previous: number | null }) {
   if (current === null && previous === null) return null;
   if (previous === null || current === null) return <span className="text-[10px] font-bold text-slate-300">new</span>;
@@ -54,7 +74,7 @@ function Sparkline({ history }: { history: RankCheck[] }) {
   const maxPos = Math.max(...definedPositions, 10);
   const minPos = Math.min(...definedPositions, 1);
   const range = Math.max(maxPos - minPos, 5);
-  const W = 80, H = 24;
+  const W = 64, H = 24;
   const xStep = W / (last14.length - 1);
   const toY = (p: number) => ((p - minPos) / range) * (H - 4) + 2;
 
@@ -315,18 +335,32 @@ interface Props {
   history: RankCheck[];
   latest: RankCheck | null;
   previous: RankCheck | null;
+  aiModeHistory: AiModeCheck[];
   hasCreds: boolean;
   pending: boolean;
+  aiModePending: boolean;
   checkAction: (fd: FormData) => Promise<void>;
   removeAction: (fd: FormData) => Promise<void>;
+  aiModeAction: (fd: FormData) => Promise<void>;
 }
 
-export default function KeywordRow({ kw, history, latest, previous, hasCreds, pending, checkAction, removeAction }: Props) {
+export default function KeywordRow({ kw, history, latest, previous, aiModeHistory, hasCreds, pending, aiModePending, checkAction, removeAction, aiModeAction }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [topChecks, setTopChecks] = useState<RankTopResultsCheck[] | null>(null);
   const [topFailed, setTopFailed] = useState(false);
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const hydrated = useSyncExternalStore(subscribeNever, () => true, () => false);
+  const [aiChecks, setAiChecks] = useState<AiModeCheckDetail[] | null>(null);
+  const [aiFailed, setAiFailed] = useState(false);
+  const latestAiCheckedAt = aiModeHistory[0]?.checkedAt ?? null;
+  useEffect(() => {
+    if (!expanded) return;
+    let cancelled = false;
+    getAiModeDetailsAction(kw.id)
+      .then((result) => { if (!cancelled) { setAiChecks(result); setAiFailed(false); } })
+      .catch(() => { if (!cancelled) setAiFailed(true); });
+    return () => { cancelled = true; };
+  }, [expanded, kw.id, latestAiCheckedAt]);
   const currPos = latest?.position ?? null;
   const prevPos = previous?.position ?? null;
   // The latest check can miss a domain that ranked days earlier; keep that position in view.
@@ -365,7 +399,7 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, pe
           </div>
           <div className="text-[10px] text-slate-400 pl-4">{kw.location} · {kw.language}</div>
         </td>
-        <td className="px-3 py-3.5 text-center">
+        <td className="px-2 py-3.5 text-center">
           {pending ? <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">Queued</span> : !latest ? <span className="text-[10px] text-slate-300">—</span> : (
             <div className="flex flex-col items-center gap-1">
               <div className="flex items-center justify-center gap-1">
@@ -380,19 +414,22 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, pe
             </div>
           )}
         </td>
-        <td className="px-3 py-3.5 text-center">
+        <td className="px-2 py-3.5 text-center">
+          <AiModeCell enabled={kw.aiMode} pending={aiModePending} latest={aiModeHistory[0]} previous={aiModeHistory[1]} />
+        </td>
+        <td className="px-2 py-3.5 text-center">
           <TrendBadge current={currPos} previous={prevPos} />
         </td>
-        <td className="px-3 py-3.5">
+        <td className="px-2 py-3.5">
           <div className="flex justify-center">
             <Sparkline history={history} />
           </div>
         </td>
-        <td className="px-3 py-3.5 text-slate-400 text-[10px] whitespace-nowrap">
+        <td className="px-2 py-3.5 text-slate-400 text-[10px] whitespace-nowrap">
           {latest ? formatDate(latest.checkedAt, hydrated ? undefined : 'UTC') : '—'}
         </td>
-        <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
-          <div className="flex gap-1.5">
+        <td className="px-2 py-3.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex gap-1">
             {hasCreds && (
               <form action={checkAction}>
                 <input type="hidden" name="id" value={kw.id} />
@@ -403,16 +440,28 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, pe
                 <PendingButton
                   type="submit"
                   disabled={pending}
-                  className="px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all"
-                  pendingClassName="px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-blue-100 text-blue-300 cursor-not-allowed"
+                  className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all"
+                  pendingClassName="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-blue-100 text-blue-300 cursor-not-allowed"
                 >
                   {pending ? '…' : '↻'}
                 </PendingButton>
               </form>
             )}
+            <form action={aiModeAction}>
+              <input type="hidden" name="id" value={kw.id} />
+              <input type="hidden" name="enabled" value={kw.aiMode ? '0' : '1'} />
+              <button
+                type="submit"
+                aria-pressed={kw.aiMode}
+                title={kw.aiMode ? 'Stop tracking Google AI Mode for this keyword' : 'Also track Google AI Mode for this keyword (about $0.0012 more per check)'}
+                className={`px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all ${kw.aiMode ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-violet-50 text-violet-500 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-300'}`}
+              >
+                AI
+              </button>
+            </form>
             <form action={removeAction}>
               <input type="hidden" name="id" value={kw.id} />
-              <button type="submit" className="px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
+              <button type="submit" className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all">
                 ✕
               </button>
             </form>
@@ -423,7 +472,7 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, pe
       {expanded && (
         <tr className="bg-slate-50/40 dark:bg-slate-800/30">
           {/* max-w-0: this cell must not size the table. A long unbreakable URL would otherwise stretch it past the page. */}
-          <td colSpan={6} className="px-5 pt-1 pb-5 max-w-0">
+          <td colSpan={7} className="px-5 pt-1 pb-5 max-w-0">
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
               Position history — last 30 days
             </div>
@@ -443,6 +492,7 @@ export default function KeywordRow({ kw, history, latest, previous, hasCreds, pe
               </div>
             )}
             <TopResultsPanel checks={topChecks} failed={topFailed} trackedDomain={kw.domain} selectedDate={selectedDate} onSelect={setPickedDate} />
+            <AiModePanel checks={aiChecks} failed={aiFailed} trackedDomain={kw.domain} enabled={kw.aiMode} />
           </td>
         </tr>
       )}

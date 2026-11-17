@@ -423,6 +423,29 @@ function initSchema(db: Database.Database) {
       ready_seen_at INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS ai_mode_checks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      keyword_id INTEGER NOT NULL,
+      checked_at INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      status TEXT NOT NULL,
+      citation_position INTEGER,
+      cited_url TEXT,
+      sources TEXT,
+      answer TEXT,
+      cost REAL
+    );
+
+    CREATE TABLE IF NOT EXISTS ai_mode_tasks (
+      task_id TEXT PRIMARY KEY,
+      keyword_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      cost REAL,
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      error_message TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS rank_tracker_schedules (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       time_of_day TEXT NOT NULL,
@@ -603,6 +626,27 @@ function initSchema(db: Database.Database) {
       ts INTEGER NOT NULL,
       mode TEXT NOT NULL,
       query TEXT NOT NULL,
+      result_count INTEGER NOT NULL,
+      total_count INTEGER,
+      cost REAL,
+      items TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tech_stats_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      technology TEXT NOT NULL,
+      date_from TEXT NOT NULL DEFAULT '',
+      date_to TEXT NOT NULL DEFAULT '',
+      cost REAL,
+      result TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS whois_find_searches (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      params TEXT NOT NULL,
       result_count INTEGER NOT NULL,
       total_count INTEGER,
       cost REAL,
@@ -911,6 +955,12 @@ function initSchema(db: Database.Database) {
   addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN links_total INTEGER');
   // Query string of the search (mode, filters…). NULL = saved before filters existed, ranks on the 0–1000 scale.
   addColumnIfMissing(db, 'backlinks_searches', 'ADD COLUMN params TEXT');
+  addColumnIfMissing(db, 'competitors_searches', 'ADD COLUMN params TEXT');
+  addColumnIfMissing(db, 'domain_intersection_searches', 'ADD COLUMN params TEXT');
+  for (const table of ['ranked_kw_searches', 'subdomains_searches', 'traffic_estimation_searches', 'hist_rank_searches', 'domain_categories_searches']) {
+    addColumnIfMissing(db, table, 'ADD COLUMN params TEXT');
+  }
+  addColumnIfMissing(db, 'subdomains_searches', 'ADD COLUMN total_count INTEGER');
   addColumnIfMissing(db, 'grid_searches', `ADD COLUMN status TEXT NOT NULL DEFAULT 'done'`);
   addColumnIfMissing(db, 'grid_searches', 'ADD COLUMN task_ids TEXT');
   addColumnIfMissing(db, 'grid_searches', `ADD COLUMN queue_mode TEXT NOT NULL DEFAULT 'live'`);
@@ -924,6 +974,11 @@ function initSchema(db: Database.Database) {
   addColumnIfMissing(db, 'reviews_tasks', 'ADD COLUMN meta TEXT');
   addColumnIfMissing(db, 'rank_checks', 'ADD COLUMN ai_overview INTEGER');
   addColumnIfMissing(db, 'rank_checks', 'ADD COLUMN top_results TEXT');
+  // Google AI Mode is an opt-in, separately billed check per keyword. 0 = organic only.
+  addColumnIfMissing(db, 'tracked_keywords', 'ADD COLUMN ai_mode INTEGER NOT NULL DEFAULT 0');
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_mode_checks_kw ON ai_mode_checks(keyword_id, date DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_mode_tasks_status ON ai_mode_tasks(status, created_at ASC)`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_mode_tasks_active_keyword ON ai_mode_tasks(keyword_id) WHERE status IN ('posting', 'pending')`);
   // Existing completed checks predate bell notifications: mark only those migration rows as seen.
   const rankTaskColumns = db.prepare('PRAGMA table_info(rank_tasks)').all() as Array<{ name: string }>;
   if (!rankTaskColumns.some((column) => column.name === 'ready_seen_at')) {
@@ -934,6 +989,7 @@ function initSchema(db: Database.Database) {
   }
   addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN keyword TEXT');
   addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN technology TEXT');
+  addColumnIfMissing(db, 'domain_find_searches', 'ADD COLUMN params TEXT');
   addColumnIfMissing(db, 'hist_rank_searches', `ADD COLUMN date_from TEXT NOT NULL DEFAULT ''`);
   addColumnIfMissing(db, 'hist_rank_searches', `ADD COLUMN date_to TEXT NOT NULL DEFAULT ''`);
 
@@ -1363,22 +1419,24 @@ export interface RankedKwSearchEntry {
   count: number;
   totalCount: number;
   cost?: number;
+  /** JSON of the request options (filters, sort, offset…). */
+  params?: string;
 }
 
 export function getRankedKwHistory(): RankedKwSearchEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, target, location, language, result_count, total_count, cost FROM ranked_kw_searches ORDER BY ts DESC LIMIT 30')
-    .all() as Array<{ id: string; ts: number; target: string; location: string; language: string; result_count: number; total_count: number; cost: number | null }>;
+    .prepare('SELECT id, ts, target, location, language, result_count, total_count, cost, params FROM ranked_kw_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; target: string; location: string; language: string; result_count: number; total_count: number; cost: number | null; params: string | null }>;
   return rows.map((r) => ({
     id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language,
-    count: r.result_count, totalCount: r.total_count, cost: r.cost ?? undefined,
+    count: r.result_count, totalCount: r.total_count, cost: r.cost ?? undefined, params: r.params ?? undefined,
   }));
 }
 
 export function saveRankedKwSearch<T>(entry: RankedKwSearchEntry, items: T[]): void {
   getDb()
-    .prepare('INSERT OR REPLACE INTO ranked_kw_searches (id, ts, target, location, language, result_count, total_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.totalCount, entry.cost ?? null, JSON.stringify(items));
+    .prepare('INSERT OR REPLACE INTO ranked_kw_searches (id, ts, target, location, language, result_count, total_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.totalCount, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 
 export function getRankedKwResults<T>(id: string): T[] | null {
@@ -1475,22 +1533,24 @@ export interface CompetitorsSearchEntry {
   language: string;
   count: number;
   cost?: number;
+  /** JSON of the optional request options (exclusions, max rank, item types…). */
+  params?: string;
 }
 
 export function getCompetitorsHistory(): CompetitorsSearchEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, target, location, language, result_count, cost FROM competitors_searches ORDER BY ts DESC LIMIT 30')
-    .all() as Array<{ id: string; ts: number; target: string; location: string; language: string; result_count: number; cost: number | null }>;
+    .prepare('SELECT id, ts, target, location, language, result_count, cost, params FROM competitors_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; target: string; location: string; language: string; result_count: number; cost: number | null; params: string | null }>;
   return rows.map((r) => ({
     id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language,
-    count: r.result_count, cost: r.cost ?? undefined,
+    count: r.result_count, cost: r.cost ?? undefined, params: r.params ?? undefined,
   }));
 }
 
 export function saveCompetitorsSearch<T>(entry: CompetitorsSearchEntry, items: T[]): void {
   getDb()
-    .prepare('INSERT OR REPLACE INTO competitors_searches (id, ts, target, location, language, result_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items));
+    .prepare('INSERT OR REPLACE INTO competitors_searches (id, ts, target, location, language, result_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 
 export function getCompetitorsResults<T>(id: string): T[] | null {
@@ -1508,6 +1568,8 @@ export interface TrackedKeyword {
   location: string;
   language: string;
   createdAt: number;
+  /** Also check Google AI Mode for this keyword (a separate, billed task per check). */
+  aiMode: boolean;
 }
 
 export interface RankCheck {
@@ -1528,10 +1590,10 @@ export function getTrackedKeywords(): TrackedKeyword[] {
 }
 
 function trackedKeywordsFromDb(db: Database.Database): TrackedKeyword[] {
-  const rows = db.prepare('SELECT id, keyword, domain, location, language, created_at FROM tracked_keywords ORDER BY created_at DESC').all() as Array<{
-    id: number; keyword: string; domain: string; location: string; language: string; created_at: number;
+  const rows = db.prepare('SELECT id, keyword, domain, location, language, created_at, ai_mode FROM tracked_keywords ORDER BY created_at DESC').all() as Array<{
+    id: number; keyword: string; domain: string; location: string; language: string; created_at: number; ai_mode: number;
   }>;
-  return rows.map((r) => ({ id: r.id, keyword: r.keyword, domain: r.domain, location: r.location, language: r.language, createdAt: r.created_at }));
+  return rows.map((r) => ({ id: r.id, keyword: r.keyword, domain: r.domain, location: r.location, language: r.language, createdAt: r.created_at, aiMode: r.ai_mode === 1 }));
 }
 
 export function getTrackedKeywordsForProject(projectId: string): TrackedKeyword[] {
@@ -1551,6 +1613,8 @@ export function addTrackedKeyword(keyword: string, domain: string, location: str
 
 export function removeTrackedKeyword(id: number): void {
   getDb().prepare('DELETE FROM rank_tasks WHERE keyword_id = ?').run(id);
+  // AI Mode checks are kept: their cost stays in Spending, like any other paid call.
+  getDb().prepare('DELETE FROM ai_mode_tasks WHERE keyword_id = ?').run(id);
   getDb().prepare('DELETE FROM tracked_keywords WHERE id = ?').run(id);
 }
 
@@ -1844,6 +1908,163 @@ export function getRankTopResultsHistory(keywordId: number, days = 30): RankTopR
   });
 }
 
+// --- Google AI Mode (Rank Tracker option) ---
+
+export function setTrackedKeywordsAiMode(ids: number[], enabled: boolean): void {
+  const db = getDb();
+  const stmt = db.prepare('UPDATE tracked_keywords SET ai_mode = ? WHERE id = ?');
+  db.transaction(() => { for (const id of ids) stmt.run(enabled ? 1 : 0, id); })();
+}
+
+export type AiModeStatus = 'cited' | 'not_cited' | 'no_answer';
+
+export interface AiModeSource {
+  domain: string;
+  url: string;
+  title: string | null;
+}
+
+export interface AiModeCheck {
+  id: number;
+  keywordId: number;
+  checkedAt: number;
+  date: string;
+  /** cited: the domain is a source; not_cited: AI Mode answered without it; no_answer: no AI answer was returned. */
+  status: AiModeStatus;
+  /** 1-based rank of the domain among the answer's distinct cited domains. */
+  citationPosition: number | null;
+  citedUrl: string | null;
+  cost: number | null;
+}
+
+export interface AiModeCheckDetail extends AiModeCheck {
+  sources: AiModeSource[];
+  answer: string | null;
+}
+
+export interface AiModeResult {
+  status: AiModeStatus;
+  citationPosition: number | null;
+  citedUrl: string | null;
+  sources: AiModeSource[];
+  answer: string | null;
+}
+
+type AiModeCheckRow = {
+  id: number; keyword_id: number; checked_at: number; date: string; status: string;
+  citation_position: number | null; cited_url: string | null; cost: number | null; sources?: string | null; answer?: string | null;
+};
+
+function aiModeCheckFromRow(r: AiModeCheckRow): AiModeCheck {
+  return {
+    id: r.id, keywordId: r.keyword_id, checkedAt: r.checked_at, date: r.date,
+    status: (r.status === 'cited' || r.status === 'not_cited' ? r.status : 'no_answer'),
+    citationPosition: r.citation_position, citedUrl: r.cited_url, cost: r.cost,
+  };
+}
+
+function parseAiModeSources(raw: string | null | undefined): AiModeSource[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed as AiModeSource[] : [];
+  } catch {
+    return [];
+  }
+}
+
+const AI_MODE_CHECK_COLUMNS = 'id, keyword_id, checked_at, date, status, citation_position, cited_url, cost';
+
+/** Latest AI Mode check of each keyword, plus its recent history, for the list page (without answers). */
+export function getAiModeHistory(keywordId: number, days = 30): AiModeCheck[] {
+  const rows = getDb().prepare(
+    `SELECT ${AI_MODE_CHECK_COLUMNS} FROM ai_mode_checks WHERE keyword_id = ? ORDER BY date DESC LIMIT ?`
+  ).all(keywordId, days) as AiModeCheckRow[];
+  return rows.map(aiModeCheckFromRow);
+}
+
+/** Saved AI Mode checks with answer and sources, newest first; loaded when a row is expanded. */
+export function getAiModeDetails(keywordId: number, days = 30): AiModeCheckDetail[] {
+  const rows = getDb().prepare(
+    `SELECT ${AI_MODE_CHECK_COLUMNS}, sources, answer FROM ai_mode_checks WHERE keyword_id = ? ORDER BY date DESC LIMIT ?`
+  ).all(keywordId, days) as AiModeCheckRow[];
+  return rows.map((row) => ({ ...aiModeCheckFromRow(row), sources: parseAiModeSources(row.sources), answer: row.answer ?? null }));
+}
+
+export interface PendingAiModeTask {
+  taskId: string;
+  keywordId: number;
+  domain: string;
+  cost: number | null;
+}
+
+export function reserveAiModeTasksForProject(projectId: string, keywordIds: number[]): RankTaskReservation[] {
+  const db = getDbForProject(projectId);
+  const now = Date.now();
+  const reservations: RankTaskReservation[] = [];
+  const stmt = db.prepare(`INSERT OR IGNORE INTO ai_mode_tasks (task_id, keyword_id, status, created_at) VALUES (?, ?, 'posting', ?)`);
+  db.transaction(() => {
+    for (const keywordId of keywordIds) {
+      const reservationId = `posting:${keywordId}:${randomUUID()}`;
+      if (stmt.run(reservationId, keywordId, now).changes > 0) reservations.push({ reservationId, keywordId });
+    }
+  })();
+  return reservations;
+}
+
+export function confirmAiModeTaskReservationForProject(projectId: string, reservationId: string, taskId: string, cost: number | null): boolean {
+  return getDbForProject(projectId).prepare(`UPDATE ai_mode_tasks SET task_id = ?, status = 'pending', cost = ?, error_message = NULL
+    WHERE task_id = ? AND status = 'posting'`).run(taskId, cost, reservationId).changes > 0;
+}
+
+export function failAiModeTaskReservationForProject(projectId: string, reservationId: string, errorMessage: string): void {
+  getDbForProject(projectId).prepare(`UPDATE ai_mode_tasks SET status = 'failed', completed_at = ?, error_message = ?
+    WHERE task_id = ? AND status = 'posting'`).run(Date.now(), errorMessage.slice(0, 500), reservationId);
+}
+
+export function getPendingAiModeTasksForProject(projectId: string): PendingAiModeTask[] {
+  const rows = getDbForProject(projectId).prepare(`SELECT ai_mode_tasks.task_id, ai_mode_tasks.keyword_id, tracked_keywords.domain, ai_mode_tasks.cost
+    FROM ai_mode_tasks JOIN tracked_keywords ON tracked_keywords.id = ai_mode_tasks.keyword_id
+    WHERE ai_mode_tasks.status = 'pending' ORDER BY ai_mode_tasks.created_at ASC`).all() as Array<{
+      task_id: string; keyword_id: number; domain: string; cost: number | null;
+    }>;
+  return rows.map((row) => ({ taskId: row.task_id, keywordId: row.keyword_id, domain: row.domain, cost: row.cost }));
+}
+
+export function getPendingAiModeKeywordIds(): number[] {
+  const rows = getDb().prepare(`SELECT keyword_id FROM ai_mode_tasks WHERE status IN ('posting', 'pending')`).all() as Array<{ keyword_id: number }>;
+  return rows.map((row) => row.keyword_id);
+}
+
+/** Stores one AI Mode check per keyword per day (a re-check the same day replaces it) and closes the task. */
+export function completeAiModeTaskForProject(projectId: string, taskId: string, result: AiModeResult, billedCost: number | null): void {
+  const db = getDbForProject(projectId);
+  const task = db.prepare('SELECT keyword_id, cost FROM ai_mode_tasks WHERE task_id = ?').get(taskId) as { keyword_id: number; cost: number | null } | undefined;
+  if (!task) return;
+  const now = Date.now();
+  const date = new Date(now).toISOString().split('T')[0];
+  const cost = billedCost ?? task.cost;
+  const sources = result.sources.length > 0 ? JSON.stringify(result.sources) : null;
+  db.transaction(() => {
+    const existing = db.prepare('SELECT id, cost FROM ai_mode_checks WHERE keyword_id = ? AND date = ?').get(task.keyword_id, date) as { id: number; cost: number | null } | undefined;
+    if (existing) {
+      // Both calls were billed: the day keeps their summed cost so Spending stays exact.
+      db.prepare(`UPDATE ai_mode_checks SET checked_at = ?, status = ?, citation_position = ?, cited_url = ?, sources = ?, answer = ?, cost = ? WHERE id = ?`)
+        .run(now, result.status, result.citationPosition, result.citedUrl, sources, result.answer, (existing.cost ?? 0) + (cost ?? 0), existing.id);
+    } else {
+      db.prepare(`INSERT INTO ai_mode_checks (keyword_id, checked_at, date, status, citation_position, cited_url, sources, answer, cost)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(task.keyword_id, now, date, result.status, result.citationPosition, result.citedUrl, sources, result.answer, cost);
+    }
+    db.prepare(`UPDATE ai_mode_tasks SET status = 'done', completed_at = ?, error_message = NULL, cost = COALESCE(?, cost) WHERE task_id = ?`).run(now, billedCost, taskId);
+  })();
+}
+
+export function failAiModeTaskForProject(projectId: string, taskId: string, errorMessage: string): void {
+  getDbForProject(projectId).prepare(`UPDATE ai_mode_tasks SET status = 'failed', completed_at = ?, error_message = ? WHERE task_id = ?`)
+    .run(Date.now(), errorMessage.slice(0, 500), taskId);
+}
+
 // --- Referring Domains ---
 
 export interface RefDomainsSearchEntry {
@@ -1911,18 +2132,20 @@ export interface HistRankSearchEntry {
   dateFrom?: string;
   dateTo?: string;
   cost?: number;
+  /** JSON of the request options (e.g. ignore_synonyms). */
+  params?: string;
 }
 
 export function getHistRankHistory(): HistRankSearchEntry[] {
-  const rows = getDb().prepare('SELECT id, ts, target, location, language, date_from, date_to, cost FROM hist_rank_searches ORDER BY ts DESC LIMIT 30').all() as Array<{
-    id: string; ts: number; target: string; location: string; language: string; date_from: string; date_to: string; cost: number | null;
+  const rows = getDb().prepare('SELECT id, ts, target, location, language, date_from, date_to, cost, params FROM hist_rank_searches ORDER BY ts DESC LIMIT 30').all() as Array<{
+    id: string; ts: number; target: string; location: string; language: string; date_from: string; date_to: string; cost: number | null; params: string | null;
   }>;
-  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language, dateFrom: r.date_from || undefined, dateTo: r.date_to || undefined, cost: r.cost ?? undefined }));
+  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language, dateFrom: r.date_from || undefined, dateTo: r.date_to || undefined, cost: r.cost ?? undefined, params: r.params ?? undefined }));
 }
 
 export function saveHistRankSearch<T>(entry: HistRankSearchEntry, items: T[]): void {
-  getDb().prepare('INSERT OR REPLACE INTO hist_rank_searches (id, ts, target, location, language, date_from, date_to, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.dateFrom ?? '', entry.dateTo ?? '', entry.cost ?? null, JSON.stringify(items));
+  getDb().prepare('INSERT OR REPLACE INTO hist_rank_searches (id, ts, target, location, language, date_from, date_to, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.dateFrom ?? '', entry.dateTo ?? '', entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 
 export function getHistRankResults<T>(id: string): T[] | null {
@@ -1943,18 +2166,20 @@ export interface DomainIntersectionSearchEntry {
   count: number;
   totalCount: number;
   cost?: number;
+  /** JSON of the optional request options (mode, filters, order). */
+  params?: string;
 }
 
 export function getDomainIntersectionHistory(): DomainIntersectionSearchEntry[] {
-  const rows = getDb().prepare('SELECT id, ts, target1, target2, location, language, result_count, total_count, cost FROM domain_intersection_searches ORDER BY ts DESC LIMIT 30').all() as Array<{
-    id: string; ts: number; target1: string; target2: string; location: string; language: string; result_count: number; total_count: number; cost: number | null;
+  const rows = getDb().prepare('SELECT id, ts, target1, target2, location, language, result_count, total_count, cost, params FROM domain_intersection_searches ORDER BY ts DESC LIMIT 30').all() as Array<{
+    id: string; ts: number; target1: string; target2: string; location: string; language: string; result_count: number; total_count: number; cost: number | null; params: string | null;
   }>;
-  return rows.map((r) => ({ id: r.id, ts: r.ts, target1: r.target1, target2: r.target2, location: r.location, language: r.language, count: r.result_count, totalCount: r.total_count, cost: r.cost ?? undefined }));
+  return rows.map((r) => ({ id: r.id, ts: r.ts, target1: r.target1, target2: r.target2, location: r.location, language: r.language, count: r.result_count, totalCount: r.total_count, cost: r.cost ?? undefined, params: r.params ?? undefined }));
 }
 
 export function saveDomainIntersectionSearch<T>(entry: DomainIntersectionSearchEntry, items: T[]): void {
-  getDb().prepare('INSERT OR REPLACE INTO domain_intersection_searches (id, ts, target1, target2, location, language, result_count, total_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, entry.target1, entry.target2, entry.location, entry.language, entry.count, entry.totalCount, entry.cost ?? null, JSON.stringify(items));
+  getDb().prepare('INSERT OR REPLACE INTO domain_intersection_searches (id, ts, target1, target2, location, language, result_count, total_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.target1, entry.target2, entry.location, entry.language, entry.count, entry.totalCount, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 
 export function getDomainIntersectionResults<T>(id: string): T[] | null {
@@ -2659,20 +2884,52 @@ export interface DomainFindEntry {
   count: number;
   totalCount?: number;
   cost?: number;
+  /** JSON of the full search settings (search type, mode, filters, sort, page); absent on older rows. */
+  params?: string;
 }
 
 export function getDomainFindHistory(): DomainFindEntry[] {
   const rows = getDb()
-    .prepare('SELECT id, ts, keyword, technology, result_count, total_count, cost FROM domain_find_searches ORDER BY ts DESC LIMIT 30')
-    .all() as Array<{ id: string; ts: number; keyword: string | null; technology: string | null; result_count: number; total_count: number | null; cost: number | null }>;
-  return rows.map((r) => ({ id: r.id, ts: r.ts, keyword: r.keyword ?? undefined, technology: r.technology ?? undefined, count: r.result_count, totalCount: r.total_count ?? undefined, cost: r.cost ?? undefined }));
+    .prepare('SELECT id, ts, keyword, technology, result_count, total_count, cost, params FROM domain_find_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; keyword: string | null; technology: string | null; result_count: number; total_count: number | null; cost: number | null; params: string | null }>;
+  return rows.map((r) => ({ id: r.id, ts: r.ts, keyword: r.keyword ?? undefined, technology: r.technology ?? undefined, count: r.result_count, totalCount: r.total_count ?? undefined, cost: r.cost ?? undefined, params: r.params ?? undefined }));
 }
 
 export function saveDomainFindSearch<T>(entry: DomainFindEntry, items: T[]): void {
   const label = [entry.technology && `tech:${entry.technology}`, entry.keyword && `kw:${entry.keyword}`].filter(Boolean).join(' + ') || '';
   getDb()
-    .prepare('INSERT OR REPLACE INTO domain_find_searches (id, ts, mode, query, keyword, technology, result_count, total_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(entry.id, entry.ts, 'find', label, entry.keyword ?? null, entry.technology ?? null, entry.count, entry.totalCount ?? null, entry.cost ?? null, JSON.stringify(items));
+    .prepare('INSERT OR REPLACE INTO domain_find_searches (id, ts, mode, query, keyword, technology, result_count, total_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, 'find', label, entry.keyword ?? null, entry.technology ?? null, entry.count, entry.totalCount ?? null, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
+}
+
+// --- Technology Stats (adoption of one technology over time) ---
+
+export interface TechStatsEntry {
+  id: string;
+  ts: number;
+  technology: string;
+  dateFrom: string;
+  dateTo: string;
+  cost?: number;
+}
+
+export function getTechStatsHistory(): TechStatsEntry[] {
+  const rows = getDb()
+    .prepare('SELECT id, ts, technology, date_from, date_to, cost FROM tech_stats_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; technology: string; date_from: string; date_to: string; cost: number | null }>;
+  return rows.map((r) => ({ id: r.id, ts: r.ts, technology: r.technology, dateFrom: r.date_from, dateTo: r.date_to, cost: r.cost ?? undefined }));
+}
+
+export function saveTechStatsSearch<T>(entry: TechStatsEntry, result: T): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO tech_stats_searches (id, ts, technology, date_from, date_to, cost, result) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.technology, entry.dateFrom, entry.dateTo, entry.cost ?? null, JSON.stringify(result));
+}
+
+export function getTechStatsResult<T>(id: string): T | null {
+  const row = getDb().prepare('SELECT result FROM tech_stats_searches WHERE id = ?').get(id) as { result: string } | undefined;
+  if (!row) return null;
+  try { return JSON.parse(row.result) as T; } catch { return null; }
 }
 
 export function getDomainFindResults<T>(id: string): T[] | null {
@@ -2707,6 +2964,39 @@ export function getDomainWhoisResult<T>(id: string): T | null {
   const row = getDb().prepare('SELECT result FROM domain_whois_searches WHERE id = ?').get(id) as { result: string } | undefined;
   if (!row) return null;
   try { return JSON.parse(row.result) as T; } catch { return null; }
+}
+
+// --- Whois: find domains by filters ---
+
+export interface WhoisFindEntry {
+  id: string;
+  ts: number;
+  /** Human-readable summary of the filters, shown in history. */
+  label: string;
+  /** JSON of the search settings (query string values). */
+  params: string;
+  count: number;
+  totalCount?: number;
+  cost?: number;
+}
+
+export function getWhoisFindHistory(): WhoisFindEntry[] {
+  const rows = getDb()
+    .prepare('SELECT id, ts, label, params, result_count, total_count, cost FROM whois_find_searches ORDER BY ts DESC LIMIT 30')
+    .all() as Array<{ id: string; ts: number; label: string; params: string; result_count: number; total_count: number | null; cost: number | null }>;
+  return rows.map((r) => ({ id: r.id, ts: r.ts, label: r.label, params: r.params, count: r.result_count, totalCount: r.total_count ?? undefined, cost: r.cost ?? undefined }));
+}
+
+export function saveWhoisFindSearch<T>(entry: WhoisFindEntry, items: T[]): void {
+  getDb()
+    .prepare('INSERT OR REPLACE INTO whois_find_searches (id, ts, label, params, result_count, total_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(entry.id, entry.ts, entry.label, entry.params, entry.count, entry.totalCount ?? null, entry.cost ?? null, JSON.stringify(items));
+}
+
+export function getWhoisFindResults<T>(id: string): T[] | null {
+  const row = getDb().prepare('SELECT items FROM whois_find_searches WHERE id = ?').get(id) as { items: string } | undefined;
+  if (!row) return null;
+  try { return JSON.parse(row.items) as T[]; } catch { return null; }
 }
 
 // --- Site Audit ---
@@ -2825,15 +3115,15 @@ export function getPageIntersectionResults<T>(id: string): T[] | null {
 
 // ─── Domain Categories ────────────────────────────────────────────────────────
 
-export interface DomainCategoriesEntry { id: string; ts: number; target: string; location: string; language: string; count: number; cost?: number; }
-type DCRow = { id: string; ts: number; target: string; location: string; language: string; result_count: number; cost: number | null };
+export interface DomainCategoriesEntry { id: string; ts: number; target: string; location: string; language: string; count: number; cost?: number; params?: string; }
+type DCRow = { id: string; ts: number; target: string; location: string; language: string; result_count: number; cost: number | null; params: string | null };
 
 export function getDomainCategoriesHistory(): DomainCategoriesEntry[] {
-  const rows = getDb().prepare('SELECT id, ts, target, location, language, result_count, cost FROM domain_categories_searches ORDER BY ts DESC LIMIT 20').all() as DCRow[];
-  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language, count: r.result_count, cost: r.cost ?? undefined }));
+  const rows = getDb().prepare('SELECT id, ts, target, location, language, result_count, cost, params FROM domain_categories_searches ORDER BY ts DESC LIMIT 20').all() as DCRow[];
+  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language, count: r.result_count, cost: r.cost ?? undefined, params: r.params ?? undefined }));
 }
 export function saveDomainCategoriesSearch(entry: DomainCategoriesEntry, items: unknown[]): void {
-  getDb().prepare('INSERT OR REPLACE INTO domain_categories_searches (id, ts, target, location, language, result_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items));
+  getDb().prepare('INSERT OR REPLACE INTO domain_categories_searches (id, ts, target, location, language, result_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 export function getDomainCategoriesResults<T>(id: string): T[] | null {
   const row = getDb().prepare('SELECT items FROM domain_categories_searches WHERE id = ?').get(id) as { items: string } | undefined;
@@ -2842,15 +3132,15 @@ export function getDomainCategoriesResults<T>(id: string): T[] | null {
 
 // ─── Subdomains ───────────────────────────────────────────────────────────────
 
-export interface SubdomainsEntry { id: string; ts: number; target: string; location: string; language: string; count: number; cost?: number; }
-type SDRow = { id: string; ts: number; target: string; location: string; language: string; result_count: number; cost: number | null };
+export interface SubdomainsEntry { id: string; ts: number; target: string; location: string; language: string; count: number; totalCount?: number; cost?: number; params?: string; }
+type SDRow = { id: string; ts: number; target: string; location: string; language: string; result_count: number; total_count: number | null; cost: number | null; params: string | null };
 
 export function getSubdomainsHistory(): SubdomainsEntry[] {
-  const rows = getDb().prepare('SELECT id, ts, target, location, language, result_count, cost FROM subdomains_searches ORDER BY ts DESC LIMIT 20').all() as SDRow[];
-  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language, count: r.result_count, cost: r.cost ?? undefined }));
+  const rows = getDb().prepare('SELECT id, ts, target, location, language, result_count, total_count, cost, params FROM subdomains_searches ORDER BY ts DESC LIMIT 20').all() as SDRow[];
+  return rows.map((r) => ({ id: r.id, ts: r.ts, target: r.target, location: r.location, language: r.language, count: r.result_count, totalCount: r.total_count ?? undefined, cost: r.cost ?? undefined, params: r.params ?? undefined }));
 }
 export function saveSubdomainsSearch(entry: SubdomainsEntry, items: unknown[]): void {
-  getDb().prepare('INSERT OR REPLACE INTO subdomains_searches (id, ts, target, location, language, result_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items));
+  getDb().prepare('INSERT OR REPLACE INTO subdomains_searches (id, ts, target, location, language, result_count, total_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.target, entry.location, entry.language, entry.count, entry.totalCount ?? null, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 export function getSubdomainsResults<T>(id: string): T[] | null {
   const row = getDb().prepare('SELECT items FROM subdomains_searches WHERE id = ?').get(id) as { items: string } | undefined;
@@ -2859,15 +3149,15 @@ export function getSubdomainsResults<T>(id: string): T[] | null {
 
 // ─── Traffic Estimation ───────────────────────────────────────────────────────
 
-export interface TrafficEstimationEntry { id: string; ts: number; targets: string; location: string; language: string; count: number; cost?: number; }
-type TERow = { id: string; ts: number; targets: string; location: string; language: string; result_count: number; cost: number | null };
+export interface TrafficEstimationEntry { id: string; ts: number; targets: string; location: string; language: string; count: number; cost?: number; params?: string; }
+type TERow = { id: string; ts: number; targets: string; location: string; language: string; result_count: number; cost: number | null; params: string | null };
 
 export function getTrafficEstimationHistory(): TrafficEstimationEntry[] {
-  const rows = getDb().prepare('SELECT id, ts, targets, location, language, result_count, cost FROM traffic_estimation_searches ORDER BY ts DESC LIMIT 20').all() as TERow[];
-  return rows.map((r) => ({ id: r.id, ts: r.ts, targets: r.targets, location: r.location, language: r.language, count: r.result_count, cost: r.cost ?? undefined }));
+  const rows = getDb().prepare('SELECT id, ts, targets, location, language, result_count, cost, params FROM traffic_estimation_searches ORDER BY ts DESC LIMIT 20').all() as TERow[];
+  return rows.map((r) => ({ id: r.id, ts: r.ts, targets: r.targets, location: r.location, language: r.language, count: r.result_count, cost: r.cost ?? undefined, params: r.params ?? undefined }));
 }
 export function saveTrafficEstimationSearch(entry: TrafficEstimationEntry, items: unknown[]): void {
-  getDb().prepare('INSERT OR REPLACE INTO traffic_estimation_searches (id, ts, targets, location, language, result_count, cost, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.targets, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items));
+  getDb().prepare('INSERT OR REPLACE INTO traffic_estimation_searches (id, ts, targets, location, language, result_count, cost, items, params) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.ts, entry.targets, entry.location, entry.language, entry.count, entry.cost ?? null, JSON.stringify(items), entry.params ?? null);
 }
 export function getTrafficEstimationResults<T>(id: string): T[] | null {
   const row = getDb().prepare('SELECT items FROM traffic_estimation_searches WHERE id = ?').get(id) as { items: string } | undefined;
@@ -3353,7 +3643,7 @@ export const DELETABLE_HISTORY_TABLES = [
   'keyword_ideas_searches', 'search_intent_searches', 'page_intersection_searches', 'domain_categories_searches',
   'subdomains_searches', 'traffic_estimation_searches', 'ai_kwdata_searches', 'llm_response_searches',
   'ai_visibility_searches', 'fan_out_searches', 'ai_optimization_searches', 'gbp_category_audits',
-  'web_mentions_searches',
+  'web_mentions_searches', 'tech_stats_searches', 'whois_find_searches',
 ] as const;
 
 export type DeletableHistoryTable = typeof DELETABLE_HISTORY_TABLES[number];
@@ -3382,6 +3672,7 @@ export function deleteHistoryEntry(table: DeletableHistoryTable, id: string): bo
 // have a page (e.g. Reddit Mentions) are kept so past spend stays visible on older DBs.
 export const SPEND_SOURCES: Array<{ table: string; tool: string; href: string | null; tsColumn?: string }> = [
   { table: 'rank_checks', tool: 'Rank Tracker', href: '/dashboard/rank-tracker', tsColumn: 'checked_at' },
+  { table: 'ai_mode_checks', tool: 'Rank Tracker · AI Mode', href: '/dashboard/rank-tracker', tsColumn: 'checked_at' },
   { table: 'ranked_kw_searches', tool: 'Ranked Keywords', href: '/dashboard/ranked-keywords' },
   { table: 'kw_overview_searches', tool: 'Keyword Overview', href: '/dashboard/keyword-overview' },
   { table: 'competitors_searches', tool: 'Competitors', href: '/dashboard/competitors' },
@@ -3391,7 +3682,9 @@ export const SPEND_SOURCES: Array<{ table: string; tool: string; href: string | 
   { table: 'top_searches_searches', tool: 'Top Searches', href: '/dashboard/top-searches' },
   { table: 'domain_tech_searches', tool: 'Technologies', href: '/dashboard/domain-analytics/technologies' },
   { table: 'domain_find_searches', tool: 'Technologies', href: '/dashboard/domain-analytics/technologies' },
+  { table: 'tech_stats_searches', tool: 'Technologies', href: '/dashboard/domain-analytics/technologies' },
   { table: 'domain_whois_searches', tool: 'Whois', href: '/dashboard/domain-analytics/whois' },
+  { table: 'whois_find_searches', tool: 'Whois', href: '/dashboard/domain-analytics/whois?mode=find' },
   { table: 'domain_categories_searches', tool: 'Categories', href: '/dashboard/domain-analytics/categories' },
   { table: 'keyword_ideas_searches', tool: 'Keyword Ideas', href: '/dashboard/keyword-ideas' },
   { table: 'search_intent_searches', tool: 'Search Intent', href: '/dashboard/search-intent' },

@@ -6,6 +6,10 @@
 
 SEO Playground is actively evolving. Highlights of the latest releases:
 
+### Next release
+
+- 🗑️ **Delete saved searches** — every tool's history now has a trash icon to remove a search and its saved results, after confirmation. What it cost stays counted in Spending.
+
 ### v0.7.0 — 2026-11-04
 
 - 📍 **GBP Category Audit** — compare a Google Business Profile's primary and additional categories with local competitors, with recommendations and CSV export.

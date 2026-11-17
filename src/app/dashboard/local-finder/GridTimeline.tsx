@@ -7,6 +7,7 @@ import { DEFAULT_GRID_LAYOUT, describeGridLayout, gridPointCount } from '@/lib/g
 import { GridSnapshotSelectionProvider, GridSelectedSnapshotExportButton } from './GridSnapshotSelection';
 import GridScheduleControl from './GridScheduleControl';
 import GridAnalysisPanel from './GridAnalysisPanel';
+import GridComparePanel from './GridComparePanel';
 import GridRunButton from './GridRunButton';
 import DeleteMonitorButton from './DeleteMonitorButton';
 import { type GridMapSnapshot } from './GridSnapshotMapPanel';
@@ -65,6 +66,11 @@ export default function GridTimeline({ entry, snapshots, schedule, brandName, br
           center={entry.center}
           language={entry.language}
         />
+        {snapshots.length > 1 && (
+          <div className="mt-6">
+            <GridComparePanel snapshots={snapshots} gridSize={entry.grid_size} target={entry.target} keyword={entry.keyword} />
+          </div>
+        )}
       </div>
 
       <details className="group border-t border-slate-200 dark:border-slate-800" open={!!schedule}>

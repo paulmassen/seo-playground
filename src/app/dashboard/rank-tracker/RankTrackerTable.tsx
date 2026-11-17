@@ -3,7 +3,7 @@
 import { METRIC_HINTS } from '@/lib/metric-glossary';
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
-import type { TrackedKeyword, RankCheck } from '@/lib/db';
+import type { TrackedKeyword, RankCheck, AiModeCheck } from '@/lib/db';
 import KeywordRow from './KeywordRow';
 
 interface Row {
@@ -11,9 +11,10 @@ interface Row {
   history: RankCheck[];
   latest: RankCheck | null;
   previous: RankCheck | null;
+  aiModeHistory: AiModeCheck[];
 }
 
-type SortKey = 'keyword' | 'position' | 'trend' | 'checked';
+type SortKey = 'keyword' | 'position' | 'aiMode' | 'trend' | 'checked';
 type SortDir = 'asc' | 'desc';
 
 function sortValue(row: Row, key: SortKey): number | string {
@@ -27,6 +28,11 @@ function sortValue(row: Row, key: SortKey): number | string {
       return prev - curr;
     }
     case 'checked': return row.latest?.checkedAt ?? -1;
+    case 'aiMode': {
+      const latest = row.aiModeHistory[0];
+      if (!latest) return row.kw.aiMode ? 900 : 1000;
+      return latest.status === 'cited' ? latest.citationPosition ?? 99 : latest.status === 'not_cited' ? 500 : 800;
+    }
   }
 }
 
@@ -39,11 +45,13 @@ interface Props {
   rows: Row[];
   hasCreds: boolean;
   pendingKeywordIds: number[];
+  pendingAiModeIds: number[];
   checkAction: (fd: FormData) => Promise<void>;
   removeAction: (fd: FormData) => Promise<void>;
+  aiModeAction: (fd: FormData) => Promise<void>;
 }
 
-export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, checkAction, removeAction }: Props) {
+export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, pendingAiModeIds, checkAction, removeAction, aiModeAction }: Props) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -61,13 +69,13 @@ export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, ch
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortKey(key); setSortDir(key === 'keyword' ? 'asc' : 'desc'); }
+    else { setSortKey(key); setSortDir(key === 'keyword' || key === 'aiMode' ? 'asc' : 'desc'); }
   }
 
   function Header({ label, sortK, align, className, hint }: { label: string; sortK: SortKey; align: 'left' | 'center'; className?: string; hint?: string }) {
     const active = sortKey === sortK;
     return (
-      <th title={hint} className={`px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left' : 'text-center'} ${className ?? ''}`}
+      <th title={hint} className={`px-2 py-3 whitespace-nowrap text-[10px] font-black text-slate-400 uppercase tracking-widest select-none cursor-pointer hover:text-slate-600 dark:hover:text-slate-200 ${align === 'left' ? 'text-left' : 'text-center'} ${className ?? ''}`}
           onClick={() => toggleSort(sortK)}>
         <span className={`inline-flex items-center gap-1 ${align === 'center' ? 'justify-center w-full' : ''}`}>
           <span className={hint ? 'underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-[3px] cursor-help' : undefined}>{label}</span>
@@ -78,32 +86,38 @@ export default function RankTrackerTable({ rows, hasCreds, pendingKeywordIds, ch
   }
 
   return (
+    <div className="overflow-x-auto">
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-slate-50 dark:border-slate-800">
           <Header label="Keyword" sortK="keyword" align="left" className="!px-5" />
           <Header label="Pos." hint={METRIC_HINTS.position} sortK="position" align="center" />
+          <Header label="AI Mode" hint="Google AI Mode: #n is the domain's rank among the sites the answer cites. Opt in per keyword." sortK="aiMode" align="center" />
           <Header label="Trend" hint={METRIC_HINTS.rankTrend} sortK="trend" align="center" />
-          <th className="text-center px-3 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">14d</th>
+          <th className="text-center px-2 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">14d</th>
           <Header label="Checked" sortK="checked" align="left" />
-          <th className="px-3 py-3"></th>
+          <th className="px-2 py-3"><span className="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-        {sorted.map(({ kw, history, latest, previous }) => (
+        {sorted.map(({ kw, history, latest, previous, aiModeHistory }) => (
           <KeywordRow
             key={kw.id}
             kw={kw}
             history={history}
             latest={latest}
             previous={previous}
+            aiModeHistory={aiModeHistory}
             hasCreds={hasCreds}
             pending={pendingKeywordIds.includes(kw.id)}
+            aiModePending={pendingAiModeIds.includes(kw.id)}
             checkAction={checkAction}
             removeAction={removeAction}
+            aiModeAction={aiModeAction}
           />
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

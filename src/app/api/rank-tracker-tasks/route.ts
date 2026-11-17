@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getActiveProject, getCredentials, getRankTaskActivity } from '@/lib/db';
 import { collectRankProgress } from '@/lib/rank-progress';
+import { collectAiModeProgress } from '@/lib/ai-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,11 @@ export async function GET() {
   const credentials = getCredentials();
   if (credentials) {
     try {
-      await collectRankProgress(project.id, credentials);
+      await Promise.all([
+        collectRankProgress(project.id, credentials),
+        // AI Mode checks are not listed in the bell; they are collected here so they finish in the background too.
+        collectAiModeProgress(project.id, credentials).catch(() => undefined),
+      ]);
     } catch {
       // Keep the task in the feed; the next top-bar poll retries collection.
     }

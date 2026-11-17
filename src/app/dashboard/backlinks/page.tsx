@@ -202,7 +202,8 @@ async function BacklinksPage({ searchParams }: { searchParams: Promise<RawParams
     } else {
       error = 'This search is no longer available.';
     }
-  } else if (q.target) {
+  } else if (q.target && params.prefill !== '1') {
+    // prefill=1 (links from other tools) only fills the form: no paid call until the user submits.
     const key = queryKey(q);
     const dedupeId = stableSearchId(['backlinks-v2', key]);
     const cachedSummary = getBacklinksResult<BacklinksSummary>(dedupeId);
