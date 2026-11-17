@@ -1,3 +1,9 @@
+[0.8.0]
+* New Backlinks workspace: up to 8 server-side filters, live/lost/all and one-per-domain/anchor views, loaded-result quick filters, richer link details, clickable summary breakdowns and a 27-column CSV export
+* New Rank Tracker Google AI Mode tracking with per-keyword/domain opt-in, citation history and costs; new Geo-grid snapshot comparison with point-by-point changes and CSV export
+* Delete saved searches from every tool history while retaining historical Spending totals; expanded Technologies, Whois and Historical Rank analysis views
+* Ranks are consistently displayed on the 0–100 scale with shared metric tooltips; saved analytics histories restore more query state
+
 [0.7.0]
 * New GBP Category Audit, project overview dashboard and spending breakdown by project
 * Geo-grid: top 10 or top 20 results, grids up to 15×15, grid-local scheduling, competitor addresses and Coverage, ARP and SoLV metrics

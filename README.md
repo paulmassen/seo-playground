@@ -6,9 +6,13 @@
 
 SEO Playground is actively evolving. Highlights of the latest releases:
 
-### Next release
+### v0.8.0 — 2026-11-17
 
-- 🗑️ **Delete saved searches** — every tool's history now has a trash icon to remove a search and its saved results, after confirmation. What it cost stays counted in Spending.
+- 🔗 **Backlinks workspace** — filter live, lost or all links, group by domain or anchor, explore enriched link data and export the active view.
+- 🤖 **Google AI Mode in Rank Tracker** — opt in by keyword or domain to see when Google AI Mode cites you, the cited-domain rank and citation changes over time.
+- 🗺️ **Free Geo-grid snapshot comparisons** — compare any two saved monitor runs point by point, see local-pack changes and export the comparison.
+- 🗑️ **Delete saved searches** — every tool history now lets you remove a search and its saved results after confirmation, while historical costs remain in Spending.
+- 📈 **More complete domain analysis** — new Technologies, Whois and Historical Rank views; richer saved query state across analytics tools.
 
 ### v0.7.0 — 2026-11-04
 

@@ -7,18 +7,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] — 2026-11-17
+
 ### Added
-- **Backlinks: filters, grouping and richer data** — choose one link per domain or per anchor, live / lost / all links, and up to 8 DataForSEO filters (minimum domain or page rank, maximum spam score, link type, anchor, source domain, target URL, country, language, platform, first seen date, new only, subdomains, internal links). Results are paginated beyond 1,000 links.
-- **Instant filters on loaded backlinks** — free text search, toggles (dofollow, new, lost, broken, indirect, in content, ranking source page, low spam, uncrowded page, original) and *By domain* / *By target page* views, with no extra API call.
-- **More per-link data** — spam score, source page title and rank, keywords the source page ranks for, context around the anchor, indirect redirect/canonical path and badges. The CSV export now has 27 columns and follows the active filters.
-- **Clickable summary breakdowns** — link types, attributes, platforms, countries, position in page and TLDs; clicking a bar loads the matching backlinks. New "See lost links", "See new links" and "One link per domain" shortcuts.
-- **Delete saved searches** — a trash icon on each entry of every tool's history (SERP, keywords, domains, backlinks, AI, On-Page, Google Reviews…) removes the search and its saved results after confirmation. Deleting the search on screen reopens the empty tool without a new API call, and its cost is kept so Spending totals don't change.
-- **Geo-grid: compare two snapshots** — under a monitor's map, "Compare two snapshots" picks any two runs (oldest against newest by default) and shows the change at every grid point: now found, moved up, no change, moved down, no longer found. Switch the map between *Change*, *Before* and *After*; each pin's popup lists both local packs and the businesses that entered or left the top 3. Visibility, Coverage, ARP and SoLV show before → after with their change, and "Who moved in the local pack" ranks competitors by their change in top 3 share and by the points where they took your spot. Exports to CSV. Built from saved snapshots only, so it costs nothing.
-- **Rank Tracker: Google AI Mode tracking** — opt in per keyword (the **AI** button on a row, "Also track Google AI Mode" when adding keywords, or "Track all" for a domain). Each check then also posts a Google AI Mode Standard task (about $0.0012 per keyword, shown before you opt in) alongside the organic check, including scheduled runs. The new *AI Mode* column shows whether the domain is cited and its rank among the cited sites, with "new" / "lost" against the previous check. Expanding a keyword lists the cited sites per day, the ones that are new or dropped out, and the AI Mode answer itself. The CSV / Markdown export gains an *AI Mode* column, and the cost appears in Spending as "Rank Tracker · AI Mode". Existing keywords stay organic only; the database gains the `ai_mode_checks` and `ai_mode_tasks` tables and a `tracked_keywords.ai_mode` column automatically on startup.
+- **Backlinks: filters, grouping and richer data** — choose one link per domain or per anchor, live / lost / all links, and up to 8 DataForSEO filters: minimum domain or page rank, maximum spam score, link type, anchor, source domain, target URL, country, language, platform, first seen date, new only, subdomains and internal links. Results are paginated beyond 1,000 links.
+- **Instant filters on loaded backlinks** — free-text search, toggles (dofollow, new, lost, broken, indirect, in content, ranking source page, low spam, uncrowded page and original) and *By domain* / *By target page* views, without an extra API call.
+- **Richer Backlinks records and exports** — show spam score, source page title and rank, ranking keywords, anchor context, indirect redirect/canonical paths and status badges. The CSV export now has 27 columns and follows the active filters.
+- **Clickable Backlinks summaries** — filter from type, attribute, platform, country, position and TLD breakdowns; use new *See lost links*, *See new links* and *One link per domain* shortcuts.
+- **Delete saved searches** — every tool history now has a confirmed delete action that removes a search and its saved results. Deleting the search on screen returns to the empty tool without a new paid call; its historical cost remains in Spending.
+- **Geo-grid snapshot comparison** — compare any two saved monitor runs (oldest to newest by default), inspect point-by-point gains, losses and rank changes in *Change*, *Before* or *After* map modes, and see local-pack entrants/leavers. Visibility, Coverage, ARP and SoLV show before → after deltas; competitor movement and a CSV export are included. The comparison only uses saved data and costs nothing.
+- **Rank Tracker: Google AI Mode tracking** — opt in per keyword, while adding keywords, or for a whole domain. Opted-in checks also submit Google AI Mode Standard tasks (about $0.0012 per keyword, disclosed before activation), including scheduled runs. The AI Mode column reports citations, citation rank and new/lost status; expanded rows show the answer and cited domains over time. CSV and Markdown exports include AI Mode, and costs appear in Spending as *Rank Tracker · AI Mode*. Existing keywords remain organic-only until opted in.
+- **Richer domain-analysis workflows** — Technologies adds Find, adoption and comparison views; Whois adds saved lookup and filtered-find views; Historical Rank adds trend and monthly-table views. Competitors, Categories, intersections, Ranked Keywords, Subdomains and Traffic Estimation retain richer query state in their saved histories.
+
+### Changed
+- **Ranks are consistently explained and displayed on a 0–100 scale** — shared tooltips clarify metrics throughout the dashboard, and affected Backlinks, competitor and domain-analysis views now use the same rank scale.
+- **Saved result views preserve more context** — history reloads restore query filters, sorting, pagination and date parameters across the updated analytics tools.
+- **Authentication middleware includes the public landing route and its explicit static assets** while continuing to protect dashboard routes and private APIs when login is enabled.
 
 ### Fixed
 - **Backlinks domain rank badge** — ranks are now requested on the 0–100 scale (previously 0–1000, which turned almost every badge green). Older saved searches are rescaled when reopened.
-- **Backlinks "Type" column** always showed "backlink"; it now shows the real link type (anchor, image, redirect, canonical…).
+- **Backlinks "Type" column** — it no longer always says "backlink"; it now shows the actual link type (anchor, image, redirect, canonical and more).
+- **Rank Tracker AI Mode task handling** — database-backed task reservation prevents duplicate pending AI Mode checks, failed submissions do not remain pending, and task collection records the corresponding spend.
 
 ---
 
